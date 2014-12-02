@@ -1,0 +1,53 @@
+include common.mk
+
+NSPR_PATH=$(shell pwd)/$(DEP_DIR)/nspr/nspr-4.10.1/nspr
+
+ifdef LINUX_BUILD
+PICOEV_SOURCE = picoev_epoll.c
+endif
+ifdef DARWING_BUILD
+PICOEV_SOURCE = picoev_kqueue.c
+endif
+ifdef GENERIC_BUILD
+PICOEV_SOURCE = picoev_selectl.c
+endif
+
+
+
+all: $(LIBS)
+
+###############################################################################
+# picoev: a tiny event loop for network applications, faster than libevent or libev
+###############################################################################
+$(LIB_PICOEV): $(DIR_PICOEV)
+	@echo $@
+	@cd $(DIR_PICOEV) && \
+	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o picoev.o $(PICOEV_SOURCE) && \
+	$(AR) cr libpicoev.a picoev.o && \
+	$(RANLIB) libpicoev.a
+
+$(DIR_PICOEV):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	git clone https://github.com/kazuho/picoev.git && \
+	cd ./picoev && \
+	cp picoev_epoll.c picoev_epoll.c.org && \
+	sed -e"s/^  assert(PICOEV_FD_BELONGS_TO_LOOP/  memset( \&ev, 0, sizeof( ev ) );\n  assert(PICOEV_FD_BELONGS_TO_LOOP/" picoev_epoll.c.org > picoev_epoll.c
+
+
+###############################################################################
+# Boilerplate
+###############################################################################
+.PHONEY: clean propperclean
+
+clean:
+	@echo cleaning some
+	@rm -rf $(LIBS)
+
+propperclean:
+	@echo cleaning all
+	@rm -rf $(shell find $(DEP_DIR) -type d)
+
+
+
+# vim: ts=4 sts=4 sw=4 noet nu

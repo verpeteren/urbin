@@ -1,0 +1,4 @@
+config.mk
+gmon.out
+*.swp
+
