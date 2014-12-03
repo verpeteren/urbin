@@ -2,10 +2,11 @@ include ./common.mk
 
 HEADERS = common.h config.h
 DEBUG_FLAGS = -p -pg -g -g3 -ggdb -fno-builtin-strlen
-RELEASE_FLAGS = -O2
+RELEASE_FLAGS = -O3
 CFLAGS = $(RELEASE_FLAGS) $(DEBUG_FLAGS) $(GET_OFF_MY_LAWN)
 HAVES = 
 LDFLAGS=-Wl,-z,relro -Wl,-z,now
+# -pg
 
 CORE_DIR=./core
 FEAT_DIR=./feature

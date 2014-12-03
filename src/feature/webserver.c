@@ -73,6 +73,8 @@ struct webclient * Webclient_New( struct webserver * webserver, int socketFd) {
 		webclient->response.end = 0;
 		webclient->response.headersSent = 0;
 		webclient->response.contentSent = 0;
+		webclient->connection = CONNECTION_Close;
+		webclient->mode = MODE_Get;
 		memset( webclient->buffer, '\0', HTTP_BUFF_LENGTH );
 		webclient->response.httpCode = 500;
 		webclient->response.contentLength = 0;
@@ -87,9 +89,71 @@ struct webclient * Webclient_New( struct webserver * webserver, int socketFd) {
 	return webclient;
 
 }
+void Webclient_Route( struct webclient * webclient ) {
+	struct {unsigned int good:1;
+			unsigned int h3:1;
+			unsigned int content:1;} cleanUp;
+	size_t i;
+	HeaderField * field;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( webclient->header = h3_request_header_new( ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.h3 = 1;
+	}
+	cleanUp.good = ( ( h3_request_header_parse( webclient->header, webclient->buffer, strlen( webclient->buffer ) ) ) == 0  );
+	if ( cleanUp.good ) {
+		//printf ("%s", webclient->buffer);
+//		fprintf( stdout, "Method: %.*s\n", webclient->header->RequestMethodLen, webclient->header->RequestMethod) ;
+//	    fprintf( stdout, "Request-URI: %.*s\n", webclient->header->RequestURILen, webclient->header->RequestURI );
+  //  	fprintf( stdout, "HTTP-Version: %.*s\n", webclient->header->HTTPVersionLen, webclient->header->HTTPVersion );
+//		foreaderFieldList
+		//char * conn;
+		//conn = h3_get_connection( webclient->header->Fields );
+		//h3_get_connection( webclient->header );
+				//strndup( webclient->header->Connection, webclient->header->ConnectionLen );
+		//printf("------------>%s\n", conn );
+
+
+		if ( strncmp( webclient->header->RequestMethod, "POST", webclient->header->RequestMethodLen) == 0 ) {
+			webclient->mode = MODE_Post;
+		}
+		for ( i = 0; i < webclient->header->HeaderSize; i++ ) {
+			field = &webclient->header->Fields[i];
+			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) { //todo: RTFSpec! only if http1.1 yadayadyada...
+				if ( strncmp( field->Value, "Keep-Alive", field->ValueLen ) == 0 ) {
+					webclient->connection = CONNECTION_KeepAlive;
+				} else 	if ( strncmp( field->Value, "close", field->ValueLen ) == 0 ) {
+					webclient->connection = CONNECTION_Close;
+				}
+			}
+		}
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( webclient->response.content = strdup( "<html><body><h1>It works!</h1>" "\n"
+																"<p>This is the default web page for this server.</p>" "\n"
+																"<p>The web server software is running but no content has been added, yet.</p>" "\n"
+																"</body></html>" "\n" ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.content = 1;
+		webclient->response.contentLength = strlen( webclient->response.content );
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.content ) {
+			free( webclient->response.content ); webclient->response.content = NULL;
+			webclient->response.contentLength = 0;
+		}
+		if ( cleanUp.h3 ) {
+			h3_request_header_free( webclient->header );
+		}
+	}
+
+}
+
 void Webclient_Reset( struct webclient * webclient ) {
 	if ( webclient->header )  {
-		free( webclient->header ); webclient->header = NULL;
+		h3_request_header_free( webclient->header ); webclient->header = NULL;
 	}
 	memset( webclient->buffer, '\0', strlen( webclient->buffer ) );
 	webclient->response.httpCode = 500;
@@ -98,13 +162,15 @@ void Webclient_Reset( struct webclient * webclient ) {
 	webclient->response.end = 0;
 	webclient->response.headersSent = 0;
 	webclient->response.contentSent = 0;
+	webclient->connection = CONNECTION_Close;
+	webclient->mode = MODE_Get;
 	if ( webclient->response.content ) {
 		free( webclient->response.content ); webclient->response.content = NULL;
 	}
 }
 void Webclient_Delete( struct webclient * webclient ) {
 	if ( webclient->header )  {
-		free( webclient->header );
+		h3_request_header_free( webclient->header );
 	}
 	webclient->response.httpCode = 500;
 	webclient->response.contentLength = 0;
@@ -112,6 +178,8 @@ void Webclient_Delete( struct webclient * webclient ) {
 	webclient->response.end = 0;
 	webclient->response.headersSent = 0;
 	webclient->response.contentSent = 0;
+	webclient->connection = CONNECTION_Close;
+	webclient->mode = MODE_Get;
 	if ( webclient->response.content )  {
 		free( webclient->response.content ); webclient->response.content = NULL;
 	}
@@ -160,6 +228,7 @@ static void Webserver_HandleRead_cb( picoev_loop* loop, int fd, int events, void
 			break;
 		default: /* got some data, send back */
 			picoev_del( loop, fd );
+			Webclient_Route( webclient );
 			picoev_add( loop, fd, PICOEV_WRITE, webclient->webserver->timeout_sec , Webserver_HandleWrite_cb, wc_arg );
 			break;
 		}
@@ -181,10 +250,6 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 		/* update timeout, and write */
 
 		picoev_set_timeout( loop, fd, webclient->webserver->timeout_sec );
-		/*todo handler */{
-			webclient->response.content = strdup( "<html><body><h1>Hello</h1></body></html>" );
-			webclient->response.contentLength = strlen( webclient->response.content );
-		}
 		if ( ! webclient->response.headersSent ) {
 			ssize_t headerLength, wroteHeader;
 			struct tm tm;
@@ -195,7 +260,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 
 			webclient->response.end = time( 0 );	//todo
 			contentTypeString = "text/html"; // mime.applicationString;
-			connectionString = "Close";//"Keep-Alive";
+			connectionString = (webclient->connection == CONNECTION_Close ) ?  "Close" : "Keep-Alive";
 			gmtime_r( &webclient->response.end , &tm);
 			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", &tm );
 			headerLength = HTTP_SERVER_TEMPLATE_SIZE;
@@ -253,10 +318,10 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 		}
 		if ( ! connClosed && webclient->response.headersSent && webclient->response.contentSent ) {
 			//listen again
-			if ( 0 /*not implemented yet Keepalive*/ ) {
-					picoev_del( loop, fd );
-					Webclient_Reset( webclient );
-					picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeout_sec , Webserver_HandleRead_cb, wc_arg );
+			if ( webclient->connection == CONNECTION_KeepAlive) {
+				picoev_del( loop, fd );
+				Webclient_Reset( webclient );
+				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeout_sec , Webserver_HandleRead_cb, wc_arg );
 			} else {
 				CloseConn( webclient );
 				connClosed = 1;

@@ -32,7 +32,6 @@ int main( int argc, const char ** argv ) {
 	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( webserver = Webserver_New( core, "127.0.0.1", 8080, 7 ) )  != NULL );
-
 	}
 	if ( cleanUp.good ) {
 		signal( SIGUSR2, &signalHandler );
@@ -41,7 +40,7 @@ int main( int argc, const char ** argv ) {
 		Core_Loop( core );
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.core ) {
+		if ( cleanUp.webserver ) {
 			Webserver_Delete( webserver );
 		}
 		if ( cleanUp.core ) {
