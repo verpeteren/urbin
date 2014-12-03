@@ -2,19 +2,31 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <fcntl.h>
 
 #include "../config.h"
 #include "core.h"
 
-void Boot( ) {
+void Core_Boot( ) {
 	fprintf( stdout, "Starting\n" );
 	picoev_init( MAX_FDS );
 }
 
-void Shutdown( ) {
+void Core_Shutdown( ) {
 	fprintf( stdout, "Shutdown\n" );
 	picoev_deinit( );
 }
+
+void SetupSocket( int fd ) {
+	int on, r;
+	
+	on = 1;
+	r = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof( on ) );
+	assert( r == 0 );
+	r = fcntl( fd, F_SETFL, O_NONBLOCK );
+	assert( r == 0 );
+}
+
 struct Core * Core_New( ) {
 	struct {unsigned int good:1;
 		unsigned int loop:1;
@@ -56,4 +68,3 @@ void Core_Delete( struct Core * core ) {
 	picoev_destroy_loop( core->loop );
 	free( core );
 }
-

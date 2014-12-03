@@ -1,11 +1,12 @@
-#ifndef __APE_COMMON_H_
+#ifndef __RONJA_COMMON_H_
 
-#define __APE_COMMON_H_
+#define __RONJA_COMMON_H_
 
-#define MAX_FDS 			1024
+#define MAX_FDS 				1024
 #define LOOP_TIMEOUT			60
+#define LISTEN_BACKLOG			100
 
+#define PR_NAME					"RONJA"
+#define PR_VERSION				"0.0.6a"
 #endif
 
-
-// vim: ts=4 sts=4 sw=4 noet nu

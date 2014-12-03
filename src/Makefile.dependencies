@@ -36,6 +36,22 @@ $(DIR_PICOEV):
 
 
 ###############################################################################
+# H3 - The Fast HTTP header parser library  
+###############################################################################
+$(LIB_H3): $(DIR_H3)
+	@echo $@
+	@cd $(DIR_H3) && \
+	make -f Makefile.dist
+
+$(DIR_H3):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q https://github.com/c9s/h3/archive/master.zip -O h3.zip && \
+	unzip -qq h3.zip && \
+	mv h3-master h3
+
+
+###############################################################################
 # Boilerplate
 ###############################################################################
 .PHONEY: clean propperclean
