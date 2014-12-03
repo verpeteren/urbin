@@ -14,6 +14,10 @@ enum Mode{
 	MODE_Get,
 	MODE_Post
 };
+enum ContentType{
+	CONTENTTYPE_Buffer,
+	CONTENTTYPE_File,
+};
 
 enum Connection{
 	CONNECTION_Close,
@@ -21,7 +25,8 @@ enum Connection{
 };
 
 enum HttpCode {
-	HTTPCODE_OK					= 200,
+	HTTPCODE_None				= 0,
+	HTTPCODE_Ok					= 200,
 	HTTPCODE_Forbidden			= 403,
 	HTTPCODE_NotFound			= 404,
 	HTTPCODE_Error				= 500,
@@ -56,7 +61,7 @@ struct Mime {
 
 struct webserver {
 	struct Core *				core;
-	int							port;
+	uint16_t					port;
 	int							socketFd;
 	int							timeout_sec;
 	const char *				ip;
@@ -73,9 +78,10 @@ struct webclient{
 	struct {
 			unsigned int			headersSent:1;
 			unsigned int			contentSent:1;
-			enum HttpCode			httpCode;
 			int						contentLength;
+			enum HttpCode			httpCode;
 			enum MimeType			mimeType;
+			enum ContentType		contentType;
 			char *	 				content;
 			time_t					start;
 			time_t					end;
@@ -89,7 +95,7 @@ void 							Webclient_Delete		( struct webclient * webclient );
 
 void							SetupSocket				( int fd );
 
-struct webserver *				Webserver_New			( struct Core * core, const char * ip, const int port, const int timeout_sec );
+struct webserver *				Webserver_New			( struct Core * core, const char * ip, const uint16_t port, const int timeout_sec );
 void 							Webserver_JoinCore		( struct webserver * webserver );
 void							Webserver_Delete		( struct webserver * webserver );
 

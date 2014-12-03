@@ -12,7 +12,8 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <math.h>
-
+#include <sys/stat.h>
+#include <sys/sendfile.h>
 
 #include "webserver.h"
 
@@ -65,6 +66,7 @@ struct Mime MimeTypeDefinitions[] = {
 static void Webserver_HandleRead_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
 static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
 static void Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
+static void Webclient_RenderRoute( struct webclient * webclient );
 
 void SetupSocket( int fd ) {
 	int on, r;
@@ -98,12 +100,13 @@ struct webclient * Webclient_New( struct webserver * webserver, int socketFd) {
 		webclient->response.start = time( 0 );
 		webclient->response.end = 0;
 		webclient->response.mimeType = MIMETYPE_Html;
+		webclient->response.contentType = CONTENTTYPE_Buffer;
+		webclient->response.httpCode = HTTPCODE_Ok;
 		webclient->response.headersSent = 0;
 		webclient->response.contentSent = 0;
 		webclient->connection = CONNECTION_Close;
 		webclient->mode = MODE_Get;
 		memset( webclient->buffer, '\0', HTTP_BUFF_LENGTH );
-		webclient->response.httpCode = HTTPCODE_Error;
 		webclient->response.contentLength = 0;
 		webclient->response.content = NULL;
 	}
@@ -114,8 +117,144 @@ struct webclient * Webclient_New( struct webserver * webserver, int socketFd) {
 	}
 
 	return webclient;
-
 }
+/*
+void WebClient_Render( struct webclient * webclient) {
+		webclient->response.httpCode = HTTPCODE_OK;
+		webclient->response.mimeType = MIMETYPE_Html;
+		webclient->response.content = strdup( 	"<html><body><h1>It works!</h1>" "\n"
+												"<p>This is the default web page for this server.</p>" "\n"
+												"<p>The web server software is running but no content has been added, yet.</p>" "\n"
+												"</body></html>" "\n" ) ) != NULL );
+		webclient->response.contentLength = strlen( webclient->response.content );
+}
+*/
+static void Webclient_RenderRoute( struct webclient * webclient ) {
+		const char * documentRoot;
+		char * fullPath;
+		const char * requestedPath;
+		size_t fullPathLength, pathLength;
+		struct {unsigned int good:1;
+				unsigned int fullPath:1;
+				unsigned int content:1;} cleanUp;
+		int exists;
+		size_t j, len;
+		struct stat fileStat;
+
+		memset( &cleanUp, '\0', sizeof( cleanUp ) );
+		fullPath = NULL;
+		webclient->response.contentType = CONTENTTYPE_File;
+		documentRoot = "/var/www";
+		requestedPath = "/";
+		pathLength = strlen( requestedPath );
+		//  check that the file is not higher then the documentRoot ( ../../../../etc/passwd )
+		for ( j = 0; j < pathLength - 1; j++ ) {
+			if ( requestedPath[j] == '.' && requestedPath[ j + 1] == '.' ) {
+				webclient->response.httpCode = HTTPCODE_Forbidden;
+				break;
+			}
+		}
+		cleanUp.good = ( webclient->response.httpCode == HTTPCODE_Ok );
+		if ( cleanUp.good ) {
+			fullPathLength = strlen( documentRoot ) + pathLength + 13;  //  13: that is  '/' + '/' + 'index.html' + '\0'
+			cleanUp.good = ( ( fullPath = malloc( fullPathLength ) ) != NULL );   //  if all goes successfull, this is stored in ->content, wich is free'd normally
+
+		}
+		if ( cleanUp.good ) {
+			cleanUp.fullPath = 1;
+		}
+		if ( cleanUp.good ) {
+			cleanUp.fullPath = 1;
+			snprintf( fullPath, fullPathLength, "%s/%s", documentRoot, requestedPath );
+			exists = stat( fullPath, &fileStat );
+			if ( exists == 0 ) {
+				webclient->response.httpCode = HTTPCODE_Ok;
+				if ( S_ISDIR( fileStat.st_mode ) ) {
+					//  if it is a dir, and has a index.html file that is readable, use that
+					snprintf( fullPath, fullPathLength, "%s/%s/index.html", documentRoot, requestedPath );
+					exists = stat( fullPath, &fileStat );
+					if ( exists != 0 ) {
+						//  @TODO: this is the place where a directory index handler can step into the arena
+						webclient->response.httpCode = HTTPCODE_NotFound;
+					}
+				}
+				//  all looks ok, we have accecss to a file
+				if ( webclient->response.httpCode == HTTPCODE_Ok ) {
+					webclient->response.contentLength = fileStat.st_size;
+					webclient->response.content = fullPath;
+					fullPathLength = strlen( fullPath );
+					//  determine mimetype
+					for ( j = 0; j < __MIMETYPE_Last; j++ ) {
+						len = strlen( MimeTypeDefinitions[j].ext );
+						if ( strncmp( &fullPath[fullPathLength - len], MimeTypeDefinitions[j].ext, len ) == 0 ) {
+							webclient->response.mimeType = MimeTypeDefinitions[j].mime;
+							break;
+						}
+					}
+					//  TODO: this is the place where a module handler can step into the arena ( e.g. .js / .py / .php )
+				}
+			} else {
+				webclient->response.httpCode = HTTPCODE_NotFound;
+			}
+		}
+		switch ( webclient->response.httpCode ) {
+		case HTTPCODE_Error:
+			if ( webclient->response.contentType == CONTENTTYPE_File && webclient->response.content ) {
+				free( webclient->response.content ); webclient->response.content = NULL;
+			}
+			webclient->response.contentType = CONTENTTYPE_Buffer;
+			webclient->response.mimeType = MIMETYPE_Html;
+			cleanUp.good  = ( ( webclient->response.content =  strdup( 	"<html><body><h1>Internal Server Error</h1>" "\n"
+																		"</body></html>" "\n" ) ) != NULL );
+			if ( cleanUp.good ) {
+				cleanUp.content = 1;
+				webclient->response.contentLength = strlen( webclient->response.content );
+			}
+			break;
+		case HTTPCODE_Forbidden:
+			if ( webclient->response.contentType == CONTENTTYPE_File && webclient->response.content ) {
+				free( webclient->response.content ); webclient->response.content = NULL;
+			}
+			webclient->response.contentType = CONTENTTYPE_Buffer;
+			webclient->response.mimeType = MIMETYPE_Html;
+			cleanUp.good = ( ( webclient->response.content =  strdup( 	"<html><body><h1>Forbidden</h1>" "\n"
+																			"</body></html>" "\n" ) ) != NULL );
+			webclient->response.contentLength = strlen( webclient->response.content );
+			if ( cleanUp.good ) {
+				cleanUp.content = 1;
+				webclient->response.contentLength = strlen( webclient->response.content );
+			}
+			break;
+		case HTTPCODE_NotFound:
+			if ( webclient->response.contentType == CONTENTTYPE_File && webclient->response.content ) {
+				free( webclient->response.content ); webclient->response.content = NULL;
+			}
+			webclient->response.contentType = CONTENTTYPE_Buffer;
+			webclient->response.mimeType = MIMETYPE_Html;
+			cleanUp.good = ( ( webclient->response.content = strdup( 	"<html><body><h1>Not Found</h1>" "\n"
+																			"</body></html>" "\n" ) ) != NULL );
+			if ( cleanUp.good ) {
+				cleanUp.content = 1;
+				webclient->response.contentLength = strlen( webclient->response.content );
+			}
+			break;
+		case HTTPCODE_Ok:
+			break;
+		case HTTPCODE_None:
+			break;
+		default:
+			break;
+		}
+		if ( ! cleanUp.good ) {
+			if ( cleanUp.content )  {
+				free( webclient->response.content ); webclient->response.content = NULL;
+			}
+			if ( cleanUp.fullPath )  {
+				free( fullPath ); fullPath = NULL;
+			}
+		}
+}
+
 void Webclient_Route( struct webclient * webclient ) {
 	struct {unsigned int good:1;
 			unsigned int h3:1;
@@ -130,18 +269,6 @@ void Webclient_Route( struct webclient * webclient ) {
 	}
 	cleanUp.good = ( ( h3_request_header_parse( webclient->header, webclient->buffer, strlen( webclient->buffer ) ) ) == 0  );
 	if ( cleanUp.good ) {
-		//printf ("%s", webclient->buffer);
-//		fprintf( stdout, "Method: %.*s\n", webclient->header->RequestMethodLen, webclient->header->RequestMethod) ;
-//	    fprintf( stdout, "Request-URI: %.*s\n", webclient->header->RequestURILen, webclient->header->RequestURI );
-  //  	fprintf( stdout, "HTTP-Version: %.*s\n", webclient->header->HTTPVersionLen, webclient->header->HTTPVersion );
-//		foreaderFieldList
-		//char * conn;
-		//conn = h3_get_connection( webclient->header->Fields );
-		//h3_get_connection( webclient->header );
-				//strndup( webclient->header->Connection, webclient->header->ConnectionLen );
-		//printf("------------>%s\n", conn );
-
-
 		if ( strncmp( webclient->header->RequestMethod, "POST", webclient->header->RequestMethodLen) == 0 ) {
 			webclient->mode = MODE_Post;
 		}
@@ -157,16 +284,11 @@ void Webclient_Route( struct webclient * webclient ) {
 		}
 	}
 	if ( cleanUp.good ) {
-		webclient->response.httpCode = HTTPCODE_OK;
-		webclient->response.mimeType = MIMETYPE_Html;
-		cleanUp.good = ( ( webclient->response.content = strdup( "<html><body><h1>It works!</h1>" "\n"
-																"<p>This is the default web page for this server.</p>" "\n"
-																"<p>The web server software is running but no content has been added, yet.</p>" "\n"
-																"</body></html>" "\n" ) ) != NULL );
+		//Route found!
+		Webclient_RenderRoute( webclient );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.content = 1;
-		webclient->response.contentLength = strlen( webclient->response.content );
+		cleanUp.content = ( webclient->response.contentLength > 0 );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.content ) {
@@ -185,11 +307,12 @@ void Webclient_Reset( struct webclient * webclient ) {
 		h3_request_header_free( webclient->header ); webclient->header = NULL;
 	}
 	memset( webclient->buffer, '\0', strlen( webclient->buffer ) );
-	webclient->response.httpCode = HTTPCODE_Error;
 	webclient->response.contentLength = 0;
 	webclient->response.start = time( 0 );
 	webclient->response.end = 0;
+	webclient->response.httpCode = HTTPCODE_Ok;
 	webclient->response.mimeType = MIMETYPE_Html;
+	webclient->response.contentType = CONTENTTYPE_Buffer;
 	webclient->response.headersSent = 0;
 	webclient->response.contentSent = 0;
 	webclient->connection = CONNECTION_Close;
@@ -202,7 +325,7 @@ void Webclient_Delete( struct webclient * webclient ) {
 	if ( webclient->header )  {
 		h3_request_header_free( webclient->header );
 	}
-	webclient->response.httpCode = HTTPCODE_Error;
+	webclient->response.httpCode = HTTPCODE_None;
 	webclient->response.contentLength = 0;
 	webclient->response.start = 0;
 	webclient->response.end = 0;
@@ -210,6 +333,7 @@ void Webclient_Delete( struct webclient * webclient ) {
 	webclient->response.contentSent = 0;
 	webclient->response.mimeType = MIMETYPE_Html;
 	webclient->connection = CONNECTION_Close;
+	webclient->response.contentType = CONTENTTYPE_Buffer;
 	webclient->mode = MODE_Get;
 	if ( webclient->response.content )  {
 		free( webclient->response.content ); webclient->response.content = NULL;
@@ -279,7 +403,6 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 		connClosed = 1;
 	} else  {
 		/* update timeout, and write */
-
 		picoev_set_timeout( loop, fd, webclient->webserver->timeout_sec );
 		if ( ! webclient->response.headersSent ) {
 			ssize_t headerLength, wroteHeader;
@@ -288,7 +411,9 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 			const char * contentTypeString;
 			const char * connectionString;
 			char dateString[30];
+/*			int flags;
 
+			flags = MSG_DONTWAIT | MSG_NOSIGNAL;*/
 			webclient->response.end = time( 0 );	//todo
 			contentTypeString = "text/html"; // mime.applicationString;
 			contentTypeString  = MimeTypeDefinitions[webclient->response.mimeType].applicationString;
@@ -297,7 +422,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", &tm );
 			headerLength = HTTP_SERVER_TEMPLATE_SIZE;
 			headerLength = (ssize_t) snprintf( headerBuffer, headerLength, HTTP_SERVER_TEMPLATE, HTTP_SERVER_TEMPLATE_ARGS );
-			wroteHeader = write( fd, headerBuffer, headerLength );
+			wroteHeader = write( fd, headerBuffer, headerLength /*, flags | MSG_MORE*/ );
 			switch ( wroteHeader ) {
 			case 0: /* the other end cannot keep up */
 				break;
@@ -320,12 +445,33 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 			}
 		}
 		if ( ! connClosed && webclient->response.headersSent ) {
-			ssize_t wroteContent;
-
-			if ( ! webclient->response.content ) {
+			if ( webclient->response.contentLength == 0 ) {
 				webclient->response.contentSent = 1;
 			} else {
-				wroteContent = write( fd, webclient->response.content, webclient->response.contentLength );
+				int fileHandle;
+				ssize_t wroteContent;
+				struct {unsigned int good:1;
+						unsigned int fileHandle:1;
+				} cleanUp;
+
+				memset( &cleanUp, 0, sizeof( cleanUp ) );
+				wroteContent = 0;
+				switch( webclient->response.contentType ){
+				case  CONTENTTYPE_File:
+					cleanUp.good = ( ( fileHandle = open( webclient->response.content, O_RDONLY | O_NONBLOCK ) ) > 0 );
+					if ( cleanUp.good ) {
+						cleanUp.fileHandle = 1;
+						wroteContent = sendfile( fd, fileHandle, 0, webclient->response.contentLength );
+					}
+					if ( cleanUp.fileHandle ) {
+						close( fileHandle );
+					}
+					break;
+				default: // FT
+				case  CONTENTTYPE_Buffer:
+					wroteContent = write( fd, webclient->response.content, webclient->response.contentLength /*, flags*/ );
+				break;
+				}
 				switch ( wroteContent ) {
 				case 0: /* the other end cannot keep up */
 					break;
@@ -363,7 +509,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 }
 
 
-struct webserver * Webserver_New( struct Core * core, const char * ip, const int port, const int timeout_sec ) {
+struct webserver * Webserver_New( struct Core * core, const char * ip, const uint16_t port, const int timeout_sec ) {
 	struct {unsigned int good:1;
 		unsigned int ip:1;
 		unsigned int socket:1;
