@@ -16,6 +16,32 @@
 
 #include "webserver.h"
 
+const char * MethodDefinitions[ ] = {
+	"GET",
+	"POST"
+};
+
+struct Mime MimeTypeDefinitions[] = {
+	{ MIMETYPE_Html,				"html", "text/html" },
+	{ MIMETYPE_Txt,					"txt", "text/plain" },
+	{ MIMETYPE_Css,					"css", "text/css" },
+	{ MIMETYPE_Htm,					"htm", "text/html" },
+	{ MIMETYPE_Js,					"js", "application/javascript" },
+	{ MIMETYPE_Gif,					"gif", "image/gif" },
+	{ MIMETYPE_Jpg,					"jpg", "image/jpg" },
+	{ MIMETYPE_Jpeg,				"jpeg", "image/jpeg"},
+	{ MIMETYPE_Png,					"png", "image/png" },
+	{ MIMETYPE_Ico,					"ico", "image/ico" },
+	{ MIMETYPE_Zip,					"zip", "image/zip" },
+	{ MIMETYPE_Gz,					"gz", "image/gz"  },
+	{ MIMETYPE_Tar,					"tar", "image/tar" },
+	{ MIMETYPE_Xml,					"xml", "application/xml  " },
+	{ MIMETYPE_Svg,					"svg", "image/svg+xml" },
+	{ MIMETYPE_Json,				"json", "application/json" },
+	{ MIMETYPE_Csv,					"csv", " application/vnd.ms-excel" },
+	{ __MIMETYPE_Last,				'\0', "application/octet-stream"}
+};
+
 //  http://stackoverflow.com/questions/4143000/find-the-string-length-of-an-int
 #define STRING_LENGTH_OF_INT( value ) (ssize_t) ( value == 0 ? 1 : ( log10( value ) + 1 ) )
 #define HTTP_SERVER_TEMPLATE "HTTP/1.1 %d OK\r\nContent-Length: %d\r\nConnection: %s\r\nContent-Type: %s\r\nDate: %s\r\nServer: %s/%s\r\n\r\n"
@@ -71,12 +97,13 @@ struct webclient * Webclient_New( struct webserver * webserver, int socketFd) {
 		webclient->header = NULL;
 		webclient->response.start = time( 0 );
 		webclient->response.end = 0;
+		webclient->response.mimeType = MIMETYPE_Html;
 		webclient->response.headersSent = 0;
 		webclient->response.contentSent = 0;
 		webclient->connection = CONNECTION_Close;
 		webclient->mode = MODE_Get;
 		memset( webclient->buffer, '\0', HTTP_BUFF_LENGTH );
-		webclient->response.httpCode = 500;
+		webclient->response.httpCode = HTTPCODE_Error;
 		webclient->response.contentLength = 0;
 		webclient->response.content = NULL;
 	}
@@ -130,6 +157,8 @@ void Webclient_Route( struct webclient * webclient ) {
 		}
 	}
 	if ( cleanUp.good ) {
+		webclient->response.httpCode = HTTPCODE_OK;
+		webclient->response.mimeType = MIMETYPE_Html;
 		cleanUp.good = ( ( webclient->response.content = strdup( "<html><body><h1>It works!</h1>" "\n"
 																"<p>This is the default web page for this server.</p>" "\n"
 																"<p>The web server software is running but no content has been added, yet.</p>" "\n"
@@ -156,10 +185,11 @@ void Webclient_Reset( struct webclient * webclient ) {
 		h3_request_header_free( webclient->header ); webclient->header = NULL;
 	}
 	memset( webclient->buffer, '\0', strlen( webclient->buffer ) );
-	webclient->response.httpCode = 500;
+	webclient->response.httpCode = HTTPCODE_Error;
 	webclient->response.contentLength = 0;
 	webclient->response.start = time( 0 );
 	webclient->response.end = 0;
+	webclient->response.mimeType = MIMETYPE_Html;
 	webclient->response.headersSent = 0;
 	webclient->response.contentSent = 0;
 	webclient->connection = CONNECTION_Close;
@@ -172,12 +202,13 @@ void Webclient_Delete( struct webclient * webclient ) {
 	if ( webclient->header )  {
 		h3_request_header_free( webclient->header );
 	}
-	webclient->response.httpCode = 500;
+	webclient->response.httpCode = HTTPCODE_Error;
 	webclient->response.contentLength = 0;
 	webclient->response.start = 0;
 	webclient->response.end = 0;
 	webclient->response.headersSent = 0;
 	webclient->response.contentSent = 0;
+	webclient->response.mimeType = MIMETYPE_Html;
 	webclient->connection = CONNECTION_Close;
 	webclient->mode = MODE_Get;
 	if ( webclient->response.content )  {
@@ -260,6 +291,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 
 			webclient->response.end = time( 0 );	//todo
 			contentTypeString = "text/html"; // mime.applicationString;
+			contentTypeString  = MimeTypeDefinitions[webclient->response.mimeType].applicationString;
 			connectionString = (webclient->connection == CONNECTION_Close ) ?  "Close" : "Keep-Alive";
 			gmtime_r( &webclient->response.end , &tm);
 			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", &tm );

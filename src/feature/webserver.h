@@ -20,7 +20,40 @@ enum Connection{
 	CONNECTION_KeepAlive
 };
 
-typedef void 			     (* event_cb_t)			( picoev_loop* loop, int fd, int events, void* cb_arg );
+enum HttpCode {
+	HTTPCODE_OK					= 200,
+	HTTPCODE_Forbidden			= 403,
+	HTTPCODE_NotFound			= 404,
+	HTTPCODE_Error				= 500,
+};
+
+enum MimeType {
+	MIMETYPE_Html = 0,
+	MIMETYPE_Txt,
+	MIMETYPE_Css,
+	MIMETYPE_Htm,
+	MIMETYPE_Js,
+	MIMETYPE_Gif,
+	MIMETYPE_Jpg,
+	MIMETYPE_Jpeg,
+	MIMETYPE_Png,
+	MIMETYPE_Ico,
+	MIMETYPE_Zip,
+	MIMETYPE_Gz,
+	MIMETYPE_Tar,
+	MIMETYPE_Xml,
+	MIMETYPE_Svg,
+	MIMETYPE_Json,
+	MIMETYPE_Csv,
+	__MIMETYPE_Last
+};
+
+struct Mime {
+	enum MimeType				mime;
+	const char *				ext;
+	const char *				applicationString;
+};
+
 struct webserver {
 	struct Core *				core;
 	int							port;
@@ -40,8 +73,9 @@ struct webclient{
 	struct {
 			unsigned int			headersSent:1;
 			unsigned int			contentSent:1;
-			int						httpCode;
+			enum HttpCode			httpCode;
 			int						contentLength;
+			enum MimeType			mimeType;
 			char *	 				content;
 			time_t					start;
 			time_t					end;
