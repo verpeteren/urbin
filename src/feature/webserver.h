@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include <h3.h>
+#include <oniguruma.h>
 
 #include "../core/core.h"
 
@@ -55,6 +56,25 @@ enum mimeType_t {
 	__MIMETYPE_LAST
 };
 
+struct webclient_t;
+
+typedef void (* dynamicHandler_cb_t)	( struct webclient_t * webclient );
+
+enum routeType_t {
+	ROUTETYPE_DOCUMENTROOT,
+	ROUTETYPE_DYNAMIC
+};
+
+struct route_t {
+	enum routeType_t			routeType;
+	const char * 				orgPattern;
+	regex_t *					urlRegex;
+	union {
+		const char * 		documentRoot;
+		dynamicHandler_cb_t	handler_cb;
+							}	details;
+};
+
 struct mimeDetail_t {
 	enum mimeType_t				mime;
 	const char *				ext;
@@ -63,6 +83,9 @@ struct mimeDetail_t {
 
 struct webserver_t {
 	struct core_t *				core;
+	struct route_t *			route;
+	OnigRegion *				region;
+	OnigOptionType regexOptions;
 	uint16_t					port;
 	int							socketFd;
 	int							timeout_sec;
@@ -70,11 +93,12 @@ struct webserver_t {
 
 };
 
-struct webclient{
+struct webclient_t{
 	int							socketFd;
 	enum mode_t					mode;
 	enum connection_t			connection;
 	struct webserver_t * 		webserver;
+	struct route_t *			route;
 	RequestHeader *	 			header;
 	char						buffer[HTTP_BUFF_LENGTH];
 	struct {
@@ -90,12 +114,8 @@ struct webclient{
 								} response;
 };
 
-struct webclient * 				Webclient_New			( struct webserver_t * webserver, int socketFd);
-void 							Webclient_Reset			( struct webclient * webclient );
-void 							Webclient_Route			( struct webclient * webclient );
-void 							Webclient_Delete		( struct webclient * webclient );
-
-void							SetupSocket				( int fd );
+int 							Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
+int 							Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handler_cb );
 
 struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, const uint16_t port, const int timeout_sec );
 void 							Webserver_JoinCore		( struct webserver_t * webserver );

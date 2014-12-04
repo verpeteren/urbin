@@ -34,6 +34,9 @@ int main( int argc, const char ** argv ) {
 		cleanUp.good = ( ( webserver = Webserver_New( core, "127.0.0.1", 8080, 7 ) )  != NULL );
 	}
 	if ( cleanUp.good ) {
+		Webserver_DocumentRoot( webserver, "/static/(.*)" , "/var/www" );
+	}
+	if ( cleanUp.good ) {
 		signal( SIGUSR2, &SignalHandler );
 		cleanUp.webserver = 1;
 		Webserver_JoinCore( webserver );
