@@ -12,12 +12,15 @@ DEP_DIR = ./deps
 DIR_PICOEV = $(DEP_DIR)/picoev
 INC_PICOEV = -isystem$(DIR_PICOEV)/
 LIB_PICOEV = $(DIR_PICOEV)/libpicoev.a
+DIR_ONIG = $(DEP_DIR)/onig-5.9.5
+INC_ONIG = $(DIR_ONIG)/
+LIB_ONIG = $(DIR_ONIG)/.libs/libonig.a
 DIR_H3 = $(DEP_DIR)/h3
 INC_H3 = -isystem$(DIR_H3)/include
 LIB_H3 = $(DIR_H3)/libh3.a
 
-INCS = $(INC_PICOEV) $(INC_H3)
-LIBS = $(LIB_PICOEV) $(LIB_H3)
+INCS = $(INC_PICOEV) $(INC_H3) $(INC_ONIG)
+LIBS = $(LIB_PICOEV) $(LIB_H3) $(LIB_ONIG)
 
 
 GET_OFF_MY_LAWN = -std=gnu99 -Wall -Werror -Wextra -Wfatal-errors \

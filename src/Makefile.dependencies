@@ -29,7 +29,9 @@ $(LIB_PICOEV): $(DIR_PICOEV)
 $(DIR_PICOEV):
 	@echo $@
 	@cd $(DEP_DIR) && \
-	git clone https://github.com/kazuho/picoev.git && \
+	wget -q https://github.com/kazuho/picoev/archive/master.zip -O picoev.zip && \
+	unzip -qq picoev.zip && \
+	mv picoev-master picoev &&\
 	cd ./picoev && \
 	cp picoev_epoll.c picoev_epoll.c.org && \
 	sed -e"s/^  assert(PICOEV_FD_BELONGS_TO_LOOP/  memset( \&ev, 0, sizeof( ev ) );\n  assert(PICOEV_FD_BELONGS_TO_LOOP/" picoev_epoll.c.org > picoev_epoll.c
@@ -49,6 +51,21 @@ $(DIR_H3):
 	wget -q https://github.com/c9s/h3/archive/master.zip -O h3.zip && \
 	unzip -qq h3.zip && \
 	mv h3-master h3
+###############################################################################
+# oniguruma: an regular expression engine
+###############################################################################
+$(LIB_ONIG): $(DIR_ONIG)
+	@echo $@
+	@cd $(DIR_ONIG) && \
+	./configure --with-pic --with-gnu-ld --enable-static --enable-shared && \
+	make
+	@touch $@
+
+$(DIR_ONIG):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://www.geocities.jp/kosako3/oniguruma/archive/onig-5.9.5.tar.gz && \
+	tar -xaf onig-5.9.5.tar.gz
 
 
 ###############################################################################
