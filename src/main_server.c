@@ -5,16 +5,16 @@
 #include "./core/core.h"
 #include "./feature/webserver.h"
 
-struct Core * core;
+struct core_t * core;
 
-static void signalHandler( int sign ) {
+static void SignalHandler( int sign ) {
 	fprintf( stdout, "Shutting down...\n" );
 	core->keepOnRunning = 0;
 }
 
 
 int main( int argc, const char ** argv ) {
-	struct webserver * webserver;
+	struct webserver_t * webserver;
 	struct {
 		unsigned int good:1;
 		unsigned int core:1;
@@ -34,7 +34,7 @@ int main( int argc, const char ** argv ) {
 		cleanUp.good = ( ( webserver = Webserver_New( core, "127.0.0.1", 8080, 7 ) )  != NULL );
 	}
 	if ( cleanUp.good ) {
-		signal( SIGUSR2, &signalHandler );
+		signal( SIGUSR2, &SignalHandler );
 		cleanUp.webserver = 1;
 		Webserver_JoinCore( webserver );
 		Core_Loop( core );

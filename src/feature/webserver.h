@@ -1,7 +1,9 @@
 #ifndef SRC_WEBSERVER_H_
 #define SRC_WEBSERVER_H_
 
+
 #include <time.h>
+#include <stdint.h>
 
 #include <h3.h>
 
@@ -10,57 +12,57 @@
 #define HTTP_BUFF_LENGTH 1024
 #define WEBSERVER_TIMEOUT_SEC 10
 
-enum Mode{
-	MODE_Get,
-	MODE_Post
+enum mode_t{
+	MODE_GET,
+	MODE_POST
 };
-enum ContentType{
-	CONTENTTYPE_Buffer,
-	CONTENTTYPE_File,
-};
-
-enum Connection{
-	CONNECTION_Close,
-	CONNECTION_KeepAlive
+enum contentType_t{
+	CONTENTTYPE_BUFFER,
+	CONTENTTYPE_FILE,
 };
 
-enum HttpCode {
-	HTTPCODE_None				= 0,
-	HTTPCODE_Ok					= 200,
-	HTTPCODE_Forbidden			= 403,
-	HTTPCODE_NotFound			= 404,
-	HTTPCODE_Error				= 500,
+enum connection_t{
+	CONNECTION_CLOSE,
+	CONNECTION_KEEPALIVE
 };
 
-enum MimeType {
-	MIMETYPE_Html = 0,
-	MIMETYPE_Txt,
-	MIMETYPE_Css,
-	MIMETYPE_Htm,
-	MIMETYPE_Js,
-	MIMETYPE_Gif,
-	MIMETYPE_Jpg,
-	MIMETYPE_Jpeg,
-	MIMETYPE_Png,
-	MIMETYPE_Ico,
-	MIMETYPE_Zip,
-	MIMETYPE_Gz,
-	MIMETYPE_Tar,
-	MIMETYPE_Xml,
-	MIMETYPE_Svg,
-	MIMETYPE_Json,
-	MIMETYPE_Csv,
-	__MIMETYPE_Last
+enum httpCode_t {
+	HTTPCODE_NONE				= 0,
+	HTTPCODE_OK					= 200,
+	HTTPCODE_FORBIDDEN			= 403,
+	HTTPCODE_NOTFOUND			= 404,
+	HTTPCODE_ERROR				= 500,
 };
 
-struct Mime {
-	enum MimeType				mime;
+enum mimeType_t {
+	MIMETYPE_HTML = 0,
+	MIMETYPE_TXT,
+	MIMETYPE_CSS,
+	MIMETYPE_HTM,
+	MIMETYPE_JS,
+	MIMETYPE_GIF,
+	MIMETYPE_JPG,
+	MIMETYPE_JPEG,
+	MIMETYPE_PNG,
+	MIMETYPE_ICO,
+	MIMETYPE_ZIP,
+	MIMETYPE_GZ,
+	MIMETYPE_TAR,
+	MIMETYPE_XML,
+	MIMETYPE_SVG,
+	MIMETYPE_JSON,
+	MIMETYPE_CSV,
+	__MIMETYPE_LAST
+};
+
+struct mimeDetail_t {
+	enum mimeType_t				mime;
 	const char *				ext;
 	const char *				applicationString;
 };
 
-struct webserver {
-	struct Core *				core;
+struct webserver_t {
+	struct core_t *				core;
 	uint16_t					port;
 	int							socketFd;
 	int							timeout_sec;
@@ -70,34 +72,34 @@ struct webserver {
 
 struct webclient{
 	int							socketFd;
-	enum Mode					mode;
-	enum Connection				connection;
-	struct webserver * 			webserver;
+	enum mode_t					mode;
+	enum connection_t			connection;
+	struct webserver_t * 		webserver;
 	RequestHeader *	 			header;
 	char						buffer[HTTP_BUFF_LENGTH];
 	struct {
 			unsigned int			headersSent:1;
 			unsigned int			contentSent:1;
 			int						contentLength;
-			enum HttpCode			httpCode;
-			enum MimeType			mimeType;
-			enum ContentType		contentType;
+			enum httpCode_t			httpCode;
+			enum mimeType_t			mimeType;
+			enum contentType_t		contentType;
 			char *	 				content;
 			time_t					start;
 			time_t					end;
 								} response;
 };
 
-struct webclient * 				Webclient_New			( struct webserver * webserver, int socketFd);
+struct webclient * 				Webclient_New			( struct webserver_t * webserver, int socketFd);
 void 							Webclient_Reset			( struct webclient * webclient );
 void 							Webclient_Route			( struct webclient * webclient );
 void 							Webclient_Delete		( struct webclient * webclient );
 
 void							SetupSocket				( int fd );
 
-struct webserver *				Webserver_New			( struct Core * core, const char * ip, const uint16_t port, const int timeout_sec );
-void 							Webserver_JoinCore		( struct webserver * webserver );
-void							Webserver_Delete		( struct webserver * webserver );
+struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, const uint16_t port, const int timeout_sec );
+void 							Webserver_JoinCore		( struct webserver_t * webserver );
+void							Webserver_Delete		( struct webserver_t * webserver );
 
 #endif  // SRC_WEBSERVER_H_
 

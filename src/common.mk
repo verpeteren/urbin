@@ -44,9 +44,12 @@ GET_OFF_MY_LAWN = -std=gnu99 -Wall -Werror -Wextra -Wfatal-errors \
 	-Wstrict-aliasing=1 \
 	-Wno-padded \
 	-Wno-unused-parameter \
-	-Wpacked
+	-Wpacked \
+	-ftrapv
+	
 ifeq ($(CC),gcc)
-	GET_OFF_MY_LAWN += -Wsuggest-attribute=pure -Wsuggest-attribute=const -Wsuggest-attribute=noreturn
+	GET_OFF_MY_LAWN += -Wsuggest-attribute=pure -Wsuggest-attribute=const -Wsuggest-attribute=noreturn \
+	-pie -fPIE
 else
 	
 endif

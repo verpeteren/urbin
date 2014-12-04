@@ -1,12 +1,38 @@
 include ./common.mk
 
 HEADERS = common.h config.h
-DEBUG_FLAGS = -p -pg -g -g3 -ggdb -fno-builtin-strlen
-#RELEASE_FLAGS = -O3
-CFLAGS = $(RELEASE_FLAGS) $(DEBUG_FLAGS) $(GET_OFF_MY_LAWN)
+OPTMIZATIONLEVEL = -O0
+
+CC_DEBUG_FLAGS =  $(GET_OFF_MY_LAWN)
+CC_RELEASE_FLAG =  $(GET_OFF_MY_LAWN)
+LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now
+LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now
+ 
+ifdef STAGING_DEBUG
+CC_DEBUG_FLAGS += -g -g3 -ggdb \
+	-Wstack-protector -fstack-protector-all \
+	-D_FORTIFY_SOURCE=2 $(OPTMIZATIONLEVEL)
+LD_DEBUG_FLAGS +=  
+ifeq ($(CC),gcc)
+CC_DEBUG_FLAGS += -pg -fno-builtin-strlen --param ssp-buffer-size=4
+else
+ 
+endif
+endif
+
+ifdef STAGING_RELEASE
+CC_RELEASE_FLAGS = $(OPTMIZATIONLEVEL)
+LD_RELEASE_FLAGS = $(OPTMIZATIONLEVEL)
+ifeq ($(CC),gcc)
+else 
+endif
+
+endif
+CFLAGS = $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS)
+LDFLAGS = $(LD_RELEASE_FLAGS) $(LD_DEBUG_FLAGS)
 HAVES = 
-LDFLAGS=-Wl,-z,relro -Wl,-z,now
-# -pg
+
+
 
 CORE_DIR=./core
 FEAT_DIR=./feature

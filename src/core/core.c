@@ -15,11 +15,11 @@ void Shutdown( ) {
 	fprintf( stdout, "Shutdown\n" );
 	picoev_deinit( );
 }
-struct Core * Core_New( ) {
+struct core_t * Core_New( ) {
 	struct {unsigned int good:1;
 		unsigned int loop:1;
 		unsigned int core:1;} cleanUp;
-	struct Core * core;
+	struct core_t * core;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 
@@ -45,14 +45,14 @@ struct Core * Core_New( ) {
 	return core;
 }
 
-void Core_Loop( struct Core * core ) {
+void Core_Loop( struct core_t * core ) {
 	core->keepOnRunning = 1;
 	while ( core->keepOnRunning )  {
 		picoev_loop_once( core->loop, 0 );
 	}
 
 }
-void Core_Delete( struct Core * core ) {
+void Core_Delete( struct core_t * core ) {
 	picoev_destroy_loop( core->loop );
 	free( core );
 }

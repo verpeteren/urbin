@@ -5,17 +5,17 @@
 
 #include "../common.h"
 
-struct Core {
+struct core_t {
 	picoev_loop *				loop;
-	int							keepOnRunning;
+	unsigned int				keepOnRunning:1;
 };
 
 void							Boot				( );
 void							Shutdown			( );
 
-struct Core *					Core_New			( );
-void							Core_Loop			( struct Core * core );
-void							Core_Delete			( struct Core * core );
+struct core_t *					Core_New			( );
+void							Core_Loop			( struct core_t * core );
+void							Core_Delete			( struct core_t * core );
 
 #endif  // SRC_CORE_H_
 
