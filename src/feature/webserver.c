@@ -23,24 +23,24 @@ const char * MethodDefinitions[ ] = {
 };
 
 struct mimeDetail_t MimeTypeDefinitions[] = {
-	{ MIMETYPE_HTML,				"html", "text/html" },
-	{ MIMETYPE_TXT,					"txt", "text/plain" },
-	{ MIMETYPE_CSS,					"css", "text/css" },
-	{ MIMETYPE_HTM,					"htm", "text/html" },
-	{ MIMETYPE_JS,					"js", "application/javascript" },
-	{ MIMETYPE_GIF,					"gif", "image/gif" },
-	{ MIMETYPE_JPG,					"jpg", "image/jpg" },
-	{ MIMETYPE_JPEG,				"jpeg", "image/jpeg"},
-	{ MIMETYPE_PNG,					"png", "image/png" },
-	{ MIMETYPE_ICO,					"ico", "image/ico" },
-	{ MIMETYPE_ZIP,					"zip", "image/zip" },
-	{ MIMETYPE_GZ,					"gz", "image/gz"  },
-	{ MIMETYPE_TAR,					"tar", "image/tar" },
-	{ MIMETYPE_XML,					"xml", "application/xml  " },
-	{ MIMETYPE_SVG,					"svg", "image/svg+xml" },
-	{ MIMETYPE_JSON,				"json", "application/json" },
-	{ MIMETYPE_CSV,					"csv", " application/vnd.ms-excel" },
-	{ __MIMETYPE_LAST,				'\0', "application/octet-stream"}
+	{ MIMETYPE_HTML,			"html",	"text/html" },
+	{ MIMETYPE_TXT,				"txt",	"text/plain" },
+	{ MIMETYPE_CSS,				"css",	"text/css" },
+	{ MIMETYPE_HTM,				"htm",	"text/html" },
+	{ MIMETYPE_JS,				"js",	"application/javascript" },
+	{ MIMETYPE_GIF,				"gif",	"image/gif" },
+	{ MIMETYPE_JPG,				"jpg",	"image/jpg" },
+	{ MIMETYPE_JPEG,			"jpeg",	"image/jpeg"},
+	{ MIMETYPE_PNG,				"png",	"image/png" },
+	{ MIMETYPE_ICO,				"ico",	"image/ico" },
+	{ MIMETYPE_ZIP,				"zip",	"image/zip" },
+	{ MIMETYPE_GZ,				"gz",	"image/gz"  },
+	{ MIMETYPE_TAR,				"tar",	"image/tar" },
+	{ MIMETYPE_XML,				"xml",	"application/xml  " },
+	{ MIMETYPE_SVG,				"svg",	"image/svg+xml" },
+	{ MIMETYPE_JSON,			"json",	"application/json" },
+	{ MIMETYPE_CSV,				"csv",	"application/vnd.ms-excel" },
+	{ __MIMETYPE_LAST,			'\0',	"application/octet-stream"}
 };
 
 //  http://stackoverflow.com/questions/4143000/find-the-string-length-of-an-int
@@ -63,21 +63,21 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								strlen( PR_VERSION ) \
 								- ( 2 * 7 ) + 1 )
 
-static void						SetupSocket					( int fd );
+static void						SetupSocket				( int fd );
 
-static struct route_t * 		Route_New					( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions );
+static struct route_t * 		Route_New				( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions );
 static void						Route_Delete				( struct route_t * route );
 
-static struct webclient_t *		Webclient_New				( struct webserver_t * webserver, int socketFd);
-static void						Webclient_PrepareRequest	( struct webclient_t * webclient );
-static void						Webclient_RenderRoute		( struct webclient_t * webclient );
-static void 					Webclient_Delete			( struct webclient_t * webclient );
+static struct webclient_t *		Webclient_New			( struct webserver_t * webserver, int socketFd);
+static void						Webclient_PrepareRequest( struct webclient_t * webclient );
+static void						Webclient_RenderRoute	( struct webclient_t * webclient );
+static void 					Webclient_Delete		( struct webclient_t * webclient );
 
-static void						Webserver_HandleRead_cb		( picoev_loop* loop, int fd, int events, void* cb_arg );
-static void						Webserver_HandleWrite_cb	( picoev_loop* loop, int fd, int events, void* cb_arg );
-static void						Webserver_HandleAccept_cb	( picoev_loop* loop, int fd, int events, void* cb_arg );
-static void 					Webserver_FindRoute			( struct webserver_t * webserver, struct webclient_t * webclient );
-static int						Webserver_RegisterRoute		( struct webserver_t * webserver, struct route_t * route );
+static void						Webserver_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cb_arg );
+static void						Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
+static void						Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
+static void 					Webserver_FindRoute		( struct webserver_t * webserver, struct webclient_t * webclient );
+static int						Webserver_RegisterRoute	( struct webserver_t * webserver, struct route_t * route );
 
 static void SetupSocket( int fd ) {
 	int on, r;
@@ -762,7 +762,7 @@ static void  Webserver_FindRoute( struct webserver_t * webserver, struct webclie
 	cleanUp.good = ( ( url = malloc( len + 1 ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
-		snprintf( url, len, "%s", webclient->header->RequestURI );
+		snprintf( url, len + 1, "%s", webclient->header->RequestURI );
 		start = ( unsigned char * ) url;
 		end = start + strlen( url );
 		range = end;

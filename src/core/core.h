@@ -10,12 +10,12 @@ struct core_t {
 	unsigned int				keepOnRunning:1;
 };
 
-void							Boot				( );
-void							Shutdown			( );
+void							Boot					( );
+void							Shutdown				( );
 
-struct core_t *					Core_New			( );
-void							Core_Loop			( struct core_t * core );
-void							Core_Delete			( struct core_t * core );
+struct core_t *					Core_New				( );
+void							Core_Loop				( struct core_t * core );
+void							Core_Delete				( struct core_t * core );
 
 #endif  // SRC_CORE_H_
 

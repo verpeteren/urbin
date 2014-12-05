@@ -58,7 +58,7 @@ enum mimeType_t {
 
 struct webclient_t;
 
-typedef void (* dynamicHandler_cb_t)	( struct webclient_t * webclient );
+typedef void				(* dynamicHandler_cb_t)	( struct webclient_t * webclient );
 
 enum routeType_t {
 	ROUTETYPE_DOCUMENTROOT,
@@ -70,8 +70,8 @@ struct route_t {
 	const char * 				orgPattern;
 	regex_t *					urlRegex;
 	union {
-		const char * 		documentRoot;
-		dynamicHandler_cb_t	handler_cb;
+		const char * 				documentRoot;
+		dynamicHandler_cb_t			handler_cb;
 							}	details;
 };
 
@@ -111,7 +111,7 @@ struct webclient_t{
 			char *	 				content;
 			time_t					start;
 			time_t					end;
-								} response;
+							}	response;
 };
 
 int 							Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
