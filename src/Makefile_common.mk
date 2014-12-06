@@ -1,4 +1,4 @@
-include ./config.mk
+include ./Makefile_platform.mk
 
 AR = ar
 RANLIB = ranlib

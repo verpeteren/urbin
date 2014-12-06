@@ -2,9 +2,9 @@
 
 DEBUG=yes
 
-PLATFORM=./src/config.mk
-CONFIG=./src/config.h
-rm -f ${PLATFORM} ${CONFIG}
+MK_PLATFORM=./src/Makefile_platform.mk
+C_PLATFORM=./src/platform.h
+rm -f ${MK_PLATFORM} ${C_PLATFORM}
 
 
 if [ -n "$1" ] && [ "$1" = "clean" ]; then
@@ -16,31 +16,31 @@ else
 	case "$OS_TARGET" in
 		linux* | Linux*)
 			HOST_OS=Linux
-			echo "LINUX_BUILD = 1" > ${PLATFORM}
+			echo "LINUX_BUILD = 1" > ${MK_PLATFORM}
 			;;
 		Darwin*)
 			HOST_OS=Darwin
-			echo "DARWIN_BUILD = 1" > ${PLATFORM}
+			echo "DARWIN_BUILD = 1" > ${MK_PLATFORM}
 			;;
 		*)
 			HOST_OS=Linux
-			echo "GENERIC_BUILD = 1" > ${PLATFORM}
+			echo "GENERIC_BUILD = 1" > ${MK_PLATFORM}
 			;;
 	esac
 	if [ "$DEBUG" == "yes" ]; then
-		echo -e "STAGING_DEBUG = 1" >> ${PLATFORM}
-		echo -e "_STAGING_RELEASE = 1" >> ${PLATFORM}
-		echo -e "#ifndef SRC_CONFIG_H_\n#define SRC_CONFIG_H_\n\n\n" > ${CONFIG}
-		echo -e "#define DEBUG 1" >> ${CONFIG}
-		echo -e "//  #define NDEBUG 1" >> ${CONFIG}
-		echo -e "\n\n#endif  // SRC_COMMON_H_\n" >> ${CONFIG}
+		echo -e "STAGING_DEBUG = 1" >> ${MK_PLATFORM}
+		echo -e "_STAGING_RELEASE = 1" >> ${MK_PLATFORM}
+		echo -e "#ifndef SRC_PLATFORM_H_\n#define SRC_PLATFORM_H_\n\n\n" > ${C_PLATFORM}
+		echo -e "#define DEBUG 1" >> ${C_PLATFORM}
+		echo -e "//  #define NDEBUG 1" >> ${C_PLATFORM}
+		echo -e "\n\n#endif  // SRC_PLATFORM_H_\n" >> ${C_PLATFORM}
 	else
-		echo -e "_STAGING_DEBUG = 1" >> ${PLATFORM}
-		echo -e "STAGING_RELEASE = 1" >> ${PLATFORM}
-		echo -e "#ifndef SRC_CONFIG_H_\n#define SRC_CONFIG_H_\n\n\n" > ${CONFIG}
-		echo -e "//  #define DEBUG 1" >> ${CONFIG}
-		echo -e "#define NDEBUG 1" >> ${CONFIG}
-		echo -e "\n\n#endif  // SRC_CONFIG_H_\n" >> ${CONFIG}
+		echo -e "_STAGING_DEBUG = 1" >> ${MK_PLATFORM}
+		echo -e "STAGING_RELEASE = 1" >> ${MK_PLATFORM}
+		echo -e "#ifndef SRC_PLATFORM_H_\n#define SRC_PLATFORM_H_\n\n\n" > ${C_PLATFORM}
+		echo -e "//  #define DEBUG 1" >> ${C_PLATFORM}
+		echo -e "#define NDEBUG 1" >> ${C_PLATFORM}
+		echo -e "\n\n#endif  // SRC_PLATFORM_H_\n" >> ${C_PLATFORM}
 	fi
 	cd ./src
 	make -f Makefile.dependencies && mmake

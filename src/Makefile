@@ -1,6 +1,6 @@
-include ./common.mk
+include ./Makefile_common.mk
 
-COMMON_HEADERS = common.h config.h
+COMMON_HEADERS = common.h platform.h
 OPTMIZATIONLEVEL = -O0
 
 CC_DEBUG_FLAGS = $(GET_OFF_MY_LAWN)
@@ -44,11 +44,11 @@ MAIN_OBJECTS = $(OBJ_DIR)/main_server.o
 
 OBJECTS = $(CODE_OBJECTS) $(MAIN_OBJECTS) $(FEAT_OBJECTS)
 
-THE_EXECUTABLE = $(BIN_DIR)/server
+THE_EXECUTABLE = $(BIN_DIR)/ronja
 
 all: 	$(THE_EXECUTABLE) 
 tests:	$(TST_EXECUTABLE) 
-docs:   ./doc/Api.txt
+docs:   ../doc/Api.txt
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
 $(OBJ_DIR)/core.o:					EXCEPTION =
@@ -91,10 +91,10 @@ $(OBJ_DIR)/main_server.o:		main_server.c $(CORE_DIR)/core.h $(FEATURE_HEADERS) $
 ###############################################################################
 # Documentation
 ###############################################################################
-./doc/Api.txt: tags
+../doc/Api.txt: tags
 	@echo $@
-	@echo 'PUBLIC\n' > $@ && \
-	grep "^RONJA_" tags|cut -f1|sort >> $@ && \
+	@echo 'PUBLIC\n' */* > $@ && \
+	grep "^RONJA_" tags|cut -f1|sort >> $@ 
 
 ###############################################################################
 # Boilerplate

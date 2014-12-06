@@ -18,6 +18,17 @@ H2. Who
 
 Peter Reijnders <peter.reijnders@verpeteren.nl>
 
+H1. Manual
+
+H2. Install
+
+./build.sh						# will create some platform specific settings
+cd ./src						#
+make -f Makefile.dependencies	# this may take some time
+make							# compiles
+../bin/ronja					# demo
+
+
 H1. Project organisation
 
 H2. Codestyle

@@ -1,4 +1,4 @@
-include common.mk
+include Makefile_common.mk
 
 NSPR_PATH=$(shell pwd)/$(DEP_DIR)/nspr/nspr-4.10.1/nspr
 
@@ -31,7 +31,7 @@ $(DIR_PICOEV):
 	@cd $(DEP_DIR) && \
 	wget -q https://github.com/kazuho/picoev/archive/master.zip -O picoev.zip && \
 	unzip -qq picoev.zip && \
-	mv picoev-master picoev &&\
+	mv picoev-master picoev && \
 	cd ./picoev && \
 	cp picoev_epoll.c picoev_epoll.c.org && \
 	sed -e"s/^  assert(PICOEV_FD_BELONGS_TO_LOOP/  memset( \&ev, 0, sizeof( ev ) );\n  assert(PICOEV_FD_BELONGS_TO_LOOP/" picoev_epoll.c.org > picoev_epoll.c
@@ -139,7 +139,7 @@ clean:
 
 propperclean:
 	@echo cleaning all
-	@rm -rf $(shell find $(DEP_DIR) -type d)
+	@rm -rf $(shell find $(DEP_DIR)/* -type d)
 
 
 

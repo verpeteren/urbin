@@ -1,4 +1,6 @@
-config.mk
+Makefile_platform.mk
+platform.h
 gmon.out
+tags
 *.swp
 

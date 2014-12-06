@@ -1,7 +1,7 @@
 #ifndef SRC_COMMON_H_
 #define SRC_COMMON_H_
 
-#include "../config.h"
+#include "../platform.h"
 
 #define __RONJA_COMMON_H_
 
