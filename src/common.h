@@ -1,4 +1,7 @@
-#ifndef __RONJA_COMMON_H_
+#ifndef SRC_COMMON_H_
+#define SRC_COMMON_H_
+
+#include "../config.h"
 
 #define __RONJA_COMMON_H_
 
@@ -6,7 +9,10 @@
 #define LOOP_TIMEOUT			60
 #define LISTEN_BACKLOG			100
 
+#define SQLCLIENT_TIMEOUT_SEC 10
+#define WEBSERVER_TIMEOUT_SEC 10
+
+
 #define PR_NAME					"RONJA"
 #define PR_VERSION				"0.0.6a"
-#endif
-
+#endif // __SRC_COMMON_H_

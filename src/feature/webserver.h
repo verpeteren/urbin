@@ -1,5 +1,5 @@
-#ifndef SRC_WEBSERVER_H_
-#define SRC_WEBSERVER_H_
+#ifndef SRC_FEATURE_WEBSERVER_H_
+#define SRC_FEATURE_WEBSERVER_H_
 
 
 #include <time.h>
@@ -10,8 +10,11 @@
 
 #include "../core/core.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define HTTP_BUFF_LENGTH 1024
-#define WEBSERVER_TIMEOUT_SEC 10
 
 enum mode_t{
 	MODE_GET,
@@ -121,5 +124,9 @@ struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, 
 void 							Webserver_JoinCore		( struct webserver_t * webserver );
 void							Webserver_Delete		( struct webserver_t * webserver );
 
-#endif  // SRC_WEBSERVER_H_
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // SRC_FEATURE_WEBSERVER_H_
 

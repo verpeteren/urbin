@@ -2,8 +2,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <fcntl.h>
 
-#include "../config.h"
 #include "core.h"
 
 void Boot( ) {
@@ -15,6 +18,18 @@ void Shutdown( ) {
 	fprintf( stdout, "Shutdown\n" );
 	picoev_deinit( );
 }
+
+void SetupSocket( int fd ) {
+	int on, r;
+
+	on = 1;
+	r = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof( on ) );
+	assert( r == 0 );
+	r = fcntl( fd, F_SETFL, O_NONBLOCK );
+	assert( r == 0 );
+}
+
+
 struct core_t * Core_New( ) {
 	struct {unsigned int good:1;
 		unsigned int loop:1;

@@ -3,17 +3,14 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
 #include <stdio.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/uio.h>
 #include <unistd.h>
 #include <math.h>
+#include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
 
 #include "webserver.h"
 
@@ -63,14 +60,13 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								strlen( PR_VERSION ) \
 								- ( 2 * 7 ) + 1 )
 
-static void						SetupSocket				( int fd );
-
 static struct route_t * 		Route_New				( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions );
 static void						Route_Delete				( struct route_t * route );
 
 static struct webclient_t *		Webclient_New			( struct webserver_t * webserver, int socketFd);
 static void						Webclient_PrepareRequest( struct webclient_t * webclient );
 static void						Webclient_RenderRoute	( struct webclient_t * webclient );
+static void 					Webclient_CloseConn		( struct webclient_t * webclient );
 static void 					Webclient_Delete		( struct webclient_t * webclient );
 
 static void						Webserver_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cb_arg );
@@ -78,22 +74,6 @@ static void						Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events
 static void						Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
 static void 					Webserver_FindRoute		( struct webserver_t * webserver, struct webclient_t * webclient );
 static int						Webserver_RegisterRoute	( struct webserver_t * webserver, struct route_t * route );
-
-static void SetupSocket( int fd ) {
-	int on, r;
-
-	on = 1;
-	r = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof( on ) );
-	assert( r == 0 );
-	r = fcntl( fd, F_SETFL, O_NONBLOCK );
-	assert( r == 0 );
-}
-
-static void CloseConn( struct webclient_t * webclient ) {
-	picoev_del( webclient->webserver->core->loop, webclient->socketFd );
-	close( webclient->socketFd );
-	Webclient_Delete( webclient );
-}
 
 static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions ) {
 	struct route_t * route;
@@ -463,6 +443,13 @@ static void Webclient_Reset( struct webclient_t * webclient ) {
 		free( webclient->response.content ); webclient->response.content = NULL;
 	}
 }
+
+static void Webclient_CloseConn( struct webclient_t * webclient ) {
+	picoev_del( webclient->webserver->core->loop, webclient->socketFd );
+	close( webclient->socketFd );
+	Webclient_Delete( webclient );
+}
+
 static void Webclient_Delete( struct webclient_t * webclient ) {
 	if ( webclient->header )  {
 		h3_request_header_free( webclient->header );
@@ -507,7 +494,7 @@ static void Webserver_HandleRead_cb( picoev_loop* loop, int fd, int events, void
 	webclient = (struct webclient_t *) wc_arg;
 	if ( ( events & PICOEV_TIMEOUT) != 0 ) {
 		/* timeout */
-		CloseConn( webclient );
+		Webclient_CloseConn( webclient );
 	} else  {
 		/* update timeout, and read */
 		picoev_set_timeout( loop, fd, webclient->webserver->timeout_sec );
@@ -515,13 +502,13 @@ static void Webserver_HandleRead_cb( picoev_loop* loop, int fd, int events, void
 		webclient->buffer[r] = '\0';
 		switch ( r ) {
 		case 0: /* connection closed by peer */
-			CloseConn( webclient );
+			Webclient_CloseConn( webclient );
 			break;
 		case -1: /* error */
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /* try again later */
 				break;
 			} else { /* fatal error */
-				CloseConn( webclient );
+				Webclient_CloseConn( webclient );
 			}
 			break;
 		default: /* got some data, send back */
@@ -542,7 +529,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 	connClosed = 0;
 	if ( ( events & PICOEV_TIMEOUT) != 0 ) {
 		/* timeout */
-		CloseConn( webclient );
+		Webclient_CloseConn( webclient );
 		connClosed = 1;
 	} else  {
 		/* update timeout, and write */
@@ -573,13 +560,13 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 				if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /* try again later */
 					break;
 				} else { /* fatal error */
-					CloseConn( webclient );
+					Webclient_CloseConn( webclient );
 					connClosed = 1;
 				}
 				break;
 			default: /* got some data, send back */
 				if ( headerLength !=  wroteHeader ) {
-					CloseConn( webclient ); /* failed to send all data at once, close */
+					Webclient_CloseConn( webclient ); /* failed to send all data at once, close */
 					connClosed = 1;
 				} else {
 					webclient->response.headersSent = 1;
@@ -622,13 +609,13 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 					if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /* try again later */
 						break;
 					} else { /* fatal error */
-						CloseConn( webclient );
+						Webclient_CloseConn( webclient );
 						connClosed = 1;
 					}
 					break;
 				default: /* got some data, send back */
 					if ( webclient->response.contentLength !=  wroteContent ) {
-						CloseConn( webclient ); /* failed to send all data at once, close */
+						Webclient_CloseConn( webclient ); /* failed to send all data at once, close */
 						connClosed = 1;
 					} else {
 						webclient->response.contentSent = 1;
@@ -644,7 +631,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 				Webclient_Reset( webclient );
 				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeout_sec , Webserver_HandleRead_cb, wc_arg );
 			} else {
-				CloseConn( webclient );
+				Webclient_CloseConn( webclient );
 				connClosed = 1;
 			}
 		}
@@ -720,9 +707,7 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 	return webserver;
 }
 
-void Webserver_JoinCore( struct webserver_t * webserver ) {
-	picoev_add( webserver->core->loop, webserver->socketFd, PICOEV_READ, 0, Webserver_HandleAccept_cb, (void * ) webserver );
-}
+FEATURE_JOINCORE( Webserver, webserver )
 
 static int Webserver_RegisterRoute( struct webserver_t * webserver, struct route_t * route ) {
 	//  @TODO: add more routes, no deletion

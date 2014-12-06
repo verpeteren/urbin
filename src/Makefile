@@ -1,10 +1,10 @@
 include ./common.mk
 
-HEADERS = common.h config.h
+COMMON_HEADERS = common.h config.h
 OPTMIZATIONLEVEL = -O0
 
-CC_DEBUG_FLAGS =  $(GET_OFF_MY_LAWN)
-CC_RELEASE_FLAG =  $(GET_OFF_MY_LAWN)
+CC_DEBUG_FLAGS = $(GET_OFF_MY_LAWN)
+CC_RELEASE_FLAG = $(GET_OFF_MY_LAWN)
 LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now
 LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now
  
@@ -39,7 +39,7 @@ FEAT_DIR=./feature
 BIN_DIR=../bin
 
 CODE_OBJECTS = $(OBJ_DIR)/core.o
-FEAT_OBJECTS = $(OBJ_DIR)/webserver.o
+FEAT_OBJECTS = $(OBJ_DIR)/webserver.o $(OBJ_DIR)/sqlclient.o
 MAIN_OBJECTS = $(OBJ_DIR)/main_server.o
 
 OBJECTS = $(CODE_OBJECTS) $(MAIN_OBJECTS) $(FEAT_OBJECTS)
@@ -52,9 +52,12 @@ docs:   ./doc/Api.txt
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
 $(OBJ_DIR)/core.o:					EXCEPTION =
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION =
 $(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion
 ifeq ($(CC),gcc)
 else 
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code
+$(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code
 endif
 
 ###############################################################################
@@ -67,13 +70,16 @@ $(THE_EXECUTABLE): 			$(OBJ_DIR)/main_server.o $(CODE_OBJECTS) $(FEAT_OBJECTS) $
 ###############################################################################
 # OBJECTS
 ###############################################################################
-$(OBJ_DIR)/webserver.o:			$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/core.h $(HEADERS)
+$(OBJ_DIR)/sqlclient.o:			$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/core.h $(COMMON_HEADERS)
 	@echo "\tCC\t"$@
 	@$(CC) $(INC) $(CFLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
-$(OBJ_DIR)/core.o:			$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(HEADERS)
+$(OBJ_DIR)/webserver.o:			$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/core.h $(COMMON_HEADERS)
 	@echo "\tCC\t"$@
 	@$(CC) $(INC) $(CFLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
-$(OBJ_DIR)/main_server.o:		main_server.c $(CORE_DIR)/core.h $(HEADERS)
+$(OBJ_DIR)/core.o:			$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(COMMON_HEADERS)
+	@echo "\tCC\t"$@
+	@$(CC) $(INC) $(CFLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+$(OBJ_DIR)/main_server.o:		main_server.c $(CORE_DIR)/core.h $(FEATURE_HEADERS) $(COMMON_HEADERS)
 	@echo "\tCC\t"$@
 	@$(CC) $(INC) $(CFLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 

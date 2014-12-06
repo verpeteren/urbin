@@ -64,9 +64,69 @@ $(LIB_ONIG): $(DIR_ONIG)
 $(DIR_ONIG):
 	@echo $@
 	@cd $(DEP_DIR) && \
-	wget -q http://www.geocities.jp/kosako3/oniguruma/archive/onig-5.9.5.tar.gz && \
-	tar -xaf onig-5.9.5.tar.gz
+	wget -q http://www.geocities.jp/kosako3/oniguruma/archive/onig-$(VER_ONIG).tar.gz && \
+	tar -xaf onig-$(VER_ONIG).tar.gz
 
+###############################################################################
+# libpq: native postgresql connector
+###############################################################################
+$(LIB_PG): $(DIR_PG)
+	@echo $@
+	@cd $(DIR_PG) && \
+	./configure --without-readline --without-zlib --with-gnu-ld --without-libxml --without-libxslt --without-openssl --without-bonjour --without-ldap --without-pam --without-krb5 --without-gssapi --without-python --without-perl --without-tcl&& \
+	cd ./src/interfaces/libpq && \
+	make
+#	@touch $@
+
+$(DIR_PG):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://ftp.postgresql.org/pub/source/v$(VER_PG)/postgresql-$(VER_PG).tar.bz2 && \
+	tar -xaf postgresql-$(VER_PG).tar.bz2
+
+###############################################################################
+# mysac: mysql simple asynchronous client 
+###############################################################################
+$(LIB_MYS): $(DIR_MYS) $(DIR_MY)
+	@echo $@
+	@cd $(DIR_MYS) && \
+	make libmysac-static.a
+	@touch $@
+
+$(DIR_MYS):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://www.arpalert.org/src/mysac-$(VER_MYS).tar.gz && \
+	tar -xaf mysac-$(VER_MYS).tar.gz && \
+	cd ./mysac-$(VER_MYS) && \
+	cp Makefile Makefile.org && \
+	sed -e"s/\/ITRIEDTOREPAIRusr\/include\/mysql/\.\.\/mysql-connector-c-$(VER_MY)-src -I\.\.\/mysql-connector-c-$(VER_MY)-src\/include/" \
+		-e"s/-ITRIEDTOREPAIRWerror//" \
+		Makefile.org > Makefile && \
+	cp mysac.h mysac.h.org && \
+	sed -e"s/^#define __MYSAC_H__/#define __MYSAC_H__\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n/" \
+		mysac.h.org | \
+		tac | \
+		sed  -e"0,/^#endif/ s//#endif\n#endif\n}\n#ifdef __cplusplus/" | \
+		tac > \
+		mysac.h
+
+###############################################################################
+# mysql: mysql c connection
+###############################################################################
+$(LIB_MY): $(DIR_MY)
+	@echo $@
+	@cd $(DIR_MY)/ && \
+	cmake . && \
+	make
+	@touch $@
+
+$(DIR_MY):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://dev.mysql.com/get/Downloads/Connector-C/mysql-connector-c-$(VER_MY)-src.tar.gz && \
+	tar -xaf mysql-connector-c-$(VER_MY)-src.tar.gz && \
+	ln -s ./mysql-connector-c-$(VER_MY)-src/include ./mysql-connector-c-$(VER_MY)-src/mysql 
 
 ###############################################################################
 # Boilerplate
