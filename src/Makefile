@@ -64,7 +64,7 @@ endif
 # LINKING
 ###############################################################################
 $(THE_EXECUTABLE): 			$(OBJ_DIR)/main_server.o $(CODE_OBJECTS) $(FEAT_OBJECTS) $(LIBS)
-	@echo "\tCCLD\t"$@
+	@echo "\tLD\t"$@
 	@$(CC) $(INC) $(LDFLAGS) -o $@ $^ -lm
 
 ###############################################################################

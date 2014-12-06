@@ -1,7 +1,5 @@
 include Makefile_common.mk
 
-NSPR_PATH=$(shell pwd)/$(DEP_DIR)/nspr/nspr-4.10.1/nspr
-
 ifdef LINUX_BUILD
 PICOEV_SOURCE = picoev_epoll.c
 endif
@@ -127,6 +125,60 @@ $(DIR_MY):
 	wget -q http://dev.mysql.com/get/Downloads/Connector-C/mysql-connector-c-$(VER_MY)-src.tar.gz && \
 	tar -xaf mysql-connector-c-$(VER_MY)-src.tar.gz && \
 	ln -s ./mysql-connector-c-$(VER_MY)-src/include ./mysql-connector-c-$(VER_MY)-src/mysql 
+###############################################################################
+# NSPR
+###############################################################################
+$(LIB_NSPR): $(DIR_NSPR)
+	@echo $@
+	@cd $(DIR_NSPR) && \
+	./configure && \
+	make && \
+	cd pr/tests && \
+	make
+
+$(DIR_NSPR): $(DIR_MOZ)
+	@echo $@
+	@cd $(DEP_DIR) 
+	#wget -q https://ftp.mozilla.org/pub/mozilla.org/nspr/betas/v$(VER_NSPR)/src/nspr-$(VER_NSPR).tar.gz && \
+	#tar xzf nspr-$(VER_NSPR).tar.gz
+
+###############################################################################
+# spidermonkey: embedded javascript interpreter
+###############################################################################
+$(LIB_MOZ): $(DIR_MOZ) $(LIB_NSPR)
+	@echo $@
+	@cp $(DIR_NSPR)/config/nspr-config $(DIR_NSPR)/dist/bin/ && \
+	cd $(DIR_MOZ)/js/src && \
+		autoconf2.13 && \
+		mkdir -p build-beta && \
+		cd build-beta && \
+		../configure \
+		--without-android-ndk \
+		--disable-metro \
+		--without-x \
+		--disable-trace-malloc \
+		--disable-wrap-malloc \
+		--disable-shark \
+		--disable-instrument \
+		--disable-callgrind \
+		--disable-vtune \
+		--disable-perf \
+		--disable-js-diagnostics \
+		--without-ccache \
+		--enable-strip \
+		--enable-shared-js \
+		--enable-valgrind \
+		--enable-threadsafe \
+		--enable-nspr-build \
+		$(DEBUG) \
+		&&make 
+		#--with-nspr-prefix=$(DIR_NSPR) --with-nspr-cflags="-I$(DIR_NSPR)/dist/include/nspr" --with-nspr-libs="-lrt -L .$(DIR_NSPR)/dist/lib/ -lnspr4 -lplds4 -lplc4 $(DIR_NSPR)/dist/lib/libnspr4.a $(DIR_NSPR)/dist/lib/libplds4.a $(DIR_NSPR)/dist/lib/libplc4.a" \
+
+$(DIR_MOZ):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q https://ftp.mozilla.org/pub/mozilla.org/firefox/candidates/$(VER_MOZ)-candidates/build1/source/firefox-$(VER_MOZ).source.tar.bz2 && \
+	tar -xaf firefox-$(VER_MOZ).source.tar.bz2 
 
 ###############################################################################
 # Boilerplate

@@ -43,7 +43,7 @@ else
 		echo -e "\n\n#endif  // SRC_PLATFORM_H_\n" >> ${C_PLATFORM}
 	fi
 	cd ./src
-	make -f Makefile.dependencies && mmake
+	make -f Makefile.dependencies && make
 fi
 
 # vim: ts=4 sts=4 sw=4 noet nu

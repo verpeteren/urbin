@@ -36,9 +36,17 @@ VER_MYS = 1.1.1
 DIR_MYS = $(DEP_DIR)/mysac-$(VER_MYS)
 INC_MYS = -isystem$(DIR_MYS)/
 LIB_MYS = $(DIR_MYS)/libmysac-static.a
+VER_MOZ = 34.0.5
+DIR_MOZ = $(DEP_DIR)/mozilla-release
+INC_MOZ = -isystem$(DIR_MOZ)/js/src/build-beta/dist/include/
+LIB_MOZ = $(DIR_MOZ)/js/src/build-beta/dist/lib/libjs_static.a
+VER_NSPR = 4.10.7
+DIR_NSPR = $(DIR_MOZ)/nsprpub
+INC_NSPR = -isystem$(DIR_NSPR)/dist/include/nspr
+LIB_NSPR = $(DIR_NSPR)/dist/lib/lilbnspr4.a
 
-INCS = $(INC_PICOEV) $(INC_H3) $(INC_ONIG) $(INC_PG) $(INC_MYS) $(INC_MY)
-LIBS = $(LIB_PICOEV) $(LIB_H3) $(LIB_ONIG) $(LIB_PG) $(LIB_MYS) $(LIB_MY)
+INCS = $(INC_PICOEV) $(INC_H3) $(INC_ONIG) $(INC_PG) $(INC_MYS) $(INC_MY) $(INC_MOZ) $(INC_NSPR)
+LIBS = $(LIB_PICOEV) $(LIB_H3) $(LIB_ONIG) $(LIB_PG) $(LIB_MYS) $(LIB_MY) $(LIB_MOZ) $(LIB_NSPR)
 
 
 GET_OFF_MY_LAWN = -std=gnu99 -Wall -Werror -Wextra -Wfatal-errors \
