@@ -38,10 +38,10 @@ struct module_t gJavascriptModule = {
  */
 void * JavascriptModule_Load( struct core_t * core ) {
 	struct javascript_t * javascript;
-	struct {unsigned int good:1;
-			unsigned int javascript:1;} cleanUp;
 	cfg_t * glot_section, * javascript_section;
 	char * path, * name;
+	struct {unsigned int good:1;
+			unsigned int javascript:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	glot_section = cfg_getnsec( core->config, "glot", 0 );
@@ -121,8 +121,8 @@ void JavascriptModule_Ready( struct core_t * core, void * args ) {
  * @see	Hard.shutdown
 */
 void JavascriptModule_Unload( struct core_t * core, void * args ) {
-	struct {unsigned int good:1;} cleanUp;
 	struct javascript_t * javascript;
+	struct {unsigned int good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	javascript = (struct javascript_t * ) args;
@@ -188,11 +188,11 @@ static const JSFunctionSpec jsnWebserverMethods[ ] = {
 static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	struct webserver_t * webserver;
 	struct javascript_t * javascript;
-	JSString * jServerIp;
-	char * cServerIp;
-	const char * cDocumentRoot, *cPath;
 	cfg_t * section;
+	JSString * jServerIp;
 	JS::CallArgs args;
+	const char * cDocumentRoot, *cPath;
+	char * cServerIp;
 	int port, timeout_sec;
 	struct {unsigned int good:1;} cleanUp;
 
@@ -339,13 +339,13 @@ static const JSFunctionSpec jsnHardMethods[ ] = {
 */
 static bool JsnConsoleLog( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	struct javascript_t * javascript;
+	cfg_t * section;
 	JSObject *  consoleObj;
 	JSString * jString;
-	cfg_t * section;
+	JS::CallArgs args;
 //	const char *fileName;
 //	unsigned int lineNo;
 	char *cString;
-	JS::CallArgs args;
 	struct {unsigned int good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -468,12 +468,12 @@ static struct JsPayload * JsPayload_New( JSContext * cx, JSObject * object, JS::
 * }
 */
 static bool JsnGlobalInclude( JSContext * cx, unsigned argc, JS::Value * vpn ) {
+	struct javascript_t * javascript;
 	JSString * jFile;
 	JSObject * globalObj;
-	struct javascript_t * javascript;
-	bool success;
-	char * cFile;
 	JS::CallArgs args;
+	char * cFile;
+	bool success;
 	struct {unsigned int good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -501,8 +501,8 @@ static bool JsnGlobalInclude( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 }
 
 static int TimerHandler_cb( void * cbArgs ) {
-	JSContext *cx;
 	struct JsPayload * payload;
+	JSContext *cx;
 	int again;
 	//JSCompartment * oldCompartment;
 
@@ -549,9 +549,9 @@ static int TimerHandler_cb( void * cbArgs ) {
 * @see	clearInterval
 */
 static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn ) {
+	struct javascript_t * javascript;
 	struct JsPayload * payload;
 	struct timing_t * timing;
-	struct javascript_t * javascript;
 	JSObject * globalObj;
 	JS::CallArgs args;
 	int ms;
@@ -581,7 +581,7 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTimer( javascript->core, ms, TimerHandler_cb, (void * ) payload ) ) != NULL );
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, TimerHandler_cb, (void * ) payload ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
@@ -589,7 +589,7 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 		args.rval().setInt32( (int32_t) timing->identifier );
 	} else {
 		if ( cleanUp.timer ) {
-			Core_DelTimer( javascript->core, timing );
+			Core_DelTiming( timing );
 		}
 		if ( cleanUp.args ) {
 			JS_free( cx, payload->args) ; payload->args = NULL;
@@ -626,9 +626,9 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 * @see	clearInterval
 */
 static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn ) {
+	struct javascript_t * javascript;
 	struct JsPayload * payload;
 	struct timing_t * timing;
-	struct javascript_t * javascript;
 	JSObject * globalObj;
 	JS::CallArgs args;
 	int ms;
@@ -659,7 +659,7 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTimer( javascript->core, ms, TimerHandler_cb, (void * ) payload ) ) != NULL );
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, TimerHandler_cb, (void * ) payload ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
@@ -667,7 +667,7 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 		args.rval().setInt32( (int32_t) timing->identifier );
 	} else {
 		if ( cleanUp.timer ) {
-			Core_DelTimer( javascript->core, timing );
+			Core_DelTiming( timing );
 		}
 		if ( cleanUp.args ) {
 			JS_free( cx, payload->args) ; payload->args = NULL;
@@ -721,8 +721,8 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 * @see	clearTimeout
 */
 static bool JsnGlobalClearTimeout( JSContext * cx, unsigned argc, JS::Value * vpn ) {
-	unsigned int identifier;
 	struct javascript_t * javascript;
+	unsigned int identifier;
 	JSObject * globalObj;
 	JS::CallArgs args;
 	struct {unsigned int good:1;} cleanUp;
@@ -734,7 +734,7 @@ static bool JsnGlobalClearTimeout( JSContext * cx, unsigned argc, JS::Value * vp
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "i", &identifier ) == true );
 	if ( cleanUp.good ) {
 		javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
-		Core_DelTimerId( javascript->core, identifier );
+		Core_DelTimingId( javascript->core, identifier );
 	}
 
 	return (cleanUp.good ) ? true: false;
@@ -850,8 +850,7 @@ static int Javascript_Init( struct javascript_t * javascript, struct core_t * co
 
 static bool Javascript_IncludeScript( struct javascript_t * javascript, const char * cfile ) {
 	char fileNameWithPath[512];
-	struct {
-			unsigned int good:1;} cleanUp;
+	struct { unsigned int good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	JSAutoRequest ar( javascript->context );

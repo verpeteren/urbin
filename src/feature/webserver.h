@@ -77,6 +77,7 @@ struct route_t {
 		const char * 				documentRoot;
 		dynamicHandler_cb_t			handler_cb;
 							}	details;
+	struct PRCListStr			mLink;
 };
 
 struct mimeDetail_t {
@@ -87,7 +88,7 @@ struct mimeDetail_t {
 
 struct webserver_t {
 	struct core_t *				core;
-	struct route_t *			route;
+	struct route_t *			routes;
 	OnigRegion *				region;
 	OnigOptionType regexOptions;
 	uint16_t					port;

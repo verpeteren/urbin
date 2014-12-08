@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <picoev.h>
+#include "prclist.h"
 
 #include "../common.h"
 #include "configuration.h"
@@ -16,22 +17,27 @@ extern "C" {
 typedef void 				( * signalAction_cb_t )		( int );
 typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
 
+#define FROM_NEXT_TO_ITEM( type ) ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
+
 #define FEATURE_JOINCORE( Feat, feature ) \
 void Feat##_JoinCore( struct feature##_t * feature ) { \
 	picoev_add( feature->core->loop, feature->socketFd, PICOEV_READ, 0, Feat##_HandleAccept_cb, (void * ) feature ); \
 }
+
 enum moduleEvent_t {
 	MODULEEVENT_LOAD,
 	MODULEEVENT_READY,
 	MODULEEVENT_UNLOAD
 };
 
+struct timing_t;
 struct timing_t {
 	int							ms;
 	uint32_t					identifier;
 	timerHandler_cb_t 			timerHandler_cb;
 	timerHandler_cb_t			clearFunc;
 	void *						cbArg;
+	PRCList						mLink;
 };
 
 struct core_t {
@@ -39,7 +45,7 @@ struct core_t {
 	cfg_t *						config;
 	struct module_t *			modules;
 	int							modulesCount;
-	struct timing_t *			timers;
+	struct timing_t *			timings;
 	unsigned int				keepOnRunning:1;
 };
 
@@ -58,9 +64,9 @@ struct core_t *					Core_New				( struct module_t * modules, const int modulesCo
 void							Core_Loop				( struct core_t * core );
 void							Core_FireEvent			( struct core_t * core, enum moduleEvent_t event );
 int 							Core_PrepareDaemon		( struct core_t * core , signalAction_cb_t signalHandler );
-struct timing_t *				Core_AddTimer 			( struct core_t * core , int ms, timerHandler_cb_t timerHandler_cb, void * cb_arg );
-void 							Core_DelTimerId			( struct core_t * core , uint32_t id );
-void 							Core_DelTimer 			( struct core_t * core , struct timing_t * timing );
+struct timing_t *				Core_AddTiming 			( struct core_t * core , int ms, timerHandler_cb_t timerHandler_cb, void * cb_arg );
+void 							Core_DelTimingId		( struct core_t * core , uint32_t id );
+void 							Core_DelTiming 			( struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );
 
 #ifdef __cplusplus

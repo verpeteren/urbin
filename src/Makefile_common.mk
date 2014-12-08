@@ -3,8 +3,8 @@ include ./Makefile_platform.mk
 AR = ar
 RANLIB = ranlib
 CTAGS = ctags
-CC = gcc
 #CC = clang
+CC = gcc
 
 OBJ_DIR = .objects
 DEP_DIR = ./deps

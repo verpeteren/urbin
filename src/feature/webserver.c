@@ -133,7 +133,7 @@ static void						Webserver_HandleRead_cb	( picoev_loop* loop, int fd, int events
 static void						Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
 static void						Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
 static void 					Webserver_FindRoute		( struct webserver_t * webserver, struct webclient_t * webclient );
-static int						Webserver_RegisterRoute	( struct webserver_t * webserver, struct route_t * route );
+static void						Webserver_RegisterRoute	( struct webserver_t * webserver, struct route_t * route );
 
 static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions ) {
 	struct route_t * route;
@@ -160,6 +160,7 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 	if ( cleanUp.good ) {
 		cleanUp.onig = 1;
 		route->routeType = routeType;
+		PR_INIT_CLIST( &route->mLink );
 		switch( route->routeType ) {
 			case ROUTETYPE_DOCUMENTROOT:
 				cleanUp.good = ( ( route->details.documentRoot = strdup( details ) ) != NULL );
@@ -194,19 +195,15 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot ) {
 	struct route_t * route;
 	struct { unsigned int good:1;
-			unsigned int route:1;
-			unsigned int registered:1;} cleanUp;
+			unsigned int route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DOCUMENTROOT, (void * ) documentRoot, webserver->regexOptions ) ) != NULL);
 	if ( cleanUp.good ){
 		cleanUp.route = 1;
-		cleanUp.registered = ( ( Webserver_RegisterRoute( webserver, route ) ) == 1 );
+		Webserver_RegisterRoute( webserver, route );
 	}
 	if ( ! cleanUp.good ){
-		if ( cleanUp.registered ) {
-			//pass
-		}
 		if ( cleanUp.route ) {
 			Route_Delete( route ); route = NULL;
 		}
@@ -218,19 +215,15 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handler_cb ) {
 	struct route_t * route;
 	struct { unsigned int good:1;
-			unsigned int route:1;
-			unsigned int registered:1;} cleanUp;
+			unsigned int route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handler_cb, webserver->regexOptions ) ) != NULL);
 	if ( cleanUp.good ){
 		cleanUp.route = 1;
-		cleanUp.registered = ( ( Webserver_RegisterRoute( webserver, route ) ) == 1 );
+		Webserver_RegisterRoute( webserver, route );
 	}
 	if ( ! cleanUp.good ){
-		if ( cleanUp.registered ) {
-			//pass
-		}
 		if ( cleanUp.route ) {
 			Route_Delete( route ); route = NULL;
 		}
@@ -251,8 +244,7 @@ static void Route_Delete ( struct route_t * route ) {
 static struct webclient_t * Webclient_New( struct webserver_t * webserver, int socketFd) {
 	struct webclient_t * webclient;
 	struct {unsigned int good:1;
-		unsigned int webclient:1;
-		} cleanUp;
+			unsigned int webclient:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( webclient = malloc( sizeof( *webclient) ) ) != NULL );
@@ -334,16 +326,16 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 		if ( route->routeType == ROUTETYPE_DYNAMIC ) {
 			route->details.handler_cb( webclient );
 		} else if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
+			struct stat fileStat;
 			const char * documentRoot;
 			char * fullPath;
 			char * requestedPath;
 			size_t fullPathLength, pathLength;
+			int exists;
+			size_t j, len;
 			struct {unsigned int good:1;
 					unsigned int fullPath:1;
 					unsigned int requestedPath:1; } cleanUp;
-			int exists;
-			size_t j, len;
-			struct stat fileStat;
 
 			memset( &cleanUp, '\0', sizeof( cleanUp ) );
 			fullPath = NULL;
@@ -437,11 +429,11 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 }
 
 static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
+	HeaderField * field;
+	size_t i;
 	struct {unsigned int good:1;
 			unsigned int h3:1;
 			unsigned int content:1;} cleanUp;
-	size_t i;
-	HeaderField * field;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( webclient->header = h3_request_header_new( ) ) != NULL );
@@ -533,9 +525,9 @@ static void Webclient_Delete( struct webclient_t * webclient ) {
 }
 
 static void Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* ws_arg ) {
-	int newFd;
 	struct webserver_t * webserver;
 	struct webclient_t * webclient;
+	int newFd;
 
 	webserver = (struct webserver_t *) ws_arg;
 	newFd  = accept( fd, NULL, NULL );
@@ -700,14 +692,14 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 
 
 struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const uint16_t port, const int timeout_sec ) {
+	struct webserver_t * webserver;
+	struct sockaddr_in listenAddr;
+	int flag;
 	struct {unsigned int good:1;
 		unsigned int ip:1;
 		unsigned int socket:1;
 		unsigned int onig:1;
 		unsigned int webserver:1;} cleanUp;
-	struct webserver_t * webserver;
-	struct sockaddr_in listenAddr;
-	int flag;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	flag = 1;
@@ -716,7 +708,7 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 		cleanUp.webserver = 1;
 		webserver->core = core;
 		webserver->socketFd = 0;
-		webserver->route = NULL;
+		PR_INIT_CLIST( &webserver->routes->mLink );
 		webserver->timeout_sec  = ( timeout_sec < 0 ) ? WEBSERVER_TIMEOUT_SEC: timeout_sec;
 		webserver->regexOptions = ONIG_OPTION_SINGLELINE | ONIG_OPTION_FIND_LONGEST | ONIG_OPTION_CAPTURE_GROUP;  //  | ONIG_OPTION_IGNORECASE | ONIG_OPTION_DEFAULT;
 		webserver->ip = strdup( ip );
@@ -769,18 +761,13 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 
 FEATURE_JOINCORE( Webserver, webserver )
 
-static int Webserver_RegisterRoute( struct webserver_t * webserver, struct route_t * route ) {
-	//  @TODO: add more routes, no deletion
-	if ( webserver->route ) {
-			Route_Delete( webserver->route );
-	}
-	webserver->route = route;
-
-	return 1;
+static void Webserver_RegisterRoute( struct webserver_t * webserver, struct route_t * route ) {
+	PR_APPEND_LINK( &route->mLink, &webserver->routes->mLink );
 }
 
 static void  Webserver_FindRoute( struct webserver_t * webserver, struct webclient_t * webclient ) {
 	struct route_t * route;
+	PRCList * next;
 	unsigned char * range, * end, * start;
 	int r, found, len;
 	char * url;
@@ -797,15 +784,18 @@ static void  Webserver_FindRoute( struct webserver_t * webserver, struct webclie
 		start = ( unsigned char * ) url;
 		end = start + strlen( url );
 		range = end;
-		//  @TODO: search more routes, see webserver_RegisterRoute
-		route = webserver->route;
-		if ( route ) {
-			r = onig_search( route->urlRegex, ( unsigned char * ) url, end, start, range, webserver->region, webserver->regexOptions );
-			found = ( r >= 0 );
-			if ( found )  {
-				webclient->route = webserver->route;
-				//break;
-			}
+		next = webserver->routes->mLink.next;
+		if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+			do {
+				route = FROM_NEXT_TO_ITEM( struct route_t );
+				next = route->mLink.next;
+				r = onig_search( route->urlRegex, ( unsigned char * ) url, end, start, range, webserver->region, webserver->regexOptions );
+				found = ( r >= 0 );
+				if ( found )  {
+					webclient->route = webserver->routes;
+					break;
+				}
+			} while( next != NULL );
 		}
 	}
 	if ( cleanUp.url ) {
@@ -817,9 +807,16 @@ static void  Webserver_FindRoute( struct webserver_t * webserver, struct webclie
 }
 
 void Webserver_Delete( struct webserver_t * webserver ) {
-	if ( webserver->route ) {
-		//  @TODO: delete more routes, see Webserver_RegisterRoute
-		Route_Delete( webserver->route ); webserver->route = NULL;
+	struct route_t * route;
+	PRCList * next;
+
+	next = webserver->routes->mLink.next;
+	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+		do {
+			route = FROM_NEXT_TO_ITEM( struct route_t );
+			next = route->mLink.next;
+			Route_Delete( webserver->routes ); webserver->routes = NULL;
+		} while( next != NULL );
 	}
 	onig_region_free( webserver->region, 1 ); webserver->region = NULL;
 	webserver->regexOptions = 0;

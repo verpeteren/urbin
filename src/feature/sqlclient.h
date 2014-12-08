@@ -14,12 +14,6 @@ extern "C" {
 
 #define MYSQL_BUFS ( 1024 * 1024 )
 
-//  @FIXME:  Pool
-typedef int pool_list_t;
-extern pool_list_t * 			pool_list_new					( 	);
-extern void  					pool_list_push					( pool_list_t *, void * );
-extern void * 					pool_list_pop					( pool_list_t * );
-extern	void 					pool_list_delete				( pool_list_t * );
 
 struct query_t;
 
@@ -29,6 +23,7 @@ enum sqlAdapter_t {
 	SQLADAPTER_POSTGRESQL,
 	SQLADAPTER_MYSQL
 };
+struct query_t;
 
 struct sqlclient_t {
 	struct core_t *				core;
@@ -47,7 +42,7 @@ struct sqlclient_t {
 	int							socketFd;
 	int							timeout_sec;
 	unsigned int				statementId; //  only needed for mysac
-	pool_list_t *				pool;
+	struct query_t *			queries;
 	uint16_t					port;
 };
 
@@ -64,7 +59,7 @@ struct query_t{
 						} 		result;
 	void *						cbArgs;
 	queryHandler_cb_t			cbHandler;
-	struct query_t *			next;
+	struct PRCListStr			mLink;
 };
 
 struct sqlclient_t *			Mysql_New					( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName );

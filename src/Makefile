@@ -17,7 +17,6 @@ LD_DEBUG_FLAGS +=
 ifeq ($(CC),gcc)
 CC_DEBUG_FLAGS += -pg -fno-builtin-strlen --param ssp-buffer-size=4
 else
- 
 endif
 endif
 
@@ -61,13 +60,12 @@ $(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion
 $(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return
 $(OBJ_DIR)/core.o:					EXCEPTION =
 $(OBJ_DIR)/utils.o:					EXCEPTION =
-$(OBJ_DIR)/utils.o:					EXCEPTION =
 ifeq ($(CC),gcc)
 else 
-$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code
-$(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
+$(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/javascript.o:			EXCEPTION += 
-$(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code
+$(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/utils.o:					EXCEPTION += 
 $(OBJ_DIR)/configuration.o:			EXCEPTION += 
 endif
