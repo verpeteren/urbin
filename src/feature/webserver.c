@@ -331,11 +331,12 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 						snprintf( fullPath, fullPathLength, "%s/%s/index.html", documentRoot, requestedPath );
 						exists = stat( fullPath, &fileStat );
 						if ( exists != 0 ) {
-							//  @TODO: this is the place where a directory index handler can step into the arena
+							//  this is the place where a directory index handler can step into the arena;
+							//  but we will not do that, because: https://github.com/monkey/monkey/blob/master/plugins/dirlisting/dirlisting.c#L153 :-)
 							webclient->response.httpCode = HTTPCODE_NOTFOUND;
 						}
 					}
-					//  all looks ok, we have accecss to a file
+					//  all looks ok, we have access to a file
 					if ( webclient->response.httpCode == HTTPCODE_OK ) {
 						webclient->response.contentLength = fileStat.st_size;
 						webclient->response.content = fullPath;
@@ -348,7 +349,8 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 								break;
 							}
 						}
-						//  @TODO: this is the place where a module handler can step into the arena ( e.g. .js / .py / .php )
+						//  this is the place where a module handler can step into the arena ( e.g. .js / .py / .php );
+						//  but we will not do this for spidermonkey, because we load that upon startup only once
 					}
 				} else {
 					webclient->response.httpCode = HTTPCODE_NOTFOUND;
@@ -403,7 +405,7 @@ static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
 		}
 		for ( i = 0; i < webclient->header->HeaderSize; i++ ) {
 			field = &webclient->header->Fields[i];
-			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) { //  @TODO: RTFSpec! only if http1.1 yadayadyada...
+			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http1.1 yadayadyada...
 				if ( strncmp( field->Value, "Keep-Alive", field->ValueLen ) == 0 ) {
 					webclient->connection = CONNECTION_KEEPALIVE;
 				} else 	if ( strncmp( field->Value, "close", field->ValueLen ) == 0 ) {

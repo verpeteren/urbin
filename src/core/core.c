@@ -55,7 +55,7 @@ struct timing_t * Timing_New ( int ms, timerHandler_cb_t timerHandler_cb, void *
 	if ( cleanUp.good ) {
 		cleanUp.timing = 1;
 		timing->ms = ms;
-		timing->identifier = 1;  //  @FIXME: generate a unqiue nr
+		timing->identifier = 1;  //  @FIXME:  generate a unqiue nr
 		timing->timerHandler_cb = timerHandler_cb;
 		timing->cbArg = cbArg;
 		timing->clearFunc = NULL;
@@ -95,8 +95,7 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 	cleanUp.good = ( ( core = malloc( sizeof( * core ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
-	}
-	if ( cleanUp.good )  {
+		PR_INIT_CLIST( (&core->timings->mLink) );
 		cleanUp.good = ( ( core->loop = picoev_create_loop( LOOP_TIMEOUT ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -118,7 +117,6 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 	}
 	if ( cleanUp.good ) {
 		cleanUp.config = 1;
-		PR_INIT_CLIST( (&core->timings->mLink) );
 	}
 	if ( cleanUp.good ) {
 		Core_FireEvent( core, MODULEEVENT_LOAD );
@@ -133,7 +131,7 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 		if ( cleanUp.core ) {
 			core->modules = NULL;
 			core->modules = 0;
-			free( core ); core = NULL;//  @TODO: clear timers
+			free( core ); core = NULL;
 		}
 	}
 
@@ -168,7 +166,7 @@ void Core_Loop( struct core_t * core ) {
 	Core_FireEvent( core, MODULEEVENT_READY );
 	core->keepOnRunning = 1;
 	while ( core->keepOnRunning )  {
-		//  @TODO: processTick( core->timing );
+		  //  @TODO:  processTick( core->timing );
 		picoev_loop_once( core->loop, 0 );
 	}
 }
@@ -185,9 +183,9 @@ void Core_FireEvent( struct core_t *core, enum moduleEvent_t event ) {
 			if (module->module_load != NULL ) {
 				instance = module->module_load( core );
 				if ( instance == NULL ) {
-					//  @TODO: better logging on errors
+					  //  @TODO:  better logging on errors
 				}
-				module->data = instance;  //  @FIXME: handle multiple instances
+				module->data = instance;  //  @FIXME:  handle multiple instances
 			}
 		}
 		break;
@@ -269,7 +267,6 @@ void Core_Delete( struct core_t * core ) {
 	picoev_destroy_loop( core->loop );
 	Core_FireEvent( core, MODULEEVENT_UNLOAD );
 	core->modules = NULL;
-	//  @TODO: clear timers
 	core->modules = 0;
 	cfg_free( core->config );
 	free( core );

@@ -106,7 +106,7 @@ void JavascriptModule_Ready( struct core_t * core, void * args ) {
  * The javascript module is stopping.
  *
  * @name	Hard.onUnload
- * @event
+ * @event:
  * @public
  * @since	0.0.5b
  * @returns	{null}
@@ -146,7 +146,7 @@ void JavascriptModule_Unload( struct core_t * core, void * args ) {
  * Webserver response object.
  *
  * @name Hard.Webserver.req
- * @private
+ * @private:
  * @object
  */
 static void JsnWebserverFinalize( JSFreeOp * fop, JSObject * webserverObj );
@@ -187,7 +187,7 @@ static const JSFunctionSpec jsnWebserverMethods[ ] = {
  */
 static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	struct webserver_t * webserver;
-	struct javascript_t * javascript;
+	struct javascript_t * javascript;:
 	cfg_t * section;
 	JSString * jServerIp;
 	JS::CallArgs args;
@@ -263,7 +263,7 @@ static bool JsnFunctionStub( JSContext *cx, unsigned argc, JS::Value *vpn ) {
 
 /**
  * Shutdown the engine after a timeout.
- *
+ *:
  * This will stop the engine.
  *
  * @name	Hard.shutdown
@@ -362,7 +362,7 @@ static bool JsnConsoleLog( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	if ( cleanUp.good ) {
 #if DEBUG & 0
 		JSScript *script;
-		//  FIXME:  act on this depending on the compiled javascript debug build
+		//  @FIXME:  act on this depending on the compiled javascript debug build
 		JS_DescribeScriptedCaller( cx, &script, &lineNo );
 //		fileName = JS_GetScriptFilename( cx, script );
 #else
@@ -559,7 +559,7 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 			 unsigned int args:1;
 			 unsigned int timer:1;
 			unsigned int good:1;} cleanUp;
-	//  @TODO DRY JsnGlobalSetTimeout && JsnGlobalSetInterval
+	  //  @TODO:  DRY JsnGlobalSetTimeout && JsnGlobalSetInterval
 	JS::RootedValue dummy( cx );
 	JS::RootedValue fnVal( cx );
 	args = CallArgsFromVp( argc, vpn );
@@ -636,7 +636,7 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 			 unsigned int args:1;
 			 unsigned int timer:1;
 			unsigned int good:1;} cleanUp;
-	//  @TODO DRY JsnGlobalSetTimeout && JsnGlobalSetInterval
+	  //  @TODO:  DRY JsnGlobalSetTimeout && JsnGlobalSetInterval
 	JS::RootedValue dummy( cx );
 	JS::RootedValue fnVal( cx );
 	args = CallArgsFromVp( argc, vpn );

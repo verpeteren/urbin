@@ -184,7 +184,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, voi
 	struct query_t * query;
 	int retCode;
 	size_t i;
-	//  @TODO:  check memory handling of resBUf and vars
+	  //  @TODO:  check memory handling of resBUf and vars
 	MYSAC_BIND * vars;
 	char resBuf[MYSQL_BUFS];
 	struct { unsigned int good:1;
@@ -224,7 +224,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, voi
 		}
 		if ( ! cleanUp.good ) {
 			if ( cleanUp.vars ) {
-				free( vars ); vars = NULL;  //  @TODO: further cleanup
+				free( vars ); vars = NULL;  //  @TODO:  further cleanup
 			}
 		}
 	}
@@ -342,7 +342,7 @@ static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter
 		}
 		sqlclient->hostName = sqlclient->ip = sqlclient->loginName = sqlclient->password = sqlclient->dbName = NULL;
 	}
-	//  @TODO:  drop parameter ip and do a hostname lookup (well actually at 'connect' as the ip address could change)
+	  //  @TODO:  drop parameter ip and do a hostname lookup (well actually at 'connect' as the ip address could change)
 	if ( hostName == NULL && ip == NULL ) {
 		return NULL;
 	}else if ( hostName == NULL && ip != NULL ) {

@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include <picoev.h>
-#include "prclist.h"
+#include <prclist.h>
 
 #include "../common.h"
 #include "configuration.h"
