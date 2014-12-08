@@ -46,5 +46,4 @@ else
 	make -f Makefile.dependencies && make
 fi
 
-# vim: ts=4 sts=4 sw=4 noet nu
 

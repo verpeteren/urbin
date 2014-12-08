@@ -14,6 +14,66 @@
 
 #include "webserver.h"
 
+/*****************************************************************************/
+/* Module                                                                    */
+/*****************************************************************************/
+struct module_t gWebserverModule = {
+	WebserverModule_Load,
+	WebserverModule_Ready,
+	WebserverModule_Unload,
+	NULL
+};
+
+void * WebserverModule_Load( struct core_t * core ) {
+	char * path, * documentRoot, * ip;
+	uint16_t port;
+	int timeout_sec;
+	struct cfg_t * webserverSection, * modulesSection;
+	struct webserver_t * webserver;
+	struct {unsigned int good:1;
+			unsigned int http:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	modulesSection = cfg_getnsec( core->config, "modules", 0 );
+	webserverSection = cfg_getnsec( modulesSection, "httpserver", 0 );
+	path = cfg_getstr( webserverSection, "path" );
+	documentRoot = cfg_getstr( webserverSection, "documentroot" );
+	ip = cfg_getstr( webserverSection, "ip" );
+	port = (uint16_t) cfg_getint( webserverSection, "port" );
+	timeout_sec = cfg_getint( webserverSection, "timeout_sec" );
+	cleanUp.good = ( ( webserver = Webserver_New( core, ip, port, timeout_sec ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.http = 1;
+		cleanUp.good = ( Webserver_DocumentRoot( webserver, path, documentRoot ) == 1 );
+	}
+	if ( cleanUp.good ) {
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.http ) {
+			Webserver_Delete( webserver ); webserver = NULL;
+		}
+	}
+
+	return (void *) webserver;
+}
+
+void WebserverModule_Ready( struct core_t * core, void * args ) {
+	struct webserver_t * webserver;
+
+	webserver = (struct webserver_t * ) args;
+	Webserver_JoinCore( webserver );
+}
+
+void WebserverModule_Unload( struct core_t * core, void * args ) {
+	struct webserver_t * webserver;
+
+	webserver = (struct webserver_t * ) args;
+	Webserver_Delete( webserver );
+}
+
+/*****************************************************************************/
+/* Static etc                                                                */
+/*****************************************************************************/
 const char * MethodDefinitions[ ] = {
 	"GET",
 	"POST"

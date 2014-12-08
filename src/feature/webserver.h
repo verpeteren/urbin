@@ -16,10 +16,11 @@ extern "C" {
 
 #define HTTP_BUFF_LENGTH 1024
 
-enum mode_t{
+enum requestMode_t {
 	MODE_GET,
 	MODE_POST
 };
+
 enum contentType_t{
 	CONTENTTYPE_BUFFER,
 	CONTENTTYPE_FILE,
@@ -98,7 +99,7 @@ struct webserver_t {
 
 struct webclient_t{
 	int							socketFd;
-	enum mode_t					mode;
+	enum requestMode_t			mode;
 	enum connection_t			connection;
 	struct webserver_t * 		webserver;
 	struct route_t *			route;
@@ -123,6 +124,10 @@ int 							Webserver_DynamicHandler( struct webserver_t * webserver, const char 
 struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, const uint16_t port, const int timeout_sec );
 void 							Webserver_JoinCore		( struct webserver_t * webserver );
 void							Webserver_Delete		( struct webserver_t * webserver );
+
+void *							WebserverModule_Load	( struct core_t * core );
+void							WebserverModule_Ready	( struct core_t * core, void * args );
+void							WebserverModule_Unload	( struct core_t * core, void * args );
 
 #ifdef __cplusplus
 }

@@ -4,6 +4,28 @@
 #include "sqlclient.h"
 
 
+/*****************************************************************************/
+/* Module                                                                    */
+/*****************************************************************************/
+#if 0
+//  Not needed as these do not need an autostart
+void * 								SqlclientModule_Load		( struct core_t * core ) {
+
+}
+
+void								SqlclientModule_Ready		( struct core_t * core, void * args ) {
+
+}
+
+void								SqlclientModule_Unload		( struct core_t * core, void * args ) {
+
+}
+#endif
+/*****************************************************************************/
+/* Static etc.                                                               */
+/*****************************************************************************/
+
+
 static struct sqlclient_t *			Sqlclient_New				( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName );
 static void							Sqlclient_Connect			( struct sqlclient_t * sqlclient );
 static void							Sqlclient_CloseConn			( struct sqlclient_t * sqlclient );

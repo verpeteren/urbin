@@ -23,33 +23,33 @@ VER_PG = 9.4rc1
 DIR_PG = $(DEP_DIR)/postgresql-$(VER_PG)
 INC_PG = -isystem$(DIR_PG)/src/interfaces/libpq/ -isystem$(DIR_PG)/src/include/ 
 LIB_PG = $(DIR_PG)/src/interfaces/libpq/libpq.a
-#VER_MY = 5.5.40
-#this stinks, (Thanks oracle):
-#	5.5.40 does  works with mysac, but cannot be downloaded! thanks oracle!
-#	6.1.5 does not work with mysac, but can be downloadedi
-# The workaround: we use "sudo apt-get install libmysqlclient-dev"
-VER_MY = 6.1.5
-DIR_MY = $(DEP_DIR)/mysql-connector-c-$(VER_MY)-src
+VER_CONF = 2.7
+DIR_CONF = $(DEP_DIR)/confuse-$(VER_CONF)
+INC_CONF = -isystem$(DIR_CONF)/src
+LIB_CONF = $(DIR_CONF)/src/.libs/libconfuse.a
+#this stinks, 6.1.5 does not work with mysac 1.1.1 and 5.6.19 is only available in the debian archive, rather be using mysql-connector-c (Thanks oracle....):
+VER_MY = 5.6.19
+DIR_MY = $(DEP_DIR)/mysql-$(VER_MY)
 INC_MY = -isystems$(DIR_MY)/include
-LIB_MY = $(DIR_MY)/libmysql/mysqlclient.a 
+LIB_MY = $(DIR_MY)/libmysql/libmysqlclient.a 
 VER_MYS = 1.1.1
 DIR_MYS = $(DEP_DIR)/mysac-$(VER_MYS)
 INC_MYS = -isystem$(DIR_MYS)/
 LIB_MYS = $(DIR_MYS)/libmysac-static.a
-VER_MOZ = 34.0.5
-DIR_MOZ = $(DEP_DIR)/mozilla-release
-INC_MOZ = -isystem$(DIR_MOZ)/js/src/build-beta/dist/include/
-LIB_MOZ = $(DIR_MOZ)/js/src/build-beta/dist/lib/libjs_static.a
+VER_MOZ = 35.0b1
+DIR_MOZ = $(DEP_DIR)/mozilla
+INC_MOZ = -isystem$(DIR_MOZ)/js/src/build/dist/include/
+LIB_MOZ = $(DIR_MOZ)/js/src/build/dist/lib/libjs_static.a
 VER_NSPR = 4.10.7
 DIR_NSPR = $(DIR_MOZ)/nsprpub
 INC_NSPR = -isystem$(DIR_NSPR)/dist/include/nspr
-LIB_NSPR = $(DIR_NSPR)/dist/lib/lilbnspr4.a
+LIB_NSPR = $(DIR_NSPR)/dist/lib/libnspr4.a
 
-INCS = $(INC_PICOEV) $(INC_H3) $(INC_ONIG) $(INC_PG) $(INC_MYS) $(INC_MY) $(INC_MOZ) $(INC_NSPR)
-LIBS = $(LIB_PICOEV) $(LIB_H3) $(LIB_ONIG) $(LIB_PG) $(LIB_MYS) $(LIB_MY) $(LIB_MOZ) $(LIB_NSPR)
+INCS = $(INC_PICOEV) $(INC_H3) $(INC_ONIG) $(INC_PG) $(INC_MYS) $(INC_MY) $(INC_MOZ) $(INC_NSPR) $(INC_CONF)
+LIBS = $(LIB_PICOEV) $(LIB_H3) $(LIB_ONIG) $(LIB_PG) $(LIB_MYS) $(LIB_MY) $(LIB_MOZ) $(LIB_NSPR) $(LIB_CONF)
 
 
-GET_OFF_MY_LAWN = -std=gnu99 -Wall -Werror -Wextra -Wfatal-errors \
+GET_OFF_MY_LAWN = -Wall -Werror -Wextra -Wfatal-errors \
 	-Wunreachable-code \
 	-Wpointer-arith \
 	-Wdiv-by-zero \
@@ -83,4 +83,3 @@ else
 	
 endif
 
-# vim: ts=4 sts=4 sw=4 noet nu

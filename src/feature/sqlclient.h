@@ -74,6 +74,12 @@ void							Sqlclient_Delete			( struct sqlclient_t * sqlclient );
 void 							Query_New					( struct sqlclient_t * sqlclient, const char * sqlStatement, size_t paramCount, const char ** paramValues, queryHandler_cb_t callback, void * args );
 void							Query_Delete				( struct query_t * query );
 
+#if 0
+void * 							SqlclientModule_Load		( struct core_t * core );
+void							SqlclientModule_Ready		( struct core_t * core, void * args );
+void							SqlclientModule_Unload		( struct core_t * core, void * args );
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,5 +1,7 @@
 include Makefile_common.mk
 
+NSPR_PATH = $(shell pwd)/$(DIR_NSPR)
+
 ifdef LINUX_BUILD
 PICOEV_SOURCE = picoev_epoll.c
 endif
@@ -115,26 +117,25 @@ $(DIR_MYS):
 $(LIB_MY): $(DIR_MY)
 	@echo $@
 	@cd $(DIR_MY)/ && \
-	cmake . && \
+	cmake . -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 && \
 	make
 	@touch $@
 
 $(DIR_MY):
 	@echo $@
 	@cd $(DEP_DIR) && \
-	wget -q http://dev.mysql.com/get/Downloads/Connector-C/mysql-connector-c-$(VER_MY)-src.tar.gz && \
-	tar -xaf mysql-connector-c-$(VER_MY)-src.tar.gz && \
-	ln -s ./mysql-connector-c-$(VER_MY)-src/include ./mysql-connector-c-$(VER_MY)-src/mysql 
+	wget -q http://ftp.de.debian.org/debian/pool/main/m/mysql-5.6/mysql-5.6_$(VER_MY).orig.tar.gz
+	tar -xaf mysql-5.6_$(VER_MY).orig.tar.gz
+	ln -s ./mysql-$(VER_MY)/include ./mysql-$(VER_MY)/mysql 
 ###############################################################################
 # NSPR
 ###############################################################################
-$(LIB_NSPR): $(DIR_NSPR)
+$(LIB_NSPR): $(DIR_MOZ)
 	@echo $@
 	@cd $(DIR_NSPR) && \
 	./configure && \
-	make && \
-	cd pr/tests && \
-	make
+	make 
+	@cp $(DIR_NSPR)/config/nspr-config $(DIR_NSPR)/dist/bin/
 
 $(DIR_NSPR): $(DIR_MOZ)
 	@echo $@
@@ -145,13 +146,12 @@ $(DIR_NSPR): $(DIR_MOZ)
 ###############################################################################
 # spidermonkey: embedded javascript interpreter
 ###############################################################################
-$(LIB_MOZ): $(DIR_MOZ) $(LIB_NSPR)
+$(LIB_MOZ): $(LIB_NSPR)
 	@echo $@
-	@cp $(DIR_NSPR)/config/nspr-config $(DIR_NSPR)/dist/bin/ && \
-	cd $(DIR_MOZ)/js/src && \
+	@cd $(DIR_MOZ)/js/src && \
 		autoconf2.13 && \
-		mkdir -p build-beta && \
-		cd build-beta && \
+		mkdir -p build && \
+		cd build && \
 		../configure \
 		--without-android-ndk \
 		--disable-metro \
@@ -169,16 +169,33 @@ $(LIB_MOZ): $(DIR_MOZ) $(LIB_NSPR)
 		--enable-shared-js \
 		--enable-valgrind \
 		--enable-threadsafe \
-		--enable-nspr-build \
+		--disable-nspr-build \
+		--with-nspr-prefix=$(NSPR_PATH) --with-nspr-cflags="-I$(NSPR_PATH)/dist/include/nspr" --with-nspr-libs="-lrt -L .$(NSPR_PATH)/dist/lib/ -lnspr4 -lplds4 -lplc4 $(NSPR_PATH)/dist/lib/libnspr4.a $(NSPR_PATH)/dist/lib/libplds4.a $(NSPR_PATH)/dist/lib/libplc4.a" \
 		$(DEBUG) \
 		&&make 
-		#--with-nspr-prefix=$(DIR_NSPR) --with-nspr-cflags="-I$(DIR_NSPR)/dist/include/nspr" --with-nspr-libs="-lrt -L .$(DIR_NSPR)/dist/lib/ -lnspr4 -lplds4 -lplc4 $(DIR_NSPR)/dist/lib/libnspr4.a $(DIR_NSPR)/dist/lib/libplds4.a $(DIR_NSPR)/dist/lib/libplc4.a" \
 
 $(DIR_MOZ):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q https://ftp.mozilla.org/pub/mozilla.org/firefox/candidates/$(VER_MOZ)-candidates/build1/source/firefox-$(VER_MOZ).source.tar.bz2 && \
 	tar -xaf firefox-$(VER_MOZ).source.tar.bz2 
+	mv mozilla-@(build|beta) mozilla
+
+#############################################################################
+# libconfuse: configuration file library 
+#############################################################################
+$(LIB_CONF): $(DIR_CONF)
+	@echo $@
+	@cd $(DIR_CONF) && \
+	./configure --with-gnu-ld --disable-examples --disable-nls --disable-rpath --enable-shared --enable-static && \
+	make 
+	@touch $@
+
+$(DIR_CONF):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://savannah.nongnu.org/download/confuse/confuse-$(VER_CONF).tar.gz && \
+	tar -xaf confuse-$(VER_CONF).tar.gz
 
 ###############################################################################
 # Boilerplate
@@ -193,6 +210,3 @@ propperclean:
 	@echo cleaning all
 	@rm -rf $(shell find $(DEP_DIR)/* -type d)
 
-
-
-# vim: ts=4 sts=4 sw=4 noet nu
