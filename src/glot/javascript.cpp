@@ -569,7 +569,7 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, TimerHandler_cb, (void * ) payload ) ) != NULL );
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, 0, TimerHandler_cb, (void * ) payload ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
@@ -638,16 +638,16 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 	if ( cleanUp.good ) {
 		if (args.length() > 2 ) {
 			JS::HandleValueArray argsAt2 = JS::HandleValueArray::fromMarkedLocation( argc - 2, vpn );
-			cleanUp.good = ( ( payload = JsPayload_New( cx, globalObj, &fnVal, &argsAt2, false ) ) != NULL );
+			cleanUp.good = ( ( payload = JsPayload_New( cx, globalObj, &fnVal, &argsAt2, true ) ) != NULL );
 			payload->repeat = true;
 		} else {
 			JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty();
-			cleanUp.good = ( ( payload = JsPayload_New( cx, globalObj, &fnVal, &argsAt2, false) ) != NULL );
+			cleanUp.good = ( ( payload = JsPayload_New( cx, globalObj, &fnVal, &argsAt2, true ) ) != NULL );
 		}
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, TimerHandler_cb, (void * ) payload ) ) != NULL );
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, 1, TimerHandler_cb, (void * ) payload ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;

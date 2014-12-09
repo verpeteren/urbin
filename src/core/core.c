@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <fcntl.h>
+//#include <stdint.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -83,11 +84,10 @@ void Module_Delete ( struct module_t * module ) {
 /*****************************************************************************/
 /* Timings                                                                    */
 /*****************************************************************************/
-struct timing_t *			Timing_New 					( int ms, timerHandler_cb_t timerHandler_cb, void * cbArg );
+struct timing_t *			Timing_New 					( int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
 void 						Timing_Delete				( struct timing_t * timing );
 
-
-struct timing_t * Timing_New ( int ms, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
+struct timing_t * Timing_New ( int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
 	struct timing_t * timing;
 	struct {unsigned int good:1;
 			unsigned timing:1; } cleanUp;
@@ -97,9 +97,11 @@ struct timing_t * Timing_New ( int ms, timerHandler_cb_t timerHandler_cb, void *
 	if ( cleanUp.good ) {
 		cleanUp.timing = 1;
 		timing->ms = ms;
-		timing->identifier = 1;  //  @FIXME:  generate a unqiue nr
+		timing->repeat = ( repeat == 1 ) ? 1: 0;
+		timing->identifier = identifier;
 		timing->timerHandler_cb = timerHandler_cb;
 		timing->cbArg = cbArg;
+		//  @TODO: Timer_CalculateDue( timer, NUL );
 		timing->clearFunc_cb = NULL;
 		PR_INIT_CLIST( &timing->mLink );
 	}
@@ -116,6 +118,7 @@ void Timing_Delete( struct timing_t * timing ) {
 		timing->clearFunc_cb( timing->cbArg);
 	}
 	timing->ms = 0;
+	timing->repeat = 0;
 	timing->identifier = 0;
 	timing->timerHandler_cb = NULL;
 	timing->clearFunc_cb= NULL;
@@ -139,6 +142,7 @@ struct core_t * Core_New( cfg_t * config ) {
 	cleanUp.good = ( ( core = malloc( sizeof( * core ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
+		core->maxIdentifier = 1;
 		PR_INIT_CLIST( (&core->timings->mLink) );
 		PR_INIT_CLIST( (&core->modules->mLink) );
 		mainSection = cfg_getnsec( core->config, "main", 0 );
@@ -203,6 +207,11 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 	return cleanUp.good;
 }
 
+static void Core_ProcessTick( struct core_t * core ) {
+	  //  @TODO:  //process tick
+	  //  if repeat than Timer_CalculateDue( timer, horizon );
+}
+
 void Core_Loop( struct core_t * core ) {
 	struct module_t * module;
 	PRCList * next;
@@ -219,7 +228,7 @@ void Core_Loop( struct core_t * core ) {
 	}
 	core->keepOnRunning = 1;
 	while ( core->keepOnRunning )  {
-		  //  @TODO:  processTick( core->timing );
+		Core_ProcessTick( core );
 		picoev_loop_once( core->loop, 0 );
 	}
 }
@@ -232,6 +241,7 @@ void Core_AddModule( struct core_t * core, struct module_t * module ) {
 		}
 	}
 }
+
 void Core_DelModule( struct core_t * core, struct module_t * module ) {
 	if ( module != NULL ) {
 		PR_REMOVE_AND_INIT_LINK( &module->mLink );
@@ -241,14 +251,14 @@ void Core_DelModule( struct core_t * core, struct module_t * module ) {
 	}
 }
 
-
-struct timing_t *  Core_AddTiming ( struct core_t * core , int ms, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
+struct timing_t *  Core_AddTiming ( struct core_t * core , int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
 	struct timing_t * timing;
 	struct {unsigned int good:1;
 			unsigned timing:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
-	cleanUp.good = ( (  timing = Timing_New( ms, timerHandler_cb, cbArg ) ) != NULL );
+	core->maxIdentifier++;
+	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArg ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.timing = 1;
 		PR_APPEND_LINK( &core->timings->mLink, &timing->mLink );
@@ -261,6 +271,7 @@ struct timing_t *  Core_AddTiming ( struct core_t * core , int ms, timerHandler_
 
 	return timing;
 }
+
 void Core_DelTimingId ( struct core_t * core , uint32_t id ) {
 	struct timing_t * timing;
 	PRCList * next;
