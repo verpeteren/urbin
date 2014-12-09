@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include <picoev.h>
+#include <tadns.h>
 #include <prclist.h>
 #include <prinrval.h>
 
@@ -53,6 +54,7 @@ struct module_t {
 struct core_t {
 	picoev_loop *				loop;
 	cfg_t *						config;
+	struct dns *				dns;
 	struct module_t *			modules;
 	struct timing_t *			timings;
 	struct {

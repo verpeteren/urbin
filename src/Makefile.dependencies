@@ -53,7 +53,6 @@ $(DIR_CLOG):
 	unzip -qq clog.zip && \
 	mv c-logging-master clog 
 
-
 ###############################################################################
 # H3 - The Fast HTTP header parser library  
 ###############################################################################
@@ -68,6 +67,23 @@ $(DIR_H3):
 	wget -q https://github.com/c9s/h3/archive/master.zip -O h3.zip && \
 	unzip -qq h3.zip && \
 	mv h3-master h3
+
+###############################################################################
+# TADns - Tiny Asyncronous Dns Lookup library
+###############################################################################
+$(LIB_TADL): $(DIR_TADL)
+	@echo $@
+	@cd $(DIR_TADL) && \
+	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o tadns.o tadns.c && \
+	$(AR) cr libtadns.a tadns.o && \
+	$(RANLIB) libtadns.a
+
+$(DIR_TADL):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://sourceforge.net/projects/adns/files/tadns/$(VER_TADL)/tadns-$(VER_TADL).tar.gz/download -O tadns-$(VER_TADL).tar.gz && \
+	tar -xaf tadns-$(VER_TADL).tar.gz 
+
 ###############################################################################
 # oniguruma: an regular expression engine
 ###############################################################################

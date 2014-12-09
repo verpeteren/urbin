@@ -52,10 +52,12 @@ Topic		Project			License			SLOC		Link
 Eventloop	picoev			BSD				 1140		http://developer.cybozu.co.jp/archives/kazuho/2009/08/picoev-a-tiny-e.html
 Http Parser	H3				MIT				  481		https://github.com/c9s/h3
 Logging		c-logging		Public Domain	  230		https://github.com/dhess/c-logging
+Dns			TADNS			Beer-ware		  570		http://adns.sourceforge.net/
 Regex		oniguruma		BSD				19458		http://www.geocities.jp/kosako3/oniguruma/
 Postgresql	pq				Postgresql		53205		http://www.postgresql.org/docs/9.4/static/libpq.html
 Portabilty	nspr			MPL2.0		   112077		https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSPR
 Javascritp	spidermonkey	MPL2.0		   439718		https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey
+
 H3. Optional libraries
 
 Topic		Project			License			SLOC		Link
