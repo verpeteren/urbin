@@ -26,7 +26,7 @@ void								SqlclientModule_Unload		( struct core_t * core, void * args ) {
 /*****************************************************************************/
 
 
-static struct sqlclient_t *			Sqlclient_New				( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName );
+static struct sqlclient_t *			Sqlclient_New				( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeout_sec );
 static void							Sqlclient_Connect			( struct sqlclient_t * sqlclient );
 static void							Sqlclient_CloseConn			( struct sqlclient_t * sqlclient );
 static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient );
@@ -138,8 +138,39 @@ static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, 
 	}
 }
 
-struct sqlclient_t * Postgresql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName ) {
-	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, ip, port, loginName, password, dbName );
+#define SET_DEFAULTS_FOR_CONN( type, sectionName ) \
+	struct cfg_t * sqlSection, * modulesSection; \
+	\
+	modulesSection = cfg_getnsec( core->config, "modules", 0 ); \
+	sqlSection = cfg_getnsec( modulesSection, sectionName, 0 ); \
+	if ( ip == NULL ) { \
+		ip = cfg_getstr( sqlSection, "ip" ); \
+	} \
+	if ( ip == NULL ) { \
+		ip = PR_CFG_MODULES_ ## type ## SQLCLIENT_IP; \
+	} \
+	if ( port == 0 ) { \
+		port = (uint16_t) cfg_getint( sqlSection, "port" ); \
+	} \
+	if ( port == 0 ) { \
+		port = PR_CFG_MODULES_ ## type ## SQLCLIENT_PORT; \
+	} \
+	if ( dbName == NULL ) { \
+		dbName = cfg_getstr( sqlSection, "database" );\
+	} \
+	if ( dbName == NULL ) { \
+		dbName = PR_CFG_MODULES_ ## type ## SQLCLIENT_DATABASE; \
+	} \
+	if ( timeout_sec == 0 ) { \
+		timeout_sec = cfg_getint( sqlSection, "timeout_sec" ); \
+	} \
+	if ( timeout_sec == 0 ) { \
+		timeout_sec = PR_CFG_MODULES_ ## type ## SQLCLIENT_TIMEOUT_SEC; \
+	}
+
+struct sqlclient_t * Postgresql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeout_sec ) {
+	SET_DEFAULTS_FOR_CONN( PG, "postgresqlclient" ) \
+	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, ip, port, loginName, password, dbName, timeout_sec );
 }
 
 /*****************************************************************************/
@@ -308,14 +339,15 @@ static void Mysql_HandleConnect_cb( picoev_loop* loop, int fd, int events, void*
 	}
 }
 
-struct sqlclient_t * Mysql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName ) {
-	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, ip, port, loginName, password, dbName );
+struct sqlclient_t * Mysql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeout_sec ) {
+	SET_DEFAULTS_FOR_CONN( MY, "mysqlclient" ) \
+	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, ip, port, loginName, password, dbName, timeout_sec );
 }
 
 /*****************************************************************************/
 /* Generic                                                                   */
 /*****************************************************************************/
-static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName ) {
+static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeout_sec ) {
 	struct sqlclient_t * sqlclient;
 	struct {unsigned int sqlclient:1;
 			unsigned int hostName:1;
@@ -381,7 +413,7 @@ static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter
 		PR_INIT_CLIST( &sqlclient->queries->mLink );
 	}
 	if ( cleanUp.good ) {
-		sqlclient->timeout_sec = SQLCLIENT_TIMEOUT_SEC;
+		sqlclient->timeout_sec = timeout_sec;
 		sqlclient->socketFd = 0;
 		sqlclient->statementId = 0;
 		sqlclient->currentQuery = NULL;

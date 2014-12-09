@@ -15,7 +15,7 @@
 /* Global things                                                             */
 /*****************************************************************************/
 
-extern cfg_opt_t all_cfg_opts[];
+extern cfg_opt_t allCfgOpts[];
 
 void Boot( ) {
 	fprintf( stdout, "Starting\n" );
@@ -112,7 +112,7 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 		if ( config != NULL ) {
 			core->config = config;
 		} else {
-			cleanUp.good = ( ( core->config = cfg_init( all_cfg_opts, 0 ) ) != NULL );
+			cleanUp.good = ( ( core->config = cfg_init( allCfgOpts, 0 ) ) != NULL );
 		}
 	}
 	if ( cleanUp.good ) {

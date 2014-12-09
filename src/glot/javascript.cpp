@@ -188,7 +188,6 @@ static const JSFunctionSpec jsnWebserverMethods[ ] = {
 static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	struct webserver_t * webserver;
 	struct javascript_t * javascript;:
-	cfg_t * section;
 	JSString * jServerIp;
 	JS::CallArgs args;
 	const char * cDocumentRoot, *cPath;
@@ -199,8 +198,8 @@ static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Val
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vpn );
 	timeout_sec = 0;
-	cDocumentRoot = "/static/(.*)";
-	cPath = "/var/www/";
+	cDocumentRoot = NULL;
+	cPath = NULL;
 	port = 0;
 	cServerIp = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S/ii", &jServerIp, &port, &timeout_sec ) == true );
@@ -213,13 +212,9 @@ static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Val
 	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( thisObj ) ) != NULL );
-		section = cfg_getnsec( javascript->core->config, "webserver", 0 );
-		if ( port == 0 ) {
-			port = cfg_getnint( section, "port", 0 );
-		}
-		if ( timeout_sec == 0 ) {
-			timeout_sec = cfg_getnint( section, "timeout_sec", 0 );
-		}
+	}
+	if (cleanUp.good ) {
+
 		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, timeout_sec ) ) != NULL );
 	}
 	if ( cleanUp.good ){

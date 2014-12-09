@@ -36,17 +36,17 @@ int main( int argc, const char ** argv ) {
 	modules[0] = gWebserverModule;
 	//modules[0] = gJavascriptModule;
 	Boot( );
-	cleanUp.good = ( ( config = process_commandline( argc, argv ) ) != NULL );
+	cleanUp.good = ( ( config = ProcessCommandline( argc, argv ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( core = Core_New( modules, modulesCount, config  ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
-		cleanUp.good = ( ( pgSqlclient = Postgresql_New( core, "localhost", "127.0.0.1", 5432, "apedev", "vedepa", "apedev" ) ) != NULL );
+		cleanUp.good = ( ( pgSqlclient = Postgresql_New( core, "localhost", "127.0.0.1", 5432, "apedev", "vedepa", "apedev", 10 ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.pgSqlclient = 1;
-		cleanUp.good = ( ( mySqlclient = Mysql_New( core, "localhost", "127.0.0.1", 3305, "apedev", "vedepa", "apedev" ) ) != NULL );
+		cleanUp.good = ( ( mySqlclient = Mysql_New( core, "localhost", "127.0.0.1", 3305, "apedev", "vedepa", "apedev", 10 ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.mySqlclient = 1;

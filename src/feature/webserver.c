@@ -693,6 +693,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const uint16_t port, const int timeout_sec ) {
 	struct webserver_t * webserver;
 	struct sockaddr_in listenAddr;
+	struct cfg_t * webserverSection, * modulesSection;
 	int flag;
 	struct {unsigned int good:1;
 		unsigned int ip:1;
@@ -708,13 +709,31 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 		webserver->core = core;
 		webserver->socketFd = 0;
 		PR_INIT_CLIST( &webserver->routes->mLink );
-		webserver->timeout_sec  = ( timeout_sec < 0 ) ? WEBSERVER_TIMEOUT_SEC: timeout_sec;
+		modulesSection = cfg_getnsec( core->config, "modules", 0 );
+		webserverSection = cfg_getnsec( modulesSection, "httpserver", 0 );
 		webserver->regexOptions = ONIG_OPTION_SINGLELINE | ONIG_OPTION_FIND_LONGEST | ONIG_OPTION_CAPTURE_GROUP;  //  | ONIG_OPTION_IGNORECASE | ONIG_OPTION_DEFAULT;
-		webserver->ip = strdup( ip );
+		if ( port == 0 ) {
+			webserver->port = (uint16_t) cfg_getint( webserverSection, "port" );
+		}
+		if ( webserver->port == 0 ) {
+			webserver->port = PR_CFG_MODULES_WEBSERVER_PORT;
+		}
+		if ( timeout_sec == 0 ) {
+			webserver->timeout_sec = cfg_getint( webserverSection, "timeout_sec" );
+		}
+		if ( timeout_sec == 0 ) {
+			webserver->timeout_sec  = PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC;
+		}
+		if ( ip == NULL ) {
+			ip = cfg_getstr( webserverSection, "ip" );
+		}
+		if ( ip == NULL ) {
+			ip = PR_CFG_MODULES_WEBSERVER_IP;
+		}
+		cleanUp.good = ( ( webserver->ip = strdup( ip ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
-		webserver->port = port;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( webserver->socketFd = socket( AF_INET, SOCK_STREAM, 0 ) ) != -1 );
