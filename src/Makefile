@@ -1,5 +1,5 @@
 include ./Makefile_common.mk
-#include ./Makefile.dependencies
+include ./Makefile.dependencies
 
 OPTMIZATIONLEVEL = -O0
 CC_FLAGS = $(GET_OFF_MY_LAWN)
@@ -30,14 +30,14 @@ endif
 endif
 CFLAGS = $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS)
 LDFLAGS = $(LD_RELEASE_FLAGS) $(LD_DEBUG_FLAGS)
-HAVES = 
+HAVES = $(HAVE_MYSQL)
 
 CORE_DIR=./core
 FEAT_DIR=./feature
 GLOT_DIR=./glot
 BIN_DIR=../bin
 
-COMMON_HEADERS = common.h platform.h
+COMMON_HEADERS = common.h platform.h $(DIRS)
 FEATURE_HEADERS = $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h
 GLOT_HEADERS = $(GLOT_DIR)/javascript.h
 
@@ -80,9 +80,9 @@ $(THE_EXECUTABLE): 			$(OBJ_DIR)/main_server.o $(CODE_OBJECTS) $(FEAT_OBJECTS) $
 ###############################################################################
 # KNOW-HOW
 ###############################################################################
-$(OBJ_DIR)/sqlclient.o:			$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(COMMON_HEADERS)
+$(OBJ_DIR)/sqlclient.o:			$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(COMMON_HEADERS) 
 $(OBJ_DIR)/webserver.o:			$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(CORE_DIR)/utils.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
-$(OBJ_DIR)/javascript.o:		$(GLOT_DIR)/javascript.cpp $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS)
+$(OBJ_DIR)/javascript.o:		$(GLOT_DIR)/javascript.cpp $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS) 
 $(OBJ_DIR)/core.o:				$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
 $(OBJ_DIR)/utils.o:				$(CORE_DIR)/utils.c 
 $(OBJ_DIR)/configuration.o:		$(CORE_DIR)/configuration.c $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
@@ -91,7 +91,7 @@ $(OBJ_DIR)/configuration.o:		$(CORE_DIR)/configuration.c $(CORE_DIR)/configurati
 # OBJECTS
 ###############################################################################
 $(OBJ_DIR)/main_server.o:		main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADERS) $(GLOT_HEADERS) $(COMMON_HEADERS)
-	@echo "\tCC\t"$@
+	@echo "\tCC\t"$@:
 	@$(CC) -std=c++0x $(INC) $(CFLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 $(OBJ_DIR)/%.o:					$(FEAT_DIR)/%.c
@@ -121,10 +121,17 @@ $(OBJ_DIR)/%.o:					$(GLOT_DIR)/%.cpp
 ###############################################################################
 # Boilerplate
 ###############################################################################
-tags:	$(shell ls *.[ch]) 
-	@$(CTAGS) --if0=yes --languages=c -f $@ --fields=+Snf --extra=+q --exclude=$(DEPS) -R . 2>/dev/null
+check: 
+	cppcheck \
+	-q --enable=all --error-exitcode=255 --check-config --platform=unix32 --suppress=unusedScopedObject \
+	$(INCS) $(HAVES)\
+	$(CORE_DIR) $(FEAT_DIR) $(GLOT_DIR) .
 
-.PHONEY: clean propperclean
+
+tags:	$(shell ls *.[ch]) 
+	@$(CTAGS) --if0=no --languages=c,c++ -f $@ --fields=+Snf --extra=+q --exclude=$(DEP_DIR) -R . 2>/dev/null
+
+.PHONEY: clean propperclean check
 
 clean:
 	@echo cleaning

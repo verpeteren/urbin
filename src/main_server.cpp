@@ -17,14 +17,19 @@ static void SignalHandler( int sign ) {
 int main( int argc, const char ** argv ) {
 	cfg_t * config, * mainSection;
 	int fds;
-	struct module_t * webserverModule, * pgSqlclientModule, * mySqlclientModule, *javascriptModule;
+	struct module_t * webserverModule, *javascriptModule, *pgSqlclientModule;
+#if HAVE_MYSQL == 1
+	struct module_t mySqlclientModule;
+#endif
 	struct {
 		unsigned int good:1;
 		unsigned int core:1;
 		unsigned int webserver:1;
 		unsigned int pgSqlclient:1;
-		unsigned int javascript:1;
+#if HAVE_MYSQL == 1
 		unsigned int mySqlclient:1;
+#endif
+		unsigned int javascript:1;
 		} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -51,11 +56,13 @@ int main( int argc, const char ** argv ) {
 	}
 	if ( cleanUp.good ) {
 		cleanUp.pgSqlclient = 1;
+#if HAVE_MYSQL == 1
 		cleanUp.good = ( ( mySqlclientModule = Module_New( "mysqlclient", NULL, NULL, NULL, NULL ) ) != NULL );
 		Core_AddModule( core, mySqlclientModule );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.mySqlclient = 1;
+#endif
 		cleanUp.good = ( ( javascriptModule = Module_New( "javascript", NULL, NULL, NULL, NULL ) ) != NULL );
 		Core_AddModule( core, javascriptModule );
 	}
@@ -75,9 +82,11 @@ int main( int argc, const char ** argv ) {
 		if ( cleanUp.pgSqlclient) {
 			Core_DelModule( core, pgSqlclientModule );
 		}
-		if ( cleanUp.pgSqlclient) {
+#if HAVE_MYSQL == 1
+		if ( cleanUp.mySqlclient) {
 			Core_DelModule( core, mySqlclientModule );
 		}
+#endif
 		if ( cleanUp.javascript ) {
 			Core_DelModule( core, javascriptModule );
 		}

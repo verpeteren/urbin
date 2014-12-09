@@ -124,9 +124,10 @@ $(LIB_MY): $(DIR_MY)
 $(DIR_MY):
 	@echo $@
 	@cd $(DEP_DIR) && \
-	wget -q http://ftp.de.debian.org/debian/pool/main/m/mysql-5.6/mysql-5.6_$(VER_MY).orig.tar.gz
-	tar -xaf mysql-5.6_$(VER_MY).orig.tar.gz
+	wget -q http://ftp.de.debian.org/debian/pool/main/m/mysql-5.6/mysql-5.6_$(VER_MY).orig.tar.gz && \
+	tar -xaf mysql-5.6_$(VER_MY).orig.tar.gz && \
 	ln -s ./mysql-$(VER_MY)/include ./mysql-$(VER_MY)/mysql 
+
 ###############################################################################
 # NSPR
 ###############################################################################
@@ -178,8 +179,8 @@ $(DIR_MOZ):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q https://ftp.mozilla.org/pub/mozilla.org/firefox/candidates/$(VER_MOZ)-candidates/build1/source/firefox-$(VER_MOZ).source.tar.bz2 && \
-	tar -xaf firefox-$(VER_MOZ).source.tar.bz2 
-	mv mozilla-@(build|beta) mozilla
+	tar -xaf firefox-$(VER_MOZ).source.tar.bz2 && \
+	$(shell mv mozilla-@(build|beta) mozilla )
 
 #############################################################################
 # libconfuse: configuration file library 
@@ -200,13 +201,13 @@ $(DIR_CONF):
 ###############################################################################
 # Boilerplate
 ###############################################################################
-.PHONEY: clean propperclean
+.PHONEY: depclean deppropperclean
 
-clean:
+depclean:
 	@echo cleaning some
 	@rm -rf $(LIBS)
 
-propperclean:
+deppropperclean:
 	@echo cleaning all
 	@rm -rf $(shell find $(DEP_DIR)/* -type d)
 

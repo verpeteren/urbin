@@ -4,7 +4,9 @@
 #include <stdint.h>
 
 #include <libpq-fe.h>
+#if HAVE_MYSQL == 1
 #include <mysac.h>
+#endif
 
 #include "../core/core.h"
 
@@ -12,7 +14,9 @@
 extern "C" {
 #endif
 
+#if HAVE_MYSQL == 1
 #define MYSQL_BUFS ( 1024 * 1024 )
+#endif
 
 
 struct query_t;
@@ -21,7 +25,9 @@ typedef void                   ( * queryHandler_cb_t )			( struct query_t * quer
 
 enum sqlAdapter_t {
 	SQLADAPTER_POSTGRESQL,
+#if HAVE_MYSQL == 1
 	SQLADAPTER_MYSQL
+#endif
 };
 struct query_t;
 
@@ -31,7 +37,9 @@ struct sqlclient_t {
 	enum sqlAdapter_t			adapter;
 	union {
 		PGconn *					pg;
+#if HAVE_MYSQL == 1
 		MYSAC *						my;
+#endif
 							}	connection;
 	const char *				hostName;
 	const char *				ip;
@@ -55,14 +63,18 @@ struct query_t{
 	unsigned int				statementId;
 	union {
 		PGresult * 					pg;
+#if HAVE_MYSQL == 1
 		MYSAC_RES * 				my;
+#endif
 						} 		result;
 	void *						cbArgs;
 	queryHandler_cb_t			cbHandler;
 	struct PRCListStr			mLink;
 };
 
+#if HAVE_MYSQL == 1
 struct sqlclient_t *			Mysql_New					( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, unsigned char timeoutSec );
+#endif
 struct sqlclient_t *			Postgresql_New				( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, unsigned char timeoutSec );
 void							Sqlclient_Delete			( struct sqlclient_t * sqlclient );
 

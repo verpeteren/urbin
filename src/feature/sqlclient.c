@@ -160,6 +160,7 @@ struct sqlclient_t * Postgresql_New( struct core_t * core, const char * hostName
 	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, ip, port, loginName, password, dbName, timeoutSec );
 }
 
+#if HAVE_MYSQL == 1
 /*****************************************************************************/
 /* MYSQL                                                                     */
 /*****************************************************************************/
@@ -330,7 +331,7 @@ struct sqlclient_t * Mysql_New( struct core_t * core, const char * hostName, con
 	SET_DEFAULTS_FOR_CONN( MY, "mysqlclient" ) \
 	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, ip, port, loginName, password, dbName, timeoutSec );
 }
-
+#endif
 /*****************************************************************************/
 /* Generic                                                                   */
 /*****************************************************************************/
@@ -354,7 +355,9 @@ static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter
 		sqlclient->adapter = adapter;
 		switch ( sqlclient->adapter ) {
 			case SQLADAPTER_POSTGRESQL: //  ft
+#if HAVE_MYSQL == 1
 			case SQLADAPTER_MYSQL:		//  ft
+#endif
 			default:
 				sqlclient->connection.pg = NULL;
 			break;
@@ -469,6 +472,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 				}
 			}
 			break;
+#if HAVE_MYSQL == 1
 		case SQLADAPTER_MYSQL:
 			if ( sqlclient->connection.my == NULL ) {
 #define CONNSTRING_TEMPLATE "%s:%d"
@@ -498,6 +502,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 				}
 			}
 			break;
+#endif
 		default:
 			break;
 	}
@@ -517,12 +522,14 @@ static void Sqlclient_CloseConn ( struct sqlclient_t * sqlclient ) {
 			PQfinish( sqlclient->connection.pg ); sqlclient->connection.pg = NULL;
 		}
 		break;
+#if HAVE_MYSQL == 1
 	case SQLADAPTER_MYSQL:
 		if ( sqlclient->connection.my != NULL ) {
 			free( sqlclient->connection.my->buf ); sqlclient->connection.my->buf = NULL;
 			mysac_close(  sqlclient->connection.my ); sqlclient->connection.my = NULL;
 		}
 		break;
+#endif
 	default:
 		break;
 	}
@@ -668,11 +675,13 @@ void Query_Delete ( struct query_t * query ) {
 			PQclear( query->result.pg ); query->result.pg = NULL;
 		}
 		break;
+#if HAVE_MYSQL == 1
 	case SQLADAPTER_MYSQL:
 		if ( query->result.my != NULL ) {
 			mysac_free_res( query->result.my ); query->result.my = NULL;
 		}
 		break;
+#endif
 	default:
 		break;
 	}
