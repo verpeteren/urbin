@@ -24,6 +24,7 @@ struct javascript_t {
 
 struct javascript_t *			Javascript_New						( struct core_t * core, const char * path, const char * fileName );
 void							Javascript_Delete					( struct javascript_t * javascript );
+
 void *							JavascriptModule_Load				( struct core_t * core );
 void							JavascriptModule_Ready				( struct core_t * core, void * args );
 void							JavascriptModule_Unload				( struct core_t * core, void * args );

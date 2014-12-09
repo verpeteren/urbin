@@ -6,8 +6,6 @@
 #include "./feature/sqlclient.h"
 #include "./glot/javascript.h"
 
-extern struct module_t gWebserverModule;
-extern struct module_t gJavascriptModule;
 
 struct core_t * core;
 
@@ -17,26 +15,20 @@ static void SignalHandler( int sign ) {
 }
 
 int main( int argc, const char ** argv ) {
-	struct sqlclient_t * pgSqlclient, *mySqlclient;
 	cfg_t * config, * mainSection;
-	const int modulesCount = 1;
-	struct module_t modules[modulesCount];
 	int fds;
+	struct module_t * webserverModule, * pgSqlclientModule, * mySqlclientModule, *javascriptModule;
 	struct {
 		unsigned int good:1;
 		unsigned int core:1;
 		unsigned int webserver:1;
 		unsigned int pgSqlclient:1;
+		unsigned int javascript:1;
 		unsigned int mySqlclient:1;
 		} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	core = NULL;
-	pgSqlclient = NULL;
-	mySqlclient = NULL;
-	  //  @TODO:  load modules as a pool-list
-	modules[0] = gWebserverModule;
-	//modules[0] = gJavascriptModule;
 	cleanUp.good = ( ( config = ProcessCommandline( argc, argv ) ) != NULL );
 	if ( cleanUp.good ) {
 		mainSection = cfg_getnsec( core->config, "main", 0 );
@@ -44,18 +36,31 @@ int main( int argc, const char ** argv ) {
 	}
 	Boot( fds );
 	if ( cleanUp.good ) {
-		cleanUp.good = ( ( core = Core_New( modules, modulesCount, config  ) ) != NULL );
+		cleanUp.good = ( ( core = Core_New( config  ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
-		cleanUp.good = ( ( pgSqlclient = Postgresql_New( core, "localhost", "127.0.0.1", 5432, "apedev", "vedepa", "apedev", 10 ) ) != NULL );
+		cleanUp.good = ( ( webserverModule = Module_New( "webserver", NULL, NULL, NULL, NULL ) ) != NULL );
+		Core_AddModule( core, webserverModule );
+
+	}
+	if ( cleanUp.good ) {
+		cleanUp.webserver = 1;
+		cleanUp.good = ( ( pgSqlclientModule = Module_New( "postgresql", NULL, NULL, NULL, NULL ) ) != NULL );
+		Core_AddModule( core, pgSqlclientModule );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.pgSqlclient = 1;
-		cleanUp.good = ( ( mySqlclient = Mysql_New( core, "localhost", "127.0.0.1", 3305, "apedev", "vedepa", "apedev", 10 ) ) != NULL );
+		cleanUp.good = ( ( mySqlclientModule = Module_New( "mysqlclient", NULL, NULL, NULL, NULL ) ) != NULL );
+		Core_AddModule( core, mySqlclientModule );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.mySqlclient = 1;
+		cleanUp.good = ( ( javascriptModule = Module_New( "javascript", NULL, NULL, NULL, NULL ) ) != NULL );
+		Core_AddModule( core, javascriptModule );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.javascript = 1;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( Core_PrepareDaemon( core, SignalHandler ) == 1 );
@@ -64,11 +69,17 @@ int main( int argc, const char ** argv ) {
 		Core_Loop( core );
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.pgSqlclient) {
-			Sqlclient_Delete( pgSqlclient );
+		if ( cleanUp.webserver) {
+			Core_DelModule( core, webserverModule );
 		}
-		if ( cleanUp.mySqlclient) {
-			Sqlclient_Delete( mySqlclient );
+		if ( cleanUp.pgSqlclient) {
+			Core_DelModule( core, pgSqlclientModule );
+		}
+		if ( cleanUp.pgSqlclient) {
+			Core_DelModule( core, mySqlclientModule );
+		}
+		if ( cleanUp.javascript ) {
+			Core_DelModule( core, javascriptModule );
 		}
 		if ( cleanUp.core ) {
 			Core_Delete( core ) ;

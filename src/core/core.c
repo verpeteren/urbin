@@ -42,6 +42,45 @@ void SetupSocket( int fd ) {
 
 
 /*****************************************************************************/
+/* Modules                                                                   */
+/*****************************************************************************/
+struct module_t * Module_New ( const char *name, moduleHandler_cb_t onLoad,  moduleHandler_cb_t onReady, moduleHandler_cb_t onUnload, void * cbArg ) {
+	struct module_t * module;
+	struct {unsigned int good:1;
+			unsigned int name:1;
+			unsigned int module:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( module = malloc( sizeof( *module ) ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.module = 1;
+		module->onLoad = onLoad;
+		module->onReady = onReady;
+		module->onUnload = onUnload;
+		module->cbArg = cbArg;
+		PR_INIT_CLIST( &module->mLink );
+		cleanUp.name = ( ( module->name = strdup( name ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.name = 1;
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.name ) {
+			free( (char * ) module->name ); module->name = NULL;
+		}
+		if ( cleanUp.module ) {
+			free( module ); module = NULL;
+		}
+	}
+	return module;
+}
+
+void Module_Delete ( struct module_t * module ) {
+	free( (char * ) module->name ); module->name = NULL;
+	free( module ); module = NULL;
+}
+
+/*****************************************************************************/
 /* Timings                                                                    */
 /*****************************************************************************/
 struct timing_t *			Timing_New 					( int ms, timerHandler_cb_t timerHandler_cb, void * cbArg );
@@ -87,7 +126,7 @@ void Timing_Delete( struct timing_t * timing ) {
 /*****************************************************************************/
 /* Core                                                                      */
 /*****************************************************************************/
-struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg_t * config ) {
+struct core_t * Core_New( cfg_t * config ) {
 	struct core_t * core;
 	cfg_t * mainSection;
 	int timeoutSec;
@@ -101,6 +140,7 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
 		PR_INIT_CLIST( (&core->timings->mLink) );
+		PR_INIT_CLIST( (&core->modules->mLink) );
 		mainSection = cfg_getnsec( core->config, "main", 0 );
 		timeoutSec = cfg_getint( mainSection, "loop_timeout_sec" );
 		if ( timeoutSec == 0 ) {
@@ -110,15 +150,6 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 	}
 	if ( cleanUp.good ) {
 		cleanUp.loop = 1;
-		if (modulesCount < 1 || modules == NULL ) {
-			core->modules = NULL;
-			core->modules = 0;
-		} else {
-			core->modules = modules;
-		}
-		core->modulesCount = modulesCount;
-	}
-	if ( cleanUp.good ) {
 		if ( config != NULL ) {
 			core->config = config;
 		} else {
@@ -127,9 +158,6 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 	}
 	if ( cleanUp.good ) {
 		cleanUp.config = 1;
-	}
-	if ( cleanUp.good ) {
-		Core_FireEvent( core, MODULEEVENT_LOAD );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.loop ) {
@@ -176,7 +204,19 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 }
 
 void Core_Loop( struct core_t * core ) {
-	Core_FireEvent( core, MODULEEVENT_READY );
+	struct module_t * module;
+	PRCList * next;
+
+	next = core->modules->mLink.next;
+	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+		do {
+			module = FROM_NEXT_TO_ITEM( struct module_t );
+			next = module->mLink.next;
+			if ( module->onReady != NULL )  {
+					module->onReady ( module->cbArg );
+			}
+		} while( next != NULL );
+	}
 	core->keepOnRunning = 1;
 	while ( core->keepOnRunning )  {
 		  //  @TODO:  processTick( core->timing );
@@ -184,45 +224,23 @@ void Core_Loop( struct core_t * core ) {
 	}
 }
 
-void Core_FireEvent( struct core_t *core, enum moduleEvent_t event ) {
-	struct module_t * module;
-	void * instance;
-	int i;
-
-	switch ( event ) {
-	case MODULEEVENT_LOAD:
-		for ( i = 0; i < core->modulesCount; i++ ) {
-			module = &core->modules[i];
-			if (module->module_load != NULL ) {
-				instance = module->module_load( core );
-				if ( instance == NULL ) {
-					  //  @TODO:  better logging on errors
-				}
-				module->data = instance;  //  @FIXME:  handle multiple instances
-			}
+void Core_AddModule( struct core_t * core, struct module_t * module ) {
+	if ( module != NULL ) {
+		PR_APPEND_LINK( &core->modules->mLink, &module->mLink );
+		if ( module->onLoad != NULL ) {
+			module->onLoad( module->cbArg );
 		}
-		break;
-	case MODULEEVENT_READY:
-		for ( i = 0; i < core->modulesCount; i++ ) {
-			module = &core->modules[i];
-			if (module->module_ready != NULL && module->data != NULL ) {
-		//		module->module_ready( core, module->data );
-			}
-		}
-		break;
-	case MODULEEVENT_UNLOAD:
-		for ( i = core->modulesCount; i > 0; i-- ) {
-			module = &core->modules[i - 1 ];
-			if (module->module_unload != NULL && module->data != NULL ) {
-				module->module_unload( core, module->data );
-			}
-		}
-		break;
-	default:
-		break;
-
 	}
 }
+void Core_DelModule( struct core_t * core, struct module_t * module ) {
+	if ( module != NULL ) {
+		PR_REMOVE_AND_INIT_LINK( &module->mLink );
+		if ( module->onUnload != NULL ) {
+			module->onUnload( module->cbArg );
+		}
+	}
+}
+
 
 struct timing_t *  Core_AddTiming ( struct core_t * core , int ms, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
 	struct timing_t * timing;
@@ -240,6 +258,7 @@ struct timing_t *  Core_AddTiming ( struct core_t * core , int ms, timerHandler_
 				Timing_Delete( timing ); timing = NULL;
 		}
 	}
+
 	return timing;
 }
 void Core_DelTimingId ( struct core_t * core , uint32_t id ) {
@@ -266,6 +285,7 @@ void Core_DelTiming( struct timing_t * timing ) {
 
 void Core_Delete( struct core_t * core ) {
 	struct timing_t * timing;
+	struct module_t * module;
 	PRCList * next;
 
 	next = core->timings->mLink.next;
@@ -277,8 +297,16 @@ void Core_Delete( struct core_t * core ) {
 		} while( next != NULL );
 	}
 
+	next = core->modules->mLink.next;
+	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+		do {
+			module = FROM_NEXT_TO_ITEM( struct module_t );
+			next = module->mLink.next;
+			Core_DelModule( core, module );
+		} while( next != NULL );
+	}
+
 	picoev_destroy_loop( core->loop );
-	Core_FireEvent( core, MODULEEVENT_UNLOAD );
 	core->modules = NULL;
 	core->modules = 0;
 	cfg_free( core->config );

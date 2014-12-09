@@ -126,9 +126,6 @@ struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, 
 void 							Webserver_JoinCore		( struct webserver_t * webserver );
 void							Webserver_Delete		( struct webserver_t * webserver );
 
-void *							WebserverModule_Load	( struct core_t * core );
-void							WebserverModule_Ready	( struct core_t * core, void * args );
-void							WebserverModule_Unload	( struct core_t * core, void * args );
 
 #ifdef __cplusplus
 }

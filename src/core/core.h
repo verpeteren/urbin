@@ -16,6 +16,7 @@ extern "C" {
 
 typedef void 				( * signalAction_cb_t )		( int );
 typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
+typedef void 				( * moduleHandler_cb_t )	( void * cbArgs );
 
 #define FROM_NEXT_TO_ITEM( type ) ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
 
@@ -23,12 +24,6 @@ typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
 void Feat##_JoinCore( struct feature##_t * feature ) { \
 	picoev_add( feature->core->loop, feature->socketFd, PICOEV_READ, 0, Feat##_HandleAccept_cb, (void * ) feature ); \
 }
-
-enum moduleEvent_t {
-	MODULEEVENT_LOAD,
-	MODULEEVENT_READY,
-	MODULEEVENT_UNLOAD
-};
 
 struct timing_t;
 struct timing_t {
@@ -40,31 +35,35 @@ struct timing_t {
 	PRCList						mLink;
 };
 
+struct module_t {
+	const char * 				name;
+	moduleHandler_cb_t			onLoad;
+	moduleHandler_cb_t			onReady;
+	moduleHandler_cb_t			onUnload;
+	void *						cbArg;
+	PRCList						mLink;
+};
+
 struct core_t {
 	picoev_loop *				loop;
 	cfg_t *						config;
 	struct module_t *			modules;
-	int							modulesCount;
 	struct timing_t *			timings;
 	unsigned int				keepOnRunning:1;
-};
-
-struct module_t {
-	void *						( * module_load )		( struct core_t * core );
-	void						( * module_ready )		( struct core_t * core, void * arg );
-	void						( * module_unload )		( struct core_t * core, void * arg );
-	void *						data;
 };
 
 void							Boot					( int maxFds );
 void							Shutdown				( );
 void							SetupSocket				( int fd );
 
-struct core_t *					Core_New				( struct module_t * modules, const int modulesCount, cfg_t * config);
+struct module_t *				Module_New				( const char *name, moduleHandler_cb_t onLoad,  moduleHandler_cb_t onReady, moduleHandler_cb_t onUnload, void * data ) ;
+void 							Module_Delete			( struct module_t * module );
+struct core_t *					Core_New				( cfg_t * config );
 void							Core_Loop				( struct core_t * core );
-void							Core_FireEvent			( struct core_t * core, enum moduleEvent_t event );
 int 							Core_PrepareDaemon		( struct core_t * core , signalAction_cb_t signalHandler );
 struct timing_t *				Core_AddTiming 			( struct core_t * core , int ms, timerHandler_cb_t timerHandler_cb, void * cbArg );
+void							Core_AddModule			( struct core_t * core, struct module_t * module );
+void							Core_DelModule			( struct core_t * core, struct module_t * module );
 void 							Core_DelTimingId		( struct core_t * core , uint32_t id );
 void 							Core_DelTiming 			( struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );

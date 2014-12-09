@@ -11,14 +11,6 @@ static const char * sectionNameMain = "main";
 
 static bool Javascript_IncludeScript( struct javascript_t * javascript, const char * cfile );
 
-
-struct module_t gJavascriptModule = {
-	JavascriptModule_Load,
-	JavascriptModule_Ready,
-	JavascriptModule_Unload,
-	NULL
-};
-
 /**
  * The spidermonkey module is loaded.
  *
@@ -137,6 +129,7 @@ void JavascriptModule_Unload( struct core_t * core, void * args ) {
 
 	Javascript_Delete( javascript );
 }
+
 /*
  ===============================================================================
  Webserver OBJECT
