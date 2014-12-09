@@ -151,8 +151,10 @@ struct core_t * Core_New( cfg_t * config ) {
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
 		core->maxIdentifier = 1;
+		// set up the linked lists
 		PR_INIT_CLIST( (&core->timings->mLink) );
 		PR_INIT_CLIST( (&core->modules->mLink) );
+		//  Set up the ticks
 		mainSection = cfg_getnsec( core->config, "main", 0 );
 		timeoutSec = cfg_getint( mainSection, "loop_timeout_sec" );
 		if ( timeoutSec == 0 ) {
@@ -162,7 +164,19 @@ struct core_t * Core_New( cfg_t * config ) {
 		if ( core->processTicksMs == 0 ) {
 			core->processTicksMs = PR_CFG_LOOP_TICKS_MS;
 		}
-
+		// Set up the logging
+#if DEBUG
+		core->logger.logLevel = LOG_DEBUG;
+#else
+		core->logger.logLevel = PR_LOG_LOG_LEVEL;
+#endif
+		if ( cfg_getbool( mainSection, "daemon" ) ) {
+			 get_syslog_logger( & core->logger.logFun, 0, &core->logger.logMask);
+		} else {
+			//  we log to the stderr in interactive mode
+			get_stderr_logger( &core->logger.logFun, 0, &core->logger.logMask );
+		}
+		core->logger.logMask( LOG_UPTO( core->logger.logLevel ) );
 		cleanUp.good = ( ( core->loop = picoev_create_loop( timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -191,6 +205,21 @@ struct core_t * Core_New( cfg_t * config ) {
 	}
 
 	return core;
+}
+/*
+inline void Core_Log( struct core_t * core, const int logLevel, const char * message ) {
+	core->logger.logFun( logLevel, message );
+}*/
+inline void Core_Log( struct core_t * core, int logLevel, const char * fmt, ... ) {
+	char *message;
+	va_list val;
+
+	va_start( val, fmt );
+	vasprintf( &message, fmt, val );
+	va_end( val );
+	core->logger.logFun( logLevel, "%", message );
+
+	free( message );
 }
 
 int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler ) {
@@ -346,7 +375,7 @@ void Core_Delete( struct core_t * core ) {
 	struct timing_t * timing;
 	struct module_t * module;
 	PRCList * next;
-
+	//  cleanup the timers
 	next = core->timings->mLink.next;
 	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
 		do {
@@ -355,7 +384,7 @@ void Core_Delete( struct core_t * core ) {
 			Core_DelTiming( timing );
 		} while( next != NULL );
 	}
-
+	//  cleanup the modules
 	next = core->modules->mLink.next;
 	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
 		do {
@@ -364,6 +393,7 @@ void Core_Delete( struct core_t * core ) {
 			Core_DelModule( core, module );
 		} while( next != NULL );
 	}
+	//  cleanup the rest
 	core->processTicksMs = 0;
 	picoev_destroy_loop( core->loop );
 	core->modules = NULL;

@@ -36,6 +36,23 @@ $(DIR_PICOEV):
 	cp picoev_epoll.c picoev_epoll.c.org && \
 	sed -e"s/^  assert(PICOEV_FD_BELONGS_TO_LOOP/  memset( \&ev, 0, sizeof( ev ) );\n  assert(PICOEV_FD_BELONGS_TO_LOOP/" picoev_epoll.c.org > picoev_epoll.c
 
+###############################################################################
+# clog: A syslog-compatible stderr logging mechanism
+###############################################################################
+$(LIB_CLOG): $(DIR_CLOG)
+	@echo $@
+	@cd $(DIR_CLOG) && \
+	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o logging.o logging.c && \
+	$(AR) cr libclog.a logging.o && \
+	$(RANLIB) libclog.a
+
+$(DIR_CLOG):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q https://github.com/dhess/c-logging/archive/master.zip -O clog.zip && \
+	unzip -qq clog.zip && \
+	mv c-logging-master clog 
+
 
 ###############################################################################
 # H3 - The Fast HTTP header parser library  

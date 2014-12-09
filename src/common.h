@@ -1,6 +1,8 @@
 #ifndef SRC_COMMON_H_
 #define SRC_COMMON_H_
 
+#include <logging.h>
+
 #include "./platform.h"
 
 #define __RONJA_COMMON_H_
@@ -8,6 +10,7 @@
 #define PR_NAME										"ronja"
 #define PR_VERSION									"0.0.8a"
 #define PR_MAINCONFIG_FILENAME						"./etc/" PR_NAME ".conf"
+#define PR_LOG_LEVEL								LOG_NOTICE
 #define PR_CFG_LOOP_MAX_FDS							1024						//  cfg:  main/loop_max_fds
 #define PR_CFG_LOOP_TIMEOUT_SEC						60							//  cfg:  main/loop_timeout_sec
 #define PR_CFG_LOOP_TICKS_MS						50							//  cfg:  main/loop_ticks_ms

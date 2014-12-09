@@ -20,6 +20,8 @@ typedef void 				( * signalAction_cb_t )		( int );
 typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
 typedef void 				( * moduleHandler_cb_t )	( void * cbArgs );
 
+#define LOG( core, level, ... ) Core_Log( (core), level, __VA_ARGS__ );
+
 #define FROM_NEXT_TO_ITEM( type ) ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
 
 #define FEATURE_JOINCORE( Feat, feature ) \
@@ -53,6 +55,11 @@ struct core_t {
 	cfg_t *						config;
 	struct module_t *			modules;
 	struct timing_t *			timings;
+	struct {
+				int					logLevel;
+				setlogmask_fun		logMask;
+				syslog_fun			logFun;
+							}	logger;
 	uint32_t					maxIdentifier;
 	unsigned char				processTicksMs;
 	unsigned int				keepOnRunning:1;
@@ -65,6 +72,7 @@ void							SetupSocket				( int fd );
 struct module_t *				Module_New				( const char *name, moduleHandler_cb_t onLoad,  moduleHandler_cb_t onReady, moduleHandler_cb_t onUnload, void * data ) ;
 void 							Module_Delete			( struct module_t * module );
 struct core_t *					Core_New				( cfg_t * config );
+void 					Core_Log				( struct core_t * core, int logLevel, const char * fmt, ... );
 void							Core_Loop				( struct core_t * core );
 int 							Core_PrepareDaemon		( struct core_t * core , signalAction_cb_t signalHandler );
 void							Core_AddModule			( struct core_t * core, struct module_t * module );

@@ -15,13 +15,16 @@ HAS_MYSQL = "no"
 DIR_PICOEV = $(DEP_DIR)/picoev
 INC_PICOEV = -isystem$(DIR_PICOEV)/
 LIB_PICOEV = $(DIR_PICOEV)/libpicoev.a
+DIR_H3 = $(DEP_DIR)/h3
+INC_H3 = -isystem$(DIR_H3)/include
+LIB_H3 = $(DIR_H3)/libh3.a
+DIR_CLOG = $(DEP_DIR)/clog
+INC_CLOG = -isystem$(DIR_CLOG)
+LIB_CLOG = $(DIR_CLOG)/libclog.a
 VER_ONIG = 5.9.5
 DIR_ONIG = $(DEP_DIR)/onig-$(VER_ONIG)
 INC_ONIG = -isystem$(DIR_ONIG)/
 LIB_ONIG = $(DIR_ONIG)/.libs/libonig.a
-DIR_H3 = $(DEP_DIR)/h3
-INC_H3 = -isystem$(DIR_H3)/include
-LIB_H3 = $(DIR_H3)/libh3.a
 VER_PG = 9.4rc1
 DIR_PG = $(DEP_DIR)/postgresql-$(VER_PG)
 INC_PG = -isystem$(DIR_PG)/src/interfaces/libpq/ -isystem$(DIR_PG)/src/include/ 
@@ -53,9 +56,9 @@ DIR_NSPR = $(DIR_MOZ)/nsprpub
 INC_NSPR = -isystem$(DIR_NSPR)/dist/include/nspr
 LIB_NSPR = $(DIR_NSPR)/dist/lib/libnspr4.a
 
-DIRS = $(DIR_PICOEV) $(DIR_H3) $(DIR_ONIG) $(DIR_PG) $(DIR_MYS) $(DIR_MY) $(DIR_MOZ) $(DIR_NSPR) $(DIR_CONF)
-INCS = $(INC_PICOEV) $(INC_H3) $(INC_ONIG) $(INC_PG) $(INC_MYS) $(INC_MY) $(INC_MOZ) $(INC_NSPR) $(INC_CONF)
-LIBS = $(LIB_PICOEV) $(LIB_H3) $(LIB_ONIG) $(LIB_PG) $(LIB_MYS) $(LIB_MY) $(LIB_MOZ) $(LIB_NSPR) $(LIB_CONF)
+DIRS = $(DIR_PICOEV) $(DIR_H3) $(DIR_CLOG) $(DIR_ONIG) $(DIR_PG) $(DIR_MYS) $(DIR_MY) $(DIR_MOZ) $(DIR_NSPR) $(DIR_CONF)
+INCS = $(INC_PICOEV) $(INC_H3) $(INC_CLOG) $(INC_ONIG) $(INC_PG) $(INC_MYS) $(INC_MY) $(INC_MOZ) $(INC_NSPR) $(INC_CONF)
+LIBS = $(LIB_PICOEV) $(LIB_H3) $(LIB_CLOG) $(LIB_ONIG) $(LIB_PG) $(LIB_MYS) $(LIB_MY) $(LIB_MOZ) $(LIB_NSPR) $(LIB_CONF)
 
 
 GET_OFF_MY_LAWN = -Wall -Werror -Wextra -Wfatal-errors \

@@ -208,7 +208,7 @@ static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Val
 	}
 	if (cleanUp.good ) {
 
-		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, timeoutSec ) ) != NULL );
+		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, (unsigned char) timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ){
 		cleanUp.good = ( Webserver_DocumentRoot( webserver, cPath, cDocumentRoot )== 1);
@@ -331,8 +331,8 @@ static bool JsnConsoleLog( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	JSObject *  consoleObj;
 	JSString * jString;
 	JS::CallArgs args;
-//	const char *fileName;
-//	unsigned int lineNo;
+	const char *fileName;
+	unsigned int lineNo;
 	char *cString;
 	struct {unsigned int good:1;} cleanUp;
 
@@ -348,16 +348,16 @@ static bool JsnConsoleLog( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 		cleanUp.good = ( ( javascript = (struct javascript_t *)( JS_GetPrivate( consoleObj ) ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-#if DEBUG & 0
+#if DEBUG && 0
 		JSScript *script;
 		//  @FIXME:  act on this depending on the compiled javascript debug build
 		JS_DescribeScriptedCaller( cx, &script, &lineNo );
-//		fileName = JS_GetScriptFilename( cx, script );
+		fileName = JS_GetScriptFilename( cx, script );
 #else
-//		fileName = __FILE__;
-//		lineNo = __LINE__;
+		fileName = __FILE__;
+		lineNo = __LINE__;
 #endif
-		//Log( javascript->core, LOG_INFO, "[%s:%d] : %s", fileName, lineNo, cString );
+		LOG( javascript->core, LOG_INFO, "[%s:%d] : %s", fileName, lineNo, cString );
 		section = cfg_getnsec( javascript->core->config, sectionNameMain, 0 );
 		if ( cfg_getbool( section, "daemon" ) ) {
 			fprintf( stderr, "%s\n", cString );
@@ -846,7 +846,7 @@ static bool Javascript_IncludeScript( struct javascript_t * javascript, const ch
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	strncpy( fileNameWithPath, javascript->path, 255 );
 	strncat( fileNameWithPath, cfile, 255 );
-	//Log( javascript->core, LOG_INFO, "[%14s] Loading script %s", __FILE__, fileNameWithPath );
+	LOG( javascript->core, LOG_INFO, "[%14s] Loading script %s", __FILE__, fileNameWithPath );
 	if (cleanUp.good ) {
 		JS::RootedScript script( javascript->context );
 		JS::CompileOptions options( javascript->context );
@@ -859,7 +859,7 @@ static bool Javascript_IncludeScript( struct javascript_t * javascript, const ch
 	}
 
 	if ( cleanUp.good ) {
-		//Log( core, LOG_INFO, "[%14s] Failed loading script %s", __FILE__, fileNameWithPath );
+		LOG( javascript->core, LOG_INFO, "[%14s] Failed loading script %s", __FILE__, fileNameWithPath );
 	}
 	if ( ! cleanUp.good ){
 	}
