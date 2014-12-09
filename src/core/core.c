@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <fcntl.h>
-//#include <stdint.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -196,6 +196,7 @@ struct core_t * Core_New( cfg_t * config ) {
 int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler ) {
 	struct rlimit limit;
 	cfg_t * mainSection;
+	cfg_bool_t daemonize;
 	int fds;
 	struct {unsigned int good:1;
 			unsigned int fds:1;
@@ -215,6 +216,19 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 		cleanUp.signal = 1;
 		signal( SIGINT, signalHandler );
 		signal( SIGTERM, signalHandler );
+		daemonize = cfg_getbool( mainSection, "daemon" );
+		if ( daemonize )  {
+			if (0 != fork( ) ) {
+				exit( 0 );
+			}
+			if ( -1 == setsid( ) ) {
+				exit( 0 );
+			}
+			signal( SIGHUP, SIG_IGN );
+			if ( 0 != fork( ) ) {
+				exit( 0 );
+			}
+		}
 	}
 
 	return cleanUp.good;

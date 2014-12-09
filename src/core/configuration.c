@@ -20,6 +20,7 @@ cfg_opt_t mainCfgOpts[] = {
 	CFG_INT( ( char * ) "max_fds",					PR_CFG_LOOP_MAX_FDS, CFGF_NONE ),
 	CFG_INT( (char * ) "loop_timeout_sec", 			PR_CFG_LOOP_TIMEOUT_SEC, CFGF_NONE ),
 	CFG_INT( (char * ) "loop_ticks_ms", 			PR_CFG_LOOP_TICKS_MS, CFGF_NONE ),
+	CFG_BOOL( (char * ) "daemon", 					PR_CFG_LOOP_DAEMON, CFGF_NONE ),
 	CFG_END()
 };
 

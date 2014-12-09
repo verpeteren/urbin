@@ -122,7 +122,8 @@ $(OBJ_DIR)/%.o:					$(GLOT_DIR)/%.cpp
 # Boilerplate
 ###############################################################################
 check: 
-	cppcheck \
+	@echo "starting cppcheck"
+	@cppcheck \
 	-q --enable=all --error-exitcode=255 --check-config --platform=unix32 --suppress=unusedScopedObject \
 	$(INCS) $(HAVES)\
 	$(CORE_DIR) $(FEAT_DIR) $(GLOT_DIR) .
