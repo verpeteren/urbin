@@ -38,16 +38,16 @@ struct module_t gJavascriptModule = {
  */
 void * JavascriptModule_Load( struct core_t * core ) {
 	struct javascript_t * javascript;
-	cfg_t * glot_section, * javascript_section;
+	cfg_t * glotSection, * javascriptSection;
 	char * path, * name;
 	struct {unsigned int good:1;
 			unsigned int javascript:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	glot_section = cfg_getnsec( core->config, "glot", 0 );
-	javascript_section = cfg_getnsec( glot_section, "Javascript", 0 );
-	path = cfg_getstr( javascript_section, (char *) "path" );
-	name = cfg_getstr( javascript_section, (char *) "main" );
+	glotSection = cfg_getnsec( core->config, "glot", 0 );
+	javascriptSection = cfg_getnsec( glotSection, "Javascript", 0 );
+	path = cfg_getstr( javascriptSection, (char *) "path" );
+	name = cfg_getstr( javascriptSection, (char *) "main" );
 	cleanUp.good = ( ( javascript = Javascript_New( core, path, name ) ) != NULL );
 	JS::RootedValue hardVal( javascript->context ) ;
 	JS::RootedObject hardObj( javascript->context );
@@ -187,22 +187,22 @@ static const JSFunctionSpec jsnWebserverMethods[ ] = {
  */
 static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	struct webserver_t * webserver;
-	struct javascript_t * javascript;:
+	struct javascript_t * javascript;
 	JSString * jServerIp;
 	JS::CallArgs args;
 	const char * cDocumentRoot, *cPath;
 	char * cServerIp;
-	int port, timeout_sec;
+	int port, timeoutSec;
 	struct {unsigned int good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vpn );
-	timeout_sec = 0;
+	timeoutSec = 0;
 	cDocumentRoot = NULL;
 	cPath = NULL;
 	port = 0;
 	cServerIp = NULL;
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "S/ii", &jServerIp, &port, &timeout_sec ) == true );
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S/ii", &jServerIp, &port, &timeoutSec ) == true );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( cServerIp = JS_EncodeString( cx, jServerIp ) ) != NULL );
 	}
@@ -215,7 +215,7 @@ static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Val
 	}
 	if (cleanUp.good ) {
 
-		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, timeout_sec ) ) != NULL );
+		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ){
 		cleanUp.good = ( Webserver_DocumentRoot( webserver, cPath, cDocumentRoot )== 1);
@@ -580,7 +580,7 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
-		timing->clearFunc = (timerHandler_cb_t) JsPayload_Delete;
+		timing->clearFunc_cb = (timerHandler_cb_t) JsPayload_Delete;
 		args.rval().setInt32( (int32_t) timing->identifier );
 	} else {
 		if ( cleanUp.timer ) {
@@ -658,7 +658,7 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
-		timing->clearFunc = (timerHandler_cb_t) JsPayload_Delete;
+		timing->clearFunc_cb = (timerHandler_cb_t) JsPayload_Delete;
 		args.rval().setInt32( (int32_t) timing->identifier );
 	} else {
 		if ( cleanUp.timer ) {

@@ -17,9 +17,12 @@
 
 extern cfg_opt_t allCfgOpts[];
 
-void Boot( ) {
+void Boot( int fds) {
+	if ( fds == 0 ) {
+		fds = PR_CFG_LOOP_MAX_FDS;
+	}
 	fprintf( stdout, "Starting\n" );
-	picoev_init( MAX_FDS );
+	picoev_init( fds );
 }
 
 void Shutdown( ) {
@@ -58,7 +61,7 @@ struct timing_t * Timing_New ( int ms, timerHandler_cb_t timerHandler_cb, void *
 		timing->identifier = 1;  //  @FIXME:  generate a unqiue nr
 		timing->timerHandler_cb = timerHandler_cb;
 		timing->cbArg = cbArg;
-		timing->clearFunc = NULL;
+		timing->clearFunc_cb = NULL;
 		PR_INIT_CLIST( &timing->mLink );
 	}
 	if ( ! cleanUp.good ) {
@@ -70,13 +73,13 @@ struct timing_t * Timing_New ( int ms, timerHandler_cb_t timerHandler_cb, void *
 }
 
 void Timing_Delete( struct timing_t * timing ) {
-	if ( timing->clearFunc != NULL ) {
-		timing->clearFunc( timing->cbArg);
+	if ( timing->clearFunc_cb != NULL ) {
+		timing->clearFunc_cb( timing->cbArg);
 	}
 	timing->ms = 0;
 	timing->identifier = 0;
 	timing->timerHandler_cb = NULL;
-	timing->clearFunc = NULL;
+	timing->clearFunc_cb= NULL;
 	timing->cbArg = NULL;
 	free( timing ); timing = NULL;
 }
@@ -86,6 +89,8 @@ void Timing_Delete( struct timing_t * timing ) {
 /*****************************************************************************/
 struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg_t * config ) {
 	struct core_t * core;
+	cfg_t * mainSection;
+	int timeoutSec;
 	struct {unsigned int good:1;
 		unsigned int loop:1;
 		unsigned int config:1;
@@ -96,7 +101,12 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
 		PR_INIT_CLIST( (&core->timings->mLink) );
-		cleanUp.good = ( ( core->loop = picoev_create_loop( LOOP_TIMEOUT ) ) != NULL );
+		mainSection = cfg_getnsec( core->config, "main", 0 );
+		timeoutSec = cfg_getint( mainSection, "loop_timeout_sec" );
+		if ( timeoutSec == 0 ) {
+			timeoutSec = PR_CFG_LOOP_TIMEOUT_SEC;
+		}
+		cleanUp.good = ( ( core->loop = picoev_create_loop( timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.loop = 1;
@@ -140,15 +150,18 @@ struct core_t * Core_New( struct module_t * modules, const int modulesCount, cfg
 
 int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler ) {
 	struct rlimit limit;
-	cfg_t * main_section;
+	cfg_t * mainSection;
 	int fds;
 	struct {unsigned int good:1;
 			unsigned int fds:1;
 			unsigned int signal:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	main_section = cfg_getnsec( core->config, "main", 0 );
-	fds = cfg_getint( main_section, "max_file_descriptors" );
+	mainSection = cfg_getnsec( core->config, "main", 0 );
+	fds = cfg_getint( mainSection, "max_fds" );
+	if ( fds == 0 ) {
+		fds = PR_CFG_LOOP_MAX_FDS;
+	}
 	limit.rlim_cur = ( rlim_t ) fds;
 	limit.rlim_max = ( rlim_t ) fds;
 	cleanUp.good = ( setrlimit( RLIMIT_NOFILE, &limit) != -1 );

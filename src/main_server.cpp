@@ -18,9 +18,10 @@ static void SignalHandler( int sign ) {
 
 int main( int argc, const char ** argv ) {
 	struct sqlclient_t * pgSqlclient, *mySqlclient;
-	cfg_t * config;
+	cfg_t * config, * mainSection;
 	const int modulesCount = 1;
 	struct module_t modules[modulesCount];
+	int fds;
 	struct {
 		unsigned int good:1;
 		unsigned int core:1;
@@ -33,10 +34,15 @@ int main( int argc, const char ** argv ) {
 	core = NULL;
 	pgSqlclient = NULL;
 	mySqlclient = NULL;
+	  //  @TODO:  load modules as a pool-list
 	modules[0] = gWebserverModule;
 	//modules[0] = gJavascriptModule;
-	Boot( );
 	cleanUp.good = ( ( config = ProcessCommandline( argc, argv ) ) != NULL );
+	if ( cleanUp.good ) {
+		mainSection = cfg_getnsec( core->config, "main", 0 );
+		fds = cfg_getint( mainSection, "max_fds" );
+	}
+	Boot( fds );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( core = Core_New( modules, modulesCount, config  ) ) != NULL );
 	}

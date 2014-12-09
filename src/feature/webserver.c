@@ -27,7 +27,7 @@ struct module_t gWebserverModule = {
 void * WebserverModule_Load( struct core_t * core ) {
 	char * path, * documentRoot, * ip;
 	uint16_t port;
-	int timeout_sec;
+	int timeoutSec;
 	struct cfg_t * webserverSection, * modulesSection;
 	struct webserver_t * webserver;
 	struct {unsigned int good:1;
@@ -40,8 +40,8 @@ void * WebserverModule_Load( struct core_t * core ) {
 	documentRoot = cfg_getstr( webserverSection, "documentroot" );
 	ip = cfg_getstr( webserverSection, "ip" );
 	port = (uint16_t) cfg_getint( webserverSection, "port" );
-	timeout_sec = cfg_getint( webserverSection, "timeout_sec" );
-	cleanUp.good = ( ( webserver = Webserver_New( core, ip, port, timeout_sec ) ) != NULL );
+	timeoutSec = cfg_getint( webserverSection, "timeout_sec" );
+	cleanUp.good = ( ( webserver = Webserver_New( core, ip, port, timeoutSec ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.http = 1;
 		cleanUp.good = ( Webserver_DocumentRoot( webserver, path, documentRoot ) == 1 );
@@ -121,11 +121,11 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								- ( 2 * 7 ) + 1 )
 
 static struct route_t * 		Route_New				( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions );
-static void						Route_Delete				( struct route_t * route );
+static void						Route_Delete			( struct route_t * route );
 
-static void						Webserver_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cb_arg );
-static void						Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
-static void						Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cb_arg );
+static void						Webserver_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
+static void						Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArg );
+static void						Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cbArg );
 static void 					Webserver_FindRoute		( struct webserver_t * webserver, struct webclient_t * webclient );
 static void						Webserver_RegisterRoute	( struct webserver_t * webserver, struct route_t * route );
 
@@ -173,7 +173,7 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 				}
 				break;
 			case ROUTETYPE_DYNAMIC:
-				route->details.handler_cb = (dynamicHandler_cb_t) details;
+				route->details.handlerCb = (dynamicHandler_cb_t) details;
 				break;
 			default:
 				break;
@@ -280,7 +280,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 		Webclient_RenderNotFound( webclient );
 	} else {
 		if ( route->routeType == ROUTETYPE_DYNAMIC ) {
-			route->details.handler_cb( webclient );
+			route->details.handlerCb( webclient );
 		} else if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
 			struct stat fileStat;
 			const char * documentRoot;
@@ -505,13 +505,13 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 	return ( cleanUp.good == 1 );
 }
 
-int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handler_cb ) {
+int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handlerCb ) {
 	struct route_t * route;
 	struct { unsigned int good:1;
 			unsigned int route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handler_cb, webserver->regexOptions ) ) != NULL);
+	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions ) ) != NULL);
 	if ( cleanUp.good ){
 		cleanUp.route = 1;
 		Webserver_RegisterRoute( webserver, route );
@@ -535,7 +535,7 @@ static void Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, vo
 		//printf( "connected: %d\n", newFd );
 		SetupSocket( newFd );
 		webclient  = Webclient_New( webserver, newFd );
-		picoev_add( loop, newFd, PICOEV_READ, webserver->timeout_sec , Webserver_HandleRead_cb, (void *) webclient  );
+		picoev_add( loop, newFd, PICOEV_READ, webserver->timeoutSec , Webserver_HandleRead_cb, (void *) webclient  );
 	}
 }
 
@@ -549,7 +549,7 @@ static void Webserver_HandleRead_cb( picoev_loop* loop, int fd, int events, void
 		Webclient_CloseConn( webclient );
 	} else  {
 		/* update timeout, and read */
-		picoev_set_timeout( loop, fd, webclient->webserver->timeout_sec );
+		picoev_set_timeout( loop, fd, webclient->webserver->timeoutSec );
 		r = read( fd, webclient->buffer, HTTP_BUFF_LENGTH );
 		webclient->buffer[r] = '\0';
 		switch ( r ) {
@@ -566,7 +566,7 @@ static void Webserver_HandleRead_cb( picoev_loop* loop, int fd, int events, void
 		default: /* got some data, send back */
 			picoev_del( loop, fd );
 			Webclient_PrepareRequest( webclient );
-			picoev_add( loop, fd, PICOEV_WRITE, webclient->webserver->timeout_sec , Webserver_HandleWrite_cb, wc_arg );
+			picoev_add( loop, fd, PICOEV_WRITE, webclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wc_arg );
 			break;
 		}
 	}
@@ -584,7 +584,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 		connClosed = 1;
 	} else  {
 		/* update timeout, and write */
-		picoev_set_timeout( loop, fd, webclient->webserver->timeout_sec );
+		picoev_set_timeout( loop, fd, webclient->webserver->timeoutSec );
 		if ( ! webclient->response.headersSent ) {
 			ssize_t headerLength, wroteHeader;
 			struct tm tm;
@@ -680,7 +680,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 			if ( webclient->connection == CONNECTION_KEEPALIVE) {
 				picoev_del( loop, fd );
 				Webclient_Reset( webclient );
-				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeout_sec , Webserver_HandleRead_cb, wc_arg );
+				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeoutSec , Webserver_HandleRead_cb, wc_arg );
 			} else {
 				Webclient_CloseConn( webclient );
 				connClosed = 1;
@@ -690,11 +690,11 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 }
 
 
-struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const uint16_t port, const int timeout_sec ) {
+struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const uint16_t port, const int timeoutSec ) {
 	struct webserver_t * webserver;
 	struct sockaddr_in listenAddr;
 	struct cfg_t * webserverSection, * modulesSection;
-	int flag;
+	int flag, listenBacklog;
 	struct {unsigned int good:1;
 		unsigned int ip:1;
 		unsigned int socket:1;
@@ -718,17 +718,21 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 		if ( webserver->port == 0 ) {
 			webserver->port = PR_CFG_MODULES_WEBSERVER_PORT;
 		}
-		if ( timeout_sec == 0 ) {
-			webserver->timeout_sec = cfg_getint( webserverSection, "timeout_sec" );
+		if ( timeoutSec == 0 ) {
+			webserver->timeoutSec = cfg_getint( webserverSection, "timeout_sec" );
 		}
-		if ( timeout_sec == 0 ) {
-			webserver->timeout_sec  = PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC;
+		if ( timeoutSec == 0 ) {
+			webserver->timeoutSec  = PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC;
 		}
 		if ( ip == NULL ) {
 			ip = cfg_getstr( webserverSection, "ip" );
 		}
 		if ( ip == NULL ) {
 			ip = PR_CFG_MODULES_WEBSERVER_IP;
+		}
+		listenBacklog = cfg_getint( webserverSection, "listen_backlog" );
+		if ( listenBacklog == 0 ) {
+			listenBacklog = PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG;
 		}
 		cleanUp.good = ( ( webserver->ip = strdup( ip ) ) != NULL );
 	}
@@ -749,7 +753,7 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 		cleanUp.good = ( bind( webserver->socketFd, (struct sockaddr*) &listenAddr, sizeof( listenAddr ) ) == 0 );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( listen( webserver->socketFd, LISTEN_BACKLOG ) == 0 );
+		cleanUp.good = ( listen( webserver->socketFd, listenBacklog ) == 0 );
 	}
 	if ( cleanUp.good ) {
 		SetupSocket( webserver->socketFd  );

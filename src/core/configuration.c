@@ -17,7 +17,8 @@ void Usage( const char * prog_name, int code ) {
 }
 
 cfg_opt_t mainCfgOpts[] = {
-	CFG_INT( ( char * ) "max_file_descriptors",		PR_CFG_MAX_FDS, CFGF_NONE ),
+	CFG_INT( ( char * ) "max_fds",					PR_CFG_LOOP_MAX_FDS, CFGF_NONE ),
+	CFG_INT( (char * ) "loop_timeout_sec", 			PR_CFG_LOOP_TIMEOUT_SEC, CFGF_NONE ),
 	CFG_END()
 };
 
@@ -27,6 +28,7 @@ cfg_opt_t webserverCfgOpts[] = {
 	CFG_STR( (char * ) "ip", 			(char *)	PR_CFG_MODULES_WEBSERVER_IP, CFGF_NONE ),
 	CFG_INT( (char * ) "port", 						PR_CFG_MODULES_WEBSERVER_PORT, CFGF_NONE ),
 	CFG_INT( (char * ) "timeout_sec", 				PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC, CFGF_NONE ),
+	CFG_INT( (char * ) "listen_backlog", 			PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG, CFGF_NONE ),
 	CFG_END()
 };
 

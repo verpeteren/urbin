@@ -35,7 +35,7 @@ struct timing_t {
 	int							ms;
 	uint32_t					identifier;
 	timerHandler_cb_t 			timerHandler_cb;
-	timerHandler_cb_t			clearFunc;
+	timerHandler_cb_t			clearFunc_cb;
 	void *						cbArg;
 	PRCList						mLink;
 };
@@ -56,7 +56,7 @@ struct module_t {
 	void *						data;
 };
 
-void							Boot					( );
+void							Boot					( int maxFds );
 void							Shutdown				( );
 void							SetupSocket				( int fd );
 
@@ -64,7 +64,7 @@ struct core_t *					Core_New				( struct module_t * modules, const int modulesCo
 void							Core_Loop				( struct core_t * core );
 void							Core_FireEvent			( struct core_t * core, enum moduleEvent_t event );
 int 							Core_PrepareDaemon		( struct core_t * core , signalAction_cb_t signalHandler );
-struct timing_t *				Core_AddTiming 			( struct core_t * core , int ms, timerHandler_cb_t timerHandler_cb, void * cb_arg );
+struct timing_t *				Core_AddTiming 			( struct core_t * core , int ms, timerHandler_cb_t timerHandler_cb, void * cbArg );
 void 							Core_DelTimingId		( struct core_t * core , uint32_t id );
 void 							Core_DelTiming 			( struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );

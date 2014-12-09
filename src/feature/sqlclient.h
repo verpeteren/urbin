@@ -40,7 +40,7 @@ struct sqlclient_t {
 	const char *				password;
 	const char *				dbName;
 	int							socketFd;
-	int							timeout_sec;
+	int							timeoutSec;
 	unsigned int				statementId; //  only needed for mysac
 	struct query_t *			queries;
 	uint16_t					port;
@@ -62,8 +62,8 @@ struct query_t{
 	struct PRCListStr			mLink;
 };
 
-struct sqlclient_t *			Mysql_New					( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeout_sec );
-struct sqlclient_t *			Postgresql_New				( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeout_sec );
+struct sqlclient_t *			Mysql_New					( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeoutSec );
+struct sqlclient_t *			Postgresql_New				( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeoutSec );
 void							Sqlclient_Delete			( struct sqlclient_t * sqlclient );
 
 void 							Query_New					( struct sqlclient_t * sqlclient, const char * sqlStatement, size_t paramCount, const char ** paramValues, queryHandler_cb_t callback, void * args );
