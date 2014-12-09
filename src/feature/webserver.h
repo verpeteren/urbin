@@ -93,7 +93,7 @@ struct webserver_t {
 	OnigOptionType regexOptions;
 	uint16_t					port;
 	int							socketFd;
-	int							timeoutSec;
+	unsigned char				timeoutSec;
 	const char *				ip;
 
 };
@@ -122,7 +122,7 @@ struct webclient_t{
 int 							Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
 int 							Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handlerCb );
 
-struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, const uint16_t port, const int timeoutSec );
+struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, const uint16_t port, const unsigned char timeoutSec );
 void 							Webserver_JoinCore		( struct webserver_t * webserver );
 void							Webserver_Delete		( struct webserver_t * webserver );
 

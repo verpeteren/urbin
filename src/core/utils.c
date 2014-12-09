@@ -8,7 +8,6 @@ int FullPath( char target[], size_t size, const char * path, const char * filena
 	char * first;
 
 	first = &target[0];
-	  //  @TODO:  use nspr??
 	memset( first, '\0', size );
 	return snprintf( first, size, "%s%s%s", path, "/", filename );
 }

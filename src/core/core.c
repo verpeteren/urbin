@@ -84,11 +84,14 @@ void Module_Delete ( struct module_t * module ) {
 /*****************************************************************************/
 /* Timings                                                                    */
 /*****************************************************************************/
-struct timing_t *			Timing_New 					( int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
-void 						Timing_Delete				( struct timing_t * timing );
+static struct timing_t *			Timing_New 					( unsigned int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
+static void 						Timer_CalculateDue			( struct timing_t * timing, PRUint32 nowOrHorizon );
+static void 						Timing_Delete				( struct timing_t * timing );
 
-struct timing_t * Timing_New ( int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
+static struct timing_t * Timing_New ( unsigned int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
 	struct timing_t * timing;
+	PRUint32 horizon;
+	PRIntervalTime now;
 	struct {unsigned int good:1;
 			unsigned timing:1; } cleanUp;
 
@@ -101,7 +104,9 @@ struct timing_t * Timing_New ( int ms, uint32_t identifier, unsigned int repeat,
 		timing->identifier = identifier;
 		timing->timerHandler_cb = timerHandler_cb;
 		timing->cbArg = cbArg;
-		//  @TODO: Timer_CalculateDue( timer, NUL );
+		now = PR_IntervalNow( );
+		horizon = PR_IntervalToMicroseconds( now );
+		Timer_CalculateDue( timing, horizon );
 		timing->clearFunc_cb = NULL;
 		PR_INIT_CLIST( &timing->mLink );
 	}
@@ -112,8 +117,11 @@ struct timing_t * Timing_New ( int ms, uint32_t identifier, unsigned int repeat,
 	}
 	return timing;
 }
+static void Timer_CalculateDue ( struct timing_t * timing, PRUint32 nowOrHorizon ) {
+	timing->due = ( nowOrHorizon + timing->ms );  //  @FIXME, this might overflow if ms is in the far future (+6 hours)
+}
 
-void Timing_Delete( struct timing_t * timing ) {
+static void Timing_Delete( struct timing_t * timing ) {
 	if ( timing->clearFunc_cb != NULL ) {
 		timing->clearFunc_cb( timing->cbArg);
 	}
@@ -150,6 +158,11 @@ struct core_t * Core_New( cfg_t * config ) {
 		if ( timeoutSec == 0 ) {
 			timeoutSec = PR_CFG_LOOP_TIMEOUT_SEC;
 		}
+		core->processTicksMs = (unsigned char) cfg_getint( mainSection, "loop_ticks_ms" );
+		if ( core->processTicksMs == 0 ) {
+			core->processTicksMs = PR_CFG_LOOP_TICKS_MS;
+		}
+
 		cleanUp.good = ( ( core->loop = picoev_create_loop( timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -208,8 +221,29 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 }
 
 static void Core_ProcessTick( struct core_t * core ) {
-	  //  @TODO:  //process tick
-	  //  if repeat than Timer_CalculateDue( timer, horizon );
+	struct timing_t * timing;
+	PRCList * next;
+	PRUint32 horizon;
+	PRIntervalTime now;
+	int needToFire;
+
+	now = PR_IntervalNow( );
+	horizon = PR_IntervalToMicroseconds( now ) + core->processTicksMs;
+	next = core->timings->mLink.next;
+	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+		do {
+			timing = FROM_NEXT_TO_ITEM( struct timing_t );
+			next = timing->mLink.next;
+			needToFire = ( timing->due < horizon && timing->due != 0 );
+			if ( needToFire ) {
+				if ( timing->repeat ) {
+					Timer_CalculateDue( timing, horizon );
+				} else {
+					Core_DelTiming( timing );
+				}
+			}
+		} while( next != NULL );
+	}
 }
 
 void Core_Loop( struct core_t * core ) {
@@ -251,7 +285,7 @@ void Core_DelModule( struct core_t * core, struct module_t * module ) {
 	}
 }
 
-struct timing_t *  Core_AddTiming ( struct core_t * core , int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
+struct timing_t *  Core_AddTiming ( struct core_t * core , unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
 	struct timing_t * timing;
 	struct {unsigned int good:1;
 			unsigned timing:1; } cleanUp;
@@ -316,7 +350,7 @@ void Core_Delete( struct core_t * core ) {
 			Core_DelModule( core, module );
 		} while( next != NULL );
 	}
-
+	core->processTicksMs = 0;
 	picoev_destroy_loop( core->loop );
 	core->modules = NULL;
 	core->modules = 0;

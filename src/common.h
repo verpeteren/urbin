@@ -10,6 +10,7 @@
 #define PR_MAINCONFIG_FILENAME						"./etc/" PR_NAME ".conf"
 #define PR_CFG_LOOP_MAX_FDS							1024						//  cfg:  main/loop_max_fds
 #define PR_CFG_LOOP_TIMEOUT_SEC						60							//  cfg:  main/loop_timeout_sec
+#define PR_CFG_LOOP_TICKS_MS						50							//  cfg:  main/loop_ticks_ms
 #define PR_CFG_GLOT_PATH							"../var/scripts/"			//  cfg:  glot/../path
 #define PR_CFG_GLOT_MAIN							PR_NAME						//  cfg:  glot/../main
 #define PR_CFG_MODULES_WEBSERVER_ROOT				"../var/www/"				//  cfg:  modules/WEBSERVER/documentroot

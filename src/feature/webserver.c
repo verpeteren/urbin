@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 
 #include "webserver.h"
+#include "../core/utils.h"
 
 /*****************************************************************************/
 /* Module                                                                    */
@@ -266,10 +267,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 			}
 			if ( cleanUp.good ) {
 				cleanUp.fullPath = 1;
-			}
-			if ( cleanUp.good ) {
-				cleanUp.fullPath = 1;
-				snprintf( fullPath, fullPathLength, "%s/%s", documentRoot, requestedPath );
+				FullPath( fullPath, fullPathLength ,documentRoot, requestedPath );
 				exists = stat( fullPath, &fileStat );
 				if ( exists == 0 ) {
 					webclient->response.httpCode = HTTPCODE_OK;
@@ -637,7 +635,7 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 }
 
 
-struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const uint16_t port, const int timeoutSec ) {
+struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const uint16_t port, const unsigned char timeoutSec ) {
 	struct webserver_t * webserver;
 	struct sockaddr_in listenAddr;
 	struct cfg_t * webserverSection, * modulesSection;
@@ -666,7 +664,7 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 			webserver->port = PR_CFG_MODULES_WEBSERVER_PORT;
 		}
 		if ( timeoutSec == 0 ) {
-			webserver->timeoutSec = cfg_getint( webserverSection, "timeout_sec" );
+			webserver->timeoutSec = (unsigned char) cfg_getint( webserverSection, "timeout_sec" );
 		}
 		if ( timeoutSec == 0 ) {
 			webserver->timeoutSec  = PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC;

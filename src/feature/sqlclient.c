@@ -13,7 +13,7 @@
 /*****************************************************************************/
 
 
-static struct sqlclient_t *			Sqlclient_New				( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeoutSec );
+static struct sqlclient_t *			Sqlclient_New				( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, const unsigned char timeoutSec );
 static void							Sqlclient_Connect			( struct sqlclient_t * sqlclient );
 static void							Sqlclient_CloseConn			( struct sqlclient_t * sqlclient );
 static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient );
@@ -149,13 +149,13 @@ static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, 
 		dbName = PR_CFG_MODULES_ ## type ## SQLCLIENT_DATABASE; \
 	} \
 	if ( timeoutSec == 0 ) { \
-		timeoutSec = cfg_getint( sqlSection, "timeout_sec" ); \
+		timeoutSec = (unsigned char) cfg_getint( sqlSection, "timeout_sec" ); \
 	} \
 	if ( timeoutSec == 0 ) { \
 		timeoutSec = PR_CFG_MODULES_ ## type ## SQLCLIENT_TIMEOUT_SEC; \
 	}
 
-struct sqlclient_t * Postgresql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeoutSec ) {
+struct sqlclient_t * Postgresql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, unsigned char timeoutSec ) {
 	SET_DEFAULTS_FOR_CONN( PG, "postgresqlclient" ) \
 	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, ip, port, loginName, password, dbName, timeoutSec );
 }
@@ -326,7 +326,7 @@ static void Mysql_HandleConnect_cb( picoev_loop* loop, int fd, int events, void*
 	}
 }
 
-struct sqlclient_t * Mysql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeoutSec ) {
+struct sqlclient_t * Mysql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, unsigned char timeoutSec ) {
 	SET_DEFAULTS_FOR_CONN( MY, "mysqlclient" ) \
 	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, ip, port, loginName, password, dbName, timeoutSec );
 }
@@ -334,7 +334,7 @@ struct sqlclient_t * Mysql_New( struct core_t * core, const char * hostName, con
 /*****************************************************************************/
 /* Generic                                                                   */
 /*****************************************************************************/
-static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, int timeoutSec ) {
+static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, const unsigned char timeoutSec ) {
 	struct sqlclient_t * sqlclient;
 	struct {unsigned int sqlclient:1;
 			unsigned int hostName:1;

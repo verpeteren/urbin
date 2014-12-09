@@ -7,6 +7,7 @@
 
 #include <picoev.h>
 #include <prclist.h>
+#include <prinrval.h>
 
 #include "../common.h"
 #include "configuration.h"
@@ -28,12 +29,12 @@ void Feat##_JoinCore( struct feature##_t * feature ) { \
 
 struct timing_t;
 struct timing_t {
-	int							ms;
+	unsigned int				ms;
 	uint32_t					identifier;
 	timerHandler_cb_t 			timerHandler_cb;
 	timerHandler_cb_t			clearFunc_cb;
 	void *						cbArg;
-	void * 						due;
+	PRUint32					due;
 	unsigned int				repeat:1;
 	PRCList						mLink;
 };
@@ -53,6 +54,7 @@ struct core_t {
 	struct module_t *			modules;
 	struct timing_t *			timings;
 	uint32_t					maxIdentifier;
+	unsigned char				processTicksMs;
 	unsigned int				keepOnRunning:1;
 };
 
@@ -67,7 +69,7 @@ void							Core_Loop				( struct core_t * core );
 int 							Core_PrepareDaemon		( struct core_t * core , signalAction_cb_t signalHandler );
 void							Core_AddModule			( struct core_t * core, struct module_t * module );
 void							Core_DelModule			( struct core_t * core, struct module_t * module );
-struct timing_t *				Core_AddTiming 			( struct core_t * core , int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
+struct timing_t *				Core_AddTiming 			( struct core_t * core , unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
 void 							Core_DelTimingId		( struct core_t * core , uint32_t id );
 void 							Core_DelTiming 			( struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );

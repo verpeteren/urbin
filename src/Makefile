@@ -5,7 +5,7 @@ OPTMIZATIONLEVEL = -O0
 CC_FLAGS = $(GET_OFF_MY_LAWN)
 CC_DEBUG_FLAGS = $(CC_FLAGS)
 CC_RELEASE_FLAG = $(CC_FLAGS)
-LD_FLAGS  = -lpthread -lstdc++ -lrt
+LD_FLAGS  = -lpthread -lstdc++ -lrt -ldl
 LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now $(LD_FLAGS)
 LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now $(LD_FLAGS)
  
@@ -80,9 +80,9 @@ $(THE_EXECUTABLE): 			$(OBJ_DIR)/main_server.o $(CODE_OBJECTS) $(FEAT_OBJECTS) $
 ###############################################################################
 # KNOW-HOW
 ###############################################################################
-$(OBJ_DIR)/sqlclient.o:			$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/core.h $(COMMON_HEADERS)
-$(OBJ_DIR)/webserver.o:			$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
-$(OBJ_DIR)/javascript.o:		$(GLOT_DIR)/javascript.cpp $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS)
+$(OBJ_DIR)/sqlclient.o:			$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(COMMON_HEADERS)
+$(OBJ_DIR)/webserver.o:			$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(CORE_DIR)/utils.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
+$(OBJ_DIR)/javascript.o:		$(GLOT_DIR)/javascript.cpp $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS)
 $(OBJ_DIR)/core.o:				$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
 $(OBJ_DIR)/utils.o:				$(CORE_DIR)/utils.c 
 $(OBJ_DIR)/configuration.o:		$(CORE_DIR)/configuration.c $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
