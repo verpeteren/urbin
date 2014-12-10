@@ -63,8 +63,8 @@ $(OBJ_DIR)/main_server.o:			EXCEPTION =
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION =
 $(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion
 $(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return
-$(OBJ_DIR)/core.o:					EXCEPTION =
-$(OBJ_DIR)/utils.o:					EXCEPTION =
+$(OBJ_DIR)/core.o:					EXCEPTION = -Wno-unused-result
+$(OBJ_DIR)/utils.o:					EXCEPTION = -Wno-unused-result
 ifeq ($(CC),gcc)
 else 
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
@@ -141,7 +141,7 @@ tags:	$(shell ls *.[ch])
 
 clean:
 	@echo cleaning
-	@rm -f $(OBJECTS) $(THE_EXECUTABLE)
+	@rm -f $(CODE_OBJECTS) $(THE_EXECUTABLE)
 	
 propperclean: clean
 	@echo propper cleaning 

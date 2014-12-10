@@ -11,13 +11,117 @@
 /*****************************************************************************/
 /* Static etc.                                                               */
 /*****************************************************************************/
-
-
 static struct sqlclient_t *			Sqlclient_New				( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, const unsigned char timeoutSec );
 static void							Sqlclient_Connect			( struct sqlclient_t * sqlclient );
 static void							Sqlclient_CloseConn			( struct sqlclient_t * sqlclient );
+static void 						Sqlclient_PushQuery 		( struct sqlclient_t * sqlclient, struct query_t * query );
 static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient );
 
+/*****************************************************************************/
+/* Query     .                                                               */
+/*****************************************************************************/
+void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, size_t paramCount, const char ** paramValues, queryHandler_cb_t callback, void * args ) {
+	struct query_t * query;
+	size_t i, j;
+	struct {unsigned int good:1;
+			unsigned int query:1;
+			unsigned int statement:1;
+			unsigned int length:1;
+			unsigned int values:1;
+			unsigned int params:1;
+			} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	query = NULL;
+	i = 0;
+	cleanUp.good = ( ( query = malloc( sizeof( * query ) ) ) != NULL );
+	if ( cleanUp.good )  {
+		cleanUp.query = 1;
+		query->paramCount = paramCount;
+		query->cbHandler = callback;
+		query->cbArgs = args;
+		PR_INIT_CLIST( &query->mLink );
+		query->sqlclient = sqlclient;
+		query->statementId = 0;
+		cleanUp.good = ( ( query->statement = strdup( sqlStatement ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.statement = 1;
+	}
+	if ( cleanUp.good ) {
+		cleanUp.statement = 1;
+		cleanUp.good = ( ( query->paramLengths = malloc( sizeof( *query->paramLengths ) * query->paramCount ) )  != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.length = 1;
+		cleanUp.good = ( ( query->paramValues = malloc( sizeof( *query->paramValues) * query->paramCount ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.values = 1;
+		for ( i = 0; i < query->paramCount; i++ ) {
+			query->paramLengths[i] = strlen( paramValues[i] );
+			cleanUp.good = ( ( query->paramValues[i] = strdup( paramValues[i] ) ) != NULL );
+			if ( ! cleanUp.good ) {
+				break;
+			}
+			cleanUp.params = 1;
+		}
+	}
+	if ( cleanUp.good ) {
+		Sqlclient_PushQuery( sqlclient, query );
+		//  Let's see if we can submit this immediately to the server
+			if ( sqlclient->socketFd < 1 ) {
+				Sqlclient_Connect( sqlclient );
+			}
+			Sqlclient_PopQuery( sqlclient );
+		}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.statement ) {
+			free( ( char * ) query->statement );	query->statement = NULL;
+		}
+		if ( cleanUp.length ) {
+			free( query->paramLengths ) ; query->paramLengths = NULL;
+		}
+		if ( cleanUp.values ) {
+			free( query->paramValues ); query->paramValues = NULL;
+		}
+		if ( cleanUp.params ) {
+			for ( j = 0; j < i ; j++ ) {
+				free( (char *) query->paramValues[j] ); query->paramValues[j] = NULL;
+			}
+		}
+	}
+}
+
+void Query_Delete ( struct query_t * query ) {
+	size_t i;
+
+	for ( i = 0; i < query->paramCount; i++ ) {
+		free( (char *) query->paramValues[i] ); query->paramValues[i] = NULL;
+	}
+	free( ( char * ) query->statement ); query->statement = NULL;
+	free( query->paramLengths ); query->paramLengths = NULL;
+	free( query->paramValues ); query->paramValues = NULL;
+	query->cbHandler = NULL;
+	query->cbArgs = NULL;
+	query->paramCount = 0;
+	switch ( query->sqlclient->adapter ) {
+	case SQLADAPTER_POSTGRESQL:
+		if ( query->result.pg != NULL ) {
+			PQclear( query->result.pg ); query->result.pg = NULL;
+		}
+		break;
+#if HAVE_MYSQL == 1
+	case SQLADAPTER_MYSQL:
+		if ( query->result.my != NULL ) {
+			mysac_free_res( query->result.my ); query->result.my = NULL;
+		}
+		break;
+#endif
+	default:
+		break;
+	}
+}
 
 /*****************************************************************************/
 /* POSTGRESQL                                                                */
@@ -49,7 +153,7 @@ static void Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, vo
 					query->result.pg = PQgetResult( sqlclient->connection.pg );
 					if ( query->cbHandler != NULL ) {
 						if ( query->result.pg != NULL ) {
-							// Most of the time all the results are returend in the first loop, but just in case we have to call it again.
+							//  Most of the time all the results are returend in the first loop, but just in case we have to call it again.
 							query->cbHandler( query );
 						}
 						PQclear( query->result.pg ); query->result.pg = NULL;
@@ -106,21 +210,22 @@ static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, 
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
 		PostgresPollingStatusType status;
 		ConnStatusType statusType;
+
 		if ( ( statusType = PQstatus( sqlclient->connection.pg ) ) == CONNECTION_BAD ) {
 			Sqlclient_CloseConn( sqlclient );
 		} else {
 			status = PQconnectPoll( sqlclient->connection.pg );
-		}
-		if ( status != PGRES_POLLING_FAILED && status != PGRES_POLLING_OK ) {
-			if ( PQstatus( sqlclient->connection.pg ) != CONNECTION_OK ) {
-				Sqlclient_CloseConn( sqlclient );
+			if ( status != PGRES_POLLING_FAILED && status != PGRES_POLLING_OK ) {
+				if ( PQstatus( sqlclient->connection.pg ) != CONNECTION_OK ) {
+					Sqlclient_CloseConn( sqlclient );
+				} else {
+					//  We are connected ( and have the database ), we are good to go.
+					picoev_del( loop, fd ) ;
+					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArg );
+				}
 			} else {
-				//  We are connected ( and have the database ), we are good to go.
-				picoev_del( loop, fd ) ;
-				picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArg );
+				Sqlclient_CloseConn( sqlclient );
 			}
-		} else {
-			Sqlclient_CloseConn( sqlclient );
 		}
 	}
 }
@@ -294,7 +399,7 @@ static void Mysql_HandleSetDb_cb( picoev_loop* loop, int fd, int events, void* c
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
 		retCode = mysac_io( sqlclient->connection.my );
 		if ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ ) {
-			// yes, we are connected and have a database, we are good to go
+			//  yes, we are connected and have a database, we are good to go
 			picoev_del( loop, fd );
 			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArg );
 		} else {
@@ -400,7 +505,7 @@ static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter
 	}
 	if ( cleanUp.good ) {
 		cleanUp.dbName = 1;
-		PR_INIT_CLIST( &sqlclient->queries->mLink );
+		sqlclient->queries = NULL;
 	}
 	if ( cleanUp.good ) {
 		sqlclient->timeoutSec = timeoutSec;
@@ -537,152 +642,58 @@ static void Sqlclient_CloseConn ( struct sqlclient_t * sqlclient ) {
 }
 
 static void Sqlclient_PushQuery ( struct sqlclient_t * sqlclient, struct query_t * query ) {
-	PR_APPEND_LINK(  &query->mLink, &sqlclient->queries->mLink );
+	if ( query != NULL ) {
+		if ( sqlclient->queries == NULL ) {
+			sqlclient->queries = query;
+		} else {
+			PR_APPEND_LINK( &sqlclient->queries->mLink, &query->mLink );
+		}
+	}
 }
 
 static struct query_t * Sqlclient_PopQuery ( struct sqlclient_t * sqlclient ) {
 	struct query_t * query;
 	PRCList * next;
 
-	query = NULL;
 	if ( sqlclient->currentQuery == NULL ) {
-		next = &sqlclient->queries->mLink;
-		if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
-			next = PR_NEXT_LINK( next );
-			query = FROM_NEXT_TO_ITEM( struct query_t );
+		if ( sqlclient->queries != NULL ) {
+			query = sqlclient->queries;
+			next = &query->mLink;
+			if ( next == &query->mLink ) {
+				sqlclient->queries = NULL;
+			} else {
+				next = PR_NEXT_LINK( next );
+				query = FROM_NEXT_TO_ITEM( struct query_t );
+			}
 			PR_REMOVE_AND_INIT_LINK( next );
-			sqlclient->currentQuery  = query;
 		}
+		sqlclient->currentQuery = query;
+		return sqlclient->currentQuery;
 	}
-	return query;
+	return NULL;
 }
 
 void Sqlclient_Delete ( struct sqlclient_t * sqlclient ) {
 	struct query_t * query;
-	PRCList * next;
 
+	//  cleanup the queries
+	if ( sqlclient->currentQuery != NULL ) {
+		Query_Delete( sqlclient->currentQuery); sqlclient->currentQuery = NULL;
+	}
+	do {
+		query = Sqlclient_PopQuery( sqlclient );
+		Query_Delete( query ); sqlclient->currentQuery = NULL;  //  pop sets also current query
+	} while (query != NULL );
+	//  cleanup the rest
 	Sqlclient_CloseConn( sqlclient );
 	sqlclient->timeoutSec = 0;
 	sqlclient->statementId = 0;
-	if ( sqlclient->currentQuery ) {
-		Query_Delete( sqlclient->currentQuery); sqlclient->currentQuery = NULL;
-	}
-	next = sqlclient->queries->mLink.next;
-	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
-		do {
-			query = FROM_NEXT_TO_ITEM( struct query_t );
-			next = query->mLink.next;
-			Query_Delete( query );
-		} while( next != NULL );
-	}
-	memset( ( char * ) sqlclient->password, '\0', strlen( sqlclient->password ) );
-	free( ( char * ) sqlclient->hostName ); 	sqlclient->hostName = NULL;
-	free( ( char * ) sqlclient->ip ); 			sqlclient->ip = NULL;
-	free( ( char * ) sqlclient->loginName );	sqlclient->loginName = NULL;
-	free( ( char * ) sqlclient->password );		sqlclient->password = NULL;
-	free( ( char * ) sqlclient->dbName ); 		sqlclient->dbName = NULL;
+	memset( (char *) sqlclient->password, '\0', strlen( sqlclient->password ) );
+	free( (char *) sqlclient->hostName ); 		sqlclient->hostName = NULL;
+	free( (char *) sqlclient->ip ); 			sqlclient->ip = NULL;
+	free( (char *) sqlclient->loginName );		sqlclient->loginName = NULL;
+	free( (char *) sqlclient->password );		sqlclient->password = NULL;
+	free( (char *) sqlclient->dbName ); 		sqlclient->dbName = NULL;
 	free( sqlclient ); 							sqlclient = NULL;
-
 }
 
-void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, size_t paramCount, const char ** paramValues, queryHandler_cb_t callback, void * args ) {
-	struct query_t * query;
-	size_t i, j;
-	struct {unsigned int good:1;
-			unsigned int query:1;
-			unsigned int statement:1;
-			unsigned int length:1;
-			unsigned int values:1;
-			unsigned int params:1;
-			} cleanUp;
-
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	query = NULL;
-	cleanUp.good = ( ( query = malloc( sizeof( * query ) ) ) != NULL );
-	if ( cleanUp.good )  {
-		cleanUp.query = 1;
-		query->paramCount = paramCount;
-		query->cbHandler = callback;
-		query->cbArgs = args;
-		PR_INIT_CLIST( &query->mLink );
-		query->sqlclient = sqlclient;
-		query->statementId = 0;
-		cleanUp.good = ( ( query->statement = strdup( sqlStatement ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.statement = 1;
-	}
-	if ( cleanUp.good ) {
-		cleanUp.statement = 1;
-		cleanUp.good = ( ( query->paramLengths = malloc( sizeof( *query->paramLengths ) * query->paramCount ) )  != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.length = 1;
-		cleanUp.good = ( ( query->paramValues = malloc( sizeof( *query->paramValues) * query->paramCount ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.values = 1;
-		for ( i = 0; i < query->paramCount; i++ ) {
-			query->paramLengths[i] = strlen( paramValues[i] );
-			cleanUp.good = ( ( query->paramValues[i] = strdup( paramValues[i] ) ) != NULL );
-			if ( ! cleanUp.good ) {
-				break;
-			}
-			cleanUp.params = 1;
-		}
-	}
-	if ( cleanUp.good ) {
-		Sqlclient_PushQuery( sqlclient, query );
-		// Let's see if we can submit this immediately to the server
-			if ( sqlclient->socketFd < 1 ) {
-				Sqlclient_Connect( sqlclient );
-			}
-			Sqlclient_PopQuery( sqlclient );
-		}
-	if ( ! cleanUp.good ) {
-		if ( cleanUp.statement ) {
-			free( ( char * ) query->statement );	query->statement = NULL;
-		}
-		if ( cleanUp.length ) {
-			free( query->paramLengths ) ; query->paramLengths = NULL;
-		}
-		if ( cleanUp.values ) {
-			free( query->paramValues ); query->paramValues = NULL;
-		}
-		if ( cleanUp.params ) {
-			for ( j = 0; j < i ; j++ ) {
-				free( (char *) query->paramValues[j] ); query->paramValues[j] = NULL;
-			}
-		}
-	}
-}
-
-void Query_Delete ( struct query_t * query ) {
-	size_t i;
-
-	for ( i = 0; i < query->paramCount; i++ ) {
-		free( (char *) query->paramValues[i] ); query->paramValues[i] = NULL;
-	}
-	free( ( char * ) query->statement ); query->statement = NULL;
-	free( query->paramLengths ); query->paramLengths = NULL;
-	free( query->paramValues ); query->paramValues = NULL;
-	query->cbHandler = NULL;
-	query->cbArgs = NULL;
-	query->paramCount = 0;
-	switch ( query->sqlclient->adapter ) {
-	case SQLADAPTER_POSTGRESQL:
-		if ( query->result.pg != NULL ) {
-			PQclear( query->result.pg ); query->result.pg = NULL;
-		}
-		break;
-#if HAVE_MYSQL == 1
-	case SQLADAPTER_MYSQL:
-		if ( query->result.my != NULL ) {
-			mysac_free_res( query->result.my ); query->result.my = NULL;
-		}
-		break;
-#endif
-	default:
-		break;
-	}
-}

@@ -16,15 +16,15 @@ void Usage( const char * prog_name, int code ) {
 	exit( code );
 }
 
-cfg_opt_t mainCfgOpts[] = {
-	CFG_INT( ( char * ) "max_fds",					PR_CFG_LOOP_MAX_FDS, CFGF_NONE ),
+static cfg_opt_t mainCfgOpts[] = {
+	CFG_INT( (char * ) "loop_max_fds",				PR_CFG_LOOP_MAX_FDS, CFGF_NONE ),
 	CFG_INT( (char * ) "loop_timeout_sec", 			PR_CFG_LOOP_TIMEOUT_SEC, CFGF_NONE ),
 	CFG_INT( (char * ) "loop_ticks_ms", 			PR_CFG_LOOP_TICKS_MS, CFGF_NONE ),
-	CFG_BOOL( (char * ) "daemon", 					PR_CFG_LOOP_DAEMON, CFGF_NONE ),
+	CFG_BOOL( (char * ) "loop_daemon",				PR_CFG_LOOP_DAEMON, CFGF_NONE ),
 	CFG_END()
 };
 
-cfg_opt_t webserverCfgOpts[] = {
+static cfg_opt_t webserverCfgOpts[] = {
 	CFG_STR( (char * ) "documentroot", 	(char *)	PR_CFG_MODULES_WEBSERVER_ROOT, CFGF_NONE ),
 	CFG_STR( (char * ) "path", 			(char *)	PR_CFG_MODULES_WEBSERVER_PATH, CFGF_NONE ),
 	CFG_STR( (char * ) "ip", 			(char *)	PR_CFG_MODULES_WEBSERVER_IP, CFGF_NONE ),
@@ -34,7 +34,7 @@ cfg_opt_t webserverCfgOpts[] = {
 	CFG_END()
 };
 
-cfg_opt_t mysqlclientCfgOpts[] = {
+static cfg_opt_t mysqlclientCfgOpts[] = {
 	CFG_STR( (char * ) "database",	 	(char *)	PR_CFG_MODULES_MYSQLCLIENT_DATABASE, CFGF_NONE ),
 	CFG_STR( (char * ) "ip", 			(char *)	PR_CFG_MODULES_MYSQLCLIENT_IP, CFGF_NONE ),
 	CFG_INT( (char * ) "port", 						PR_CFG_MODULES_MYSQLCLIENT_PORT, CFGF_NONE ),
@@ -42,7 +42,7 @@ cfg_opt_t mysqlclientCfgOpts[] = {
 	CFG_END()
 };
 
-cfg_opt_t pgsqlclientCfgOpts[] = {
+static cfg_opt_t pgsqlclientCfgOpts[] = {
 	CFG_STR( (char * ) "database",	 	(char *)	PR_CFG_MODULES_PGSQLCLIENT_DATABASE, CFGF_NONE ),
 	CFG_STR( (char * ) "ip", 			(char *)	PR_CFG_MODULES_PGSQLCLIENT_IP, CFGF_NONE ),
 	CFG_INT( (char * ) "port", 						PR_CFG_MODULES_PGSQLCLIENT_PORT, CFGF_NONE ),
@@ -50,25 +50,25 @@ cfg_opt_t pgsqlclientCfgOpts[] = {
 	CFG_END()
 };
 
-cfg_opt_t javascriptCfgOpts[] = {
+static cfg_opt_t javascriptCfgOpts[] = {
 	CFG_STR( (char * ) "path", 			(char *)	PR_CFG_GLOT_PATH, CFGF_NONE ),
 	CFG_STR( (char * ) "main", 			(char *)	PR_CFG_GLOT_MAIN, CFGF_NONE ),
 	CFG_END()
 };
 
-cfg_opt_t modulesCfgOpts[] = {
+static cfg_opt_t modulesCfgOpts[] = {
 	CFG_SEC( (char * ) "webserver", 		webserverCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char * ) "mysqlclient", 		mysqlclientCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char * ) "postgresqlclient",	pgsqlclientCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_END()
 };
 
-cfg_opt_t glotCfgOpts[] = {
+static cfg_opt_t glotCfgOpts[] = {
 	CFG_SEC( (char * ) "javascript", javascriptCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_END()
 };
 
-cfg_opt_t allCfgOpts[] = {
+static cfg_opt_t allCfgOpts[] = {
 	CFG_SEC( (char * ) "main", 		mainCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char * ) "modules",	modulesCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char * ) "glot",		glotCfgOpts, CFGF_MULTI | CFGF_TITLE),

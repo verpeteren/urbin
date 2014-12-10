@@ -7,7 +7,6 @@
 #include "../core/utils.h"
 
 static int JS_INTERPRETERS_alive = 0;
-static const char * sectionNameMain = "main";
 
 static bool Javascript_IncludeScript( struct javascript_t * javascript, const char * cfile );
 
@@ -327,16 +326,17 @@ static const JSFunctionSpec jsnHardMethods[ ] = {
 */
 static bool JsnConsoleLog( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 	struct javascript_t * javascript;
-	cfg_t * section;
 	JSObject *  consoleObj;
 	JSString * jString;
 	JS::CallArgs args;
 	const char *fileName;
 	unsigned int lineNo;
 	char *cString;
-	struct {unsigned int good:1;} cleanUp;
+	struct {unsigned int good:1;
+			unsigned int cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cString = NULL;
 	args = CallArgsFromVp( argc, vpn );
 	args.rval().setUndefined();
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
@@ -344,6 +344,7 @@ static bool JsnConsoleLog( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 		cleanUp.good = ( ( cString = JS_EncodeString( cx, jString ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
+		cleanUp.cstring = 1;
 		consoleObj = JS_THIS_OBJECT( cx, vpn );
 		cleanUp.good = ( ( javascript = (struct javascript_t *)( JS_GetPrivate( consoleObj ) ) ) != NULL );
 	}
@@ -358,12 +359,10 @@ static bool JsnConsoleLog( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 		lineNo = __LINE__;
 #endif
 		LOG( javascript->core, LOG_INFO, "[%s:%d] : %s", fileName, lineNo, cString );
-		section = cfg_getnsec( javascript->core->config, sectionNameMain, 0 );
-		if ( cfg_getbool( section, "daemon" ) ) {
-			fprintf( stderr, "%s\n", cString );
-		}
 	}
-	JS_free( cx, cString );
+	if ( cleanUp.cstring ) {
+		JS_free( cx, cString );
+	}
 
 	return ( cleanUp.good ) ? true : false;
 }
@@ -544,10 +543,11 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 	JS::CallArgs args;
 	int ms;
 	struct { unsigned int payload:1;
-			 unsigned int args:1;
 			 unsigned int timer:1;
 			unsigned int good:1;} cleanUp;
 	  //  @TODO:  DRY JsnGlobalSetTimeout && JsnGlobalSetInterval
+	payload = NULL;
+	timing = NULL;
 	JS::RootedValue dummy( cx );
 	JS::RootedValue fnVal( cx );
 	args = CallArgsFromVp( argc, vpn );
@@ -569,7 +569,7 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, 0, TimerHandler_cb, (void * ) payload ) ) != NULL );
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, 0, TimerHandler_cb, (void * ) payload ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
@@ -577,13 +577,10 @@ static bool JsnGlobalSetTimeout( JSContext * cx, unsigned argc, JS::Value * vpn 
 		args.rval().setInt32( (int32_t) timing->identifier );
 	} else {
 		if ( cleanUp.timer ) {
-			Core_DelTiming( timing );
-		}
-		if ( cleanUp.args ) {
-			JS_free( cx, payload->args) ; payload->args = NULL;
+			Core_DelTiming( javascript->core, timing );
 		}
 		if ( cleanUp.payload ) {
-			free( payload ) ; payload = NULL;
+			JsPayload_Delete( payload ) ; payload = NULL;
 		}
 		args.rval().setUndefined();
 	}
@@ -621,14 +618,15 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 	JS::CallArgs args;
 	int ms;
 	struct { unsigned int payload:1;
-			 unsigned int args:1;
 			 unsigned int timer:1;
 			unsigned int good:1;} cleanUp;
 	  //  @TODO:  DRY JsnGlobalSetTimeout && JsnGlobalSetInterval
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	payload = NULL;
+	timing = NULL;
 	JS::RootedValue dummy( cx );
 	JS::RootedValue fnVal( cx );
 	args = CallArgsFromVp( argc, vpn );
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	globalObj = JS_THIS_OBJECT( cx, vpn );
 	javascript = (struct javascript_t *)( JS_GetPrivate( globalObj ) );
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "fi", &dummy, &ms ) == true );
@@ -647,7 +645,7 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, ms, 1, TimerHandler_cb, (void * ) payload ) ) != NULL );
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, 1, TimerHandler_cb, (void * ) payload ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
@@ -655,13 +653,10 @@ static bool JsnGlobalSetInterval( JSContext * cx, unsigned argc, JS::Value * vpn
 		args.rval().setInt32( (int32_t) timing->identifier );
 	} else {
 		if ( cleanUp.timer ) {
-			Core_DelTiming( timing );
-		}
-		if ( cleanUp.args ) {
-			JS_free( cx, payload->args) ; payload->args = NULL;
+			Core_DelTiming( javascript->core, timing );
 		}
 		if ( cleanUp.payload ) {
-			free( payload ) ; payload = NULL;
+			JsPayload_Delete( payload ) ; payload = NULL;
 		}
 		args.rval().setUndefined();
 	}

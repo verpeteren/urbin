@@ -150,11 +150,13 @@ struct core_t * Core_New( cfg_t * config ) {
 	cleanUp.good = ( ( core = malloc( sizeof( * core ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
+	}
+	if ( cleanUp.good ) {
+		cleanUp.config = 1;
 		core->maxIdentifier = 1;
-		// set up the linked lists
-		PR_INIT_CLIST( (&core->timings->mLink) );
-		PR_INIT_CLIST( (&core->modules->mLink) );
-		//  Set up the ticks
+		core->config = config;
+		core->timings = NULL;
+		core->modules = NULL;
 		mainSection = cfg_getnsec( core->config, "main", 0 );
 		timeoutSec = cfg_getint( mainSection, "loop_timeout_sec" );
 		if ( timeoutSec == 0 ) {
@@ -164,13 +166,13 @@ struct core_t * Core_New( cfg_t * config ) {
 		if ( core->processTicksMs == 0 ) {
 			core->processTicksMs = PR_CFG_LOOP_TICKS_MS;
 		}
-		// Set up the logging
+		//  Set up the logging
 #if DEBUG
 		core->logger.logLevel = LOG_DEBUG;
 #else
 		core->logger.logLevel = PR_LOG_LOG_LEVEL;
 #endif
-		if ( cfg_getbool( mainSection, "daemon" ) ) {
+		if ( cfg_getbool( mainSection, "loop_daemon" ) ) {
 			 get_syslog_logger( & core->logger.logFun, 0, &core->logger.logMask);
 		} else {
 			//  we log to the stderr in interactive mode
@@ -181,14 +183,6 @@ struct core_t * Core_New( cfg_t * config ) {
 	}
 	if ( cleanUp.good ) {
 		cleanUp.loop = 1;
-		if ( config != NULL ) {
-			core->config = config;
-		} else {
-			cleanUp.good = ( ( core->config = cfg_init( allCfgOpts, 0 ) ) != NULL );
-		}
-	}
-	if ( cleanUp.good ) {
-		cleanUp.config = 1;
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.loop ) {
@@ -199,18 +193,14 @@ struct core_t * Core_New( cfg_t * config ) {
 		}
 		if ( cleanUp.core ) {
 			core->modules = NULL;
-			core->modules = 0;
+			core->timings = NULL;
 			free( core ); core = NULL;
 		}
 	}
 
 	return core;
 }
-/*
-inline void Core_Log( struct core_t * core, const int logLevel, const char * message ) {
-	core->logger.logFun( logLevel, message );
-}*/
-inline void Core_Log( struct core_t * core, int logLevel, const char * fmt, ... ) {
+void Core_Log( struct core_t * core, int logLevel, const char * fmt, ... ) {
 	char *message;
 	va_list val;
 
@@ -233,7 +223,7 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	mainSection = cfg_getnsec( core->config, "main", 0 );
-	fds = cfg_getint( mainSection, "max_fds" );
+	fds = cfg_getint( mainSection, "loop_max_fds" );
 	if ( fds == 0 ) {
 		fds = PR_CFG_LOOP_MAX_FDS;
 	}
@@ -243,9 +233,8 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 	if ( cleanUp.good ) {
 		cleanUp.fds = 1;
 		cleanUp.signal = 1;
-		signal( SIGINT, signalHandler );
-		signal( SIGTERM, signalHandler );
-		daemonize = cfg_getbool( mainSection, "daemon" );
+		signal( SIGUSR2, signalHandler );
+		daemonize = cfg_getbool( mainSection, "loop_daemon" );
 		if ( daemonize )  {
 			if (0 != fork( ) ) {
 				exit( 0 );
@@ -270,10 +259,10 @@ static void Core_ProcessTick( struct core_t * core ) {
 	PRIntervalTime now;
 	int needToFire;
 
-	now = PR_IntervalNow( );
-	horizon = PR_IntervalToMicroseconds( now ) + core->processTicksMs;
-	next = core->timings->mLink.next;
-	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+	if ( core->timings != NULL ) {
+		now = PR_IntervalNow( );
+		horizon = PR_IntervalToMicroseconds( now ) + core->processTicksMs;
+		next = core->timings->mLink.next;
 		do {
 			timing = FROM_NEXT_TO_ITEM( struct timing_t );
 			next = timing->mLink.next;
@@ -282,7 +271,7 @@ static void Core_ProcessTick( struct core_t * core ) {
 				if ( timing->repeat ) {
 					Timer_CalculateDue( timing, horizon );
 				} else {
-					Core_DelTiming( timing );
+					Core_DelTiming( core, timing );
 				}
 			}
 		} while( next != NULL );
@@ -293,8 +282,8 @@ void Core_Loop( struct core_t * core ) {
 	struct module_t * module;
 	PRCList * next;
 
-	next = core->modules->mLink.next;
-	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+	if ( core->modules != NULL ) {
+		next = core->modules->mLink.next;
 		do {
 			module = FROM_NEXT_TO_ITEM( struct module_t );
 			next = module->mLink.next;
@@ -312,7 +301,11 @@ void Core_Loop( struct core_t * core ) {
 
 void Core_AddModule( struct core_t * core, struct module_t * module ) {
 	if ( module != NULL ) {
-		PR_APPEND_LINK( &core->modules->mLink, &module->mLink );
+		if ( core->modules == NULL ) {
+			core->modules = module;
+		} else {
+			PR_APPEND_LINK( &core->modules->mLink, &module->mLink );
+		}
 		if ( module->onLoad != NULL ) {
 			module->onLoad( module->cbArg );
 		}
@@ -320,11 +313,24 @@ void Core_AddModule( struct core_t * core, struct module_t * module ) {
 }
 
 void Core_DelModule( struct core_t * core, struct module_t * module ) {
+	struct module_t * moduleNext;
+	PRCList * next;
+
 	if ( module != NULL ) {
+		if ( module == core->modules ) {
+			next = module->mLink.next;
+			if ( next == &module->mLink ) {
+				core->modules = NULL;
+			} else {
+				moduleNext = FROM_NEXT_TO_ITEM( struct module_t );
+				core->modules = moduleNext;
+			}
+		}
 		PR_REMOVE_AND_INIT_LINK( &module->mLink );
 		if ( module->onUnload != NULL ) {
 			module->onUnload( module->cbArg );
 		}
+		Module_Delete( module );
 	}
 }
 
@@ -338,7 +344,11 @@ struct timing_t *  Core_AddTiming ( struct core_t * core , unsigned int ms, unsi
 	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArg ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.timing = 1;
-		PR_APPEND_LINK( &core->timings->mLink, &timing->mLink );
+		if ( core->timings == NULL ) {
+			core->timings = timing;
+		} else {
+			PR_APPEND_LINK( &core->timings->mLink, &timing->mLink );
+		}
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.timing ) {
@@ -349,16 +359,36 @@ struct timing_t *  Core_AddTiming ( struct core_t * core , unsigned int ms, unsi
 	return timing;
 }
 
+void Core_DelTiming( struct core_t * core, struct timing_t * timing ) {
+	struct timing_t * timingNext;
+	PRCList * next;
+
+	if ( timing != NULL ) {
+		if ( timing == core->timings ) {
+			next = timing->mLink.next;
+			if ( next == &timing->mLink ) {
+				core->timings = NULL;
+			} else {
+				timingNext = FROM_NEXT_TO_ITEM( struct timing_t );
+				core->timings = timingNext;
+			}
+		}
+		PR_REMOVE_AND_INIT_LINK( &timing->mLink );
+		Timing_Delete( timing );
+	}
+
+}
+
 void Core_DelTimingId ( struct core_t * core , uint32_t id ) {
 	struct timing_t * timing;
 	PRCList * next;
 
-	next = core->timings->mLink.next;
-	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+	if ( core->timings != NULL ) {
+		next = core->timings->mLink.next;
 		do {
 			timing = FROM_NEXT_TO_ITEM( struct timing_t );
 			if ( timing->identifier == id ) {
-				Core_DelTiming( timing );
+				Core_DelTiming( core, timing );
 				break;
 			}
 			next = timing->mLink.next;
@@ -366,33 +396,31 @@ void Core_DelTimingId ( struct core_t * core , uint32_t id ) {
 	}
 }
 
-void Core_DelTiming( struct timing_t * timing ) {
-	PR_REMOVE_AND_INIT_LINK( &timing->mLink );
-	Timing_Delete( timing );
-}
-
 void Core_Delete( struct core_t * core ) {
 	struct timing_t * timing;
 	struct module_t * module;
 	PRCList * next;
-	//  cleanup the timers
-	next = core->timings->mLink.next;
-	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
-		do {
-			timing = FROM_NEXT_TO_ITEM( struct timing_t );
-			next = timing->mLink.next;
-			Core_DelTiming( timing );
-		} while( next != NULL );
-	}
+
 	//  cleanup the modules
-	next = core->modules->mLink.next;
-	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+	if ( core->modules != NULL ) {
+		next = core->modules->mLink.next;
 		do {
 			module = FROM_NEXT_TO_ITEM( struct module_t );
 			next = module->mLink.next;
 			Core_DelModule( core, module );
 		} while( next != NULL );
 	}
+	core->modules = NULL;
+	//  cleanup the timers
+	if ( core->timings != NULL )  {
+		next = core->timings->mLink.next;
+		do {
+			timing = FROM_NEXT_TO_ITEM( struct timing_t );
+			next = timing->mLink.next;
+			Core_DelTiming( core, timing );
+		} while( next != NULL );
+	}
+	core->timings = NULL;
 	//  cleanup the rest
 	core->processTicksMs = 0;
 	picoev_destroy_loop( core->loop );

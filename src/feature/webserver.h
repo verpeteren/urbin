@@ -90,7 +90,7 @@ struct webserver_t {
 	struct core_t *				core;
 	struct route_t *			routes;
 	OnigRegion *				region;
-	OnigOptionType regexOptions;
+	OnigOptionType				regexOptions;
 	uint16_t					port;
 	int							socketFd;
 	unsigned char				timeoutSec;

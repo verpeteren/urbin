@@ -34,10 +34,17 @@ int main( int argc, const char ** argv ) {
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	core = NULL;
+	webserverModule = NULL;
+	javascriptModule = NULL;
+	pgSqlclientModule = NULL;
+#if HAVE_MYSQL == 1
+	mySqlclientModule = NULL;
+#endif
 	cleanUp.good = ( ( config = ProcessCommandline( argc, argv ) ) != NULL );
+	fds = PR_CFG_LOOP_MAX_FDS;
 	if ( cleanUp.good ) {
-		mainSection = cfg_getnsec( core->config, "main", 0 );
-		fds = cfg_getint( mainSection, "max_fds" );
+		mainSection = cfg_getnsec( config, "main", 0 );
+		fds = cfg_getint( mainSection, "loop_max_fds" );
 	}
 	Boot( fds );
 	if ( cleanUp.good ) {
@@ -68,12 +75,11 @@ int main( int argc, const char ** argv ) {
 	}
 	if ( cleanUp.good ) {
 		cleanUp.javascript = 1;
-	}
-	if ( cleanUp.good ) {
 		cleanUp.good = ( Core_PrepareDaemon( core, SignalHandler ) == 1 );
 	}
 	if ( cleanUp.good ) {
 		Core_Loop( core );
+		Core_Delete( core ) ;
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.webserver) {
@@ -93,11 +99,10 @@ int main( int argc, const char ** argv ) {
 		if ( cleanUp.core ) {
 			Core_Delete( core ) ;
 		}
-	} else {
-		Core_Delete( core ) ;
 	}
 
 	Shutdown( );
+
 	return 0;
 }
 

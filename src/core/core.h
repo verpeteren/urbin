@@ -74,14 +74,14 @@ void							SetupSocket				( int fd );
 struct module_t *				Module_New				( const char *name, moduleHandler_cb_t onLoad,  moduleHandler_cb_t onReady, moduleHandler_cb_t onUnload, void * data ) ;
 void 							Module_Delete			( struct module_t * module );
 struct core_t *					Core_New				( cfg_t * config );
-void 					Core_Log				( struct core_t * core, int logLevel, const char * fmt, ... );
+void 							Core_Log				( struct core_t * core, int logLevel, const char * fmt, ... );
 void							Core_Loop				( struct core_t * core );
-int 							Core_PrepareDaemon		( struct core_t * core , signalAction_cb_t signalHandler );
+int 							Core_PrepareDaemon		( struct core_t * core, signalAction_cb_t signalHandler );
 void							Core_AddModule			( struct core_t * core, struct module_t * module );
 void							Core_DelModule			( struct core_t * core, struct module_t * module );
-struct timing_t *				Core_AddTiming 			( struct core_t * core , unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
-void 							Core_DelTimingId		( struct core_t * core , uint32_t id );
-void 							Core_DelTiming 			( struct timing_t * timing );
+struct timing_t *				Core_AddTiming 			( struct core_t * core, unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
+void 							Core_DelTimingId		( struct core_t * core, uint32_t id );
+void 							Core_DelTiming 			( struct core_t * core, struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );
 
 #ifdef __cplusplus
