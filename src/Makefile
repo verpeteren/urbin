@@ -1,14 +1,23 @@
 include ./Makefile.dependencies
-
+###############################################################################
+# For the tweaker
+###############################################################################
+ifdef STAGING_RELEASE
+OPTMIZATIONLEVEL = -O2
+else
 OPTMIZATIONLEVEL = -O0
+endif
 
+###############################################################################
+# For the master of the Makefiles
+###############################################################################
 STDCPP = gnu++11
 STDC = gnu99
 
-CC_FLAGS =
+CC_FLAGS +=
 CC_DEBUG_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
 CC_RELEASE_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
-LD_FLAGS += -shared -lpthread -lstdc++ -lrt -ldl -lz -lm
+LD_FLAGS += -shared -lpthread -lstdc++ -lrt -ldl -lm
 LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now
 LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now
  

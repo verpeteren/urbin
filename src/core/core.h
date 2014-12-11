@@ -21,9 +21,9 @@ typedef void 				( * signalAction_cb_t )		( int );
 typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
 typedef void 				( * moduleHandler_cb_t )	( void * cbArgs );
 
-#define LOG( core, level, ... ) Core_Log( (core), level, __VA_ARGS__ );
+#define LOG( core, level, ... ) do {Core_Log( (core), level, __VA_ARGS__ ); } while( 0 );
 
-#define FROM_NEXT_TO_ITEM( type ) ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
+#define FROM_NEXT_TO_ITEM( type )  ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
 
 #define FEATURE_JOINCORE( Feat, feature ) \
 void Feat##_JoinCore( struct feature##_t * feature ) { \

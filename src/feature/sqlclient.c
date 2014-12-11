@@ -230,7 +230,7 @@ static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, 
 	}
 }
 
-#define SET_DEFAULTS_FOR_CONN( type, sectionName ) \
+#define SET_DEFAULTS_FOR_CONN( type, sectionName ) do { \
 	struct cfg_t * sqlSection, * modulesSection; \
 	\
 	modulesSection = cfg_getnsec( core->config, "modules", 0 ); \
@@ -258,7 +258,8 @@ static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, 
 	} \
 	if ( timeoutSec == 0 ) { \
 		timeoutSec = PR_CFG_MODULES_ ## type ## SQLCLIENT_TIMEOUT_SEC; \
-	}
+	} \
+} while( 0 );
 
 struct sqlclient_t * Postgresql_New( struct core_t * core, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, unsigned char timeoutSec ) {
 	SET_DEFAULTS_FOR_CONN( PG, "postgresqlclient" ) \

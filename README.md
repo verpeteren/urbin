@@ -63,9 +63,14 @@ H3. Optional libraries
 Topic		Project			License			SLOC		Link
 Mysql		mysac			GPL3			18593		http://cv.arpalert.org/page.sh?mysac
 
-H3. Licence
 
 TBD, probably MIT
 MySql can be excluded from the linking
+
+H2. FAQ
+
+Q:	What is your thing with Makefiles?
+A:	I think they are quite handy
+
 
 

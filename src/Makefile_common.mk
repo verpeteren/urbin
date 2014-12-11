@@ -1,5 +1,19 @@
 include ./Makefile_platform.mk
+###############################################################################
+# For the tweaker
+###############################################################################
+#HAS_MYSQL = yes
+HAS_MYSQL = no
 
+#MAKE_STATIC_LIBS =yes
+MAKE_STATIC_LIBS = no
+
+CC_FLAGS =
+LD_FLAGS = 
+
+###############################################################################
+# For the master of the Makefiles
+###############################################################################
 AR = ar
 RANLIB = ranlib
 CTAGS = ctags
@@ -7,20 +21,17 @@ STRIP = strip
 CC = gcc
 #CC = clang
 
-CC_FLAGS =
-LD_FLAGS = 
 #sharedLibFileToParam = $(shell echo $1 )
 sharedLibFileToParam = -L$(shell dirname $1) -l$(shell basename $1 .so|cut -b 4-)
 
 OBJ_DIR = .objects
 DEP_DIR = ../deps
 
-#HAS_MYSQL = yes
-HAS_MYSQL = no
-
-MAKE_STATIC_LIBS =yes
-#MAKE_STATIC_LIBS = no
-
+VER_Z = 1.2.8
+DIR_Z = $(DEP_DIR)/zlib-$(VER_Z)
+INC_Z = -isystem$(DIR_Z)
+LIB_Z_STATIC = $(DIR_Z)/libz.a
+LIB_Z_SHARED = $(DIR_Z)/libz.so
 DIR_PICOEV = $(DEP_DIR)/picoev
 INC_PICOEV = -isystem$(DIR_PICOEV)/
 LIB_PICOEV_STATIC = $(DIR_PICOEV)/libpicoev.a
@@ -80,14 +91,14 @@ else
 HAVE_MYSQL = -DHAVE_MYSQL=0
 endif
 
-DIRS = $(DIR_PICOEV) $(DIR_H3) $(DIR_CLOG) $(DIR_TADL) $(DIR_ONIG) $(DIR_PG) $(DIR_MOZ) $(DIR_NSPR) $(DIR_CONF)
-INCS = $(INC_PICOEV) $(INC_H3) $(INC_CLOG) $(INC_TADL) $(INC_ONIG) $(INC_PG) $(INC_MOZ) $(INC_NSPR) $(INC_CONF)
+DIRS = $(DIR_PICOEV) $(DIR_H3) $(DIR_CLOG) $(DIR_TADL) $(DIR_ONIG) $(DIR_PG) $(DIR_MOZ) $(DIR_NSPR) $(DIR_CONF) $(DIR_Z)
+INCS = $(INC_PICOEV) $(INC_H3) $(INC_CLOG) $(INC_TADL) $(INC_ONIG) $(INC_PG) $(INC_MOZ) $(INC_NSPR) $(INC_CONF) $(INC_Z)
 ifeq ($(MAKE_STATIC_LIBS),yes)
-DEPS = $(LIB_PICOEV_STATIC) $(LIB_H3_STATIC) $(LIB_CLOG_STATIC) $(LIB_TADL_STATIC) $(LIB_ONIG_STATIC) $(LIB_PG_STATIC) $(LIB_MOZ_STATIC) $(LIB_NSPR_STATIC) $(LIB_CONF_STATIC) 
-LIBS = $(LIB_PICOEV_STATIC) $(LIB_H3_STATIC) $(LIB_CLOG_STATIC) $(LIB_TADL_STATIC) $(LIB_ONIG_STATIC) $(LIB_PG_STATIC) $(LIB_MOZ_STATIC) $(LIB_NSPR_STATIC) $(LIB_CONF_STATIC)
+DEPS = $(LIB_PICOEV_STATIC) $(LIB_H3_STATIC) $(LIB_CLOG_STATIC) $(LIB_TADL_STATIC) $(LIB_ONIG_STATIC) $(LIB_PG_STATIC) $(LIB_MOZ_STATIC) $(LIB_NSPR_STATIC) $(LIB_CONF_STATIC) $(LIB_Z_STATIC)
+LIBS = $(LIB_PICOEV_STATIC) $(LIB_H3_STATIC) $(LIB_CLOG_STATIC) $(LIB_TADL_STATIC) $(LIB_ONIG_STATIC) $(LIB_PG_STATIC) $(LIB_MOZ_STATIC) $(LIB_NSPR_STATIC) $(LIB_CONF_STATIC) $(LIB_Z_STATIC)
 LD_FLAGS += -static
 else
-DEPS = $(LIB_PICOEV_SHARED) $(LIB_H3_SHARED) $(LIB_CLOG_SHARED) $(LIB_TADL_SHARED) $(LIB_ONIG_SHARED) $(LIB_PG_SHARED) $(LIB_MOZ_SHARED) $(LIB_NSPR_SHARED) $(LIB_CONF_SHARED) 
+DEPS = $(LIB_PICOEV_SHARED) $(LIB_H3_SHARED) $(LIB_CLOG_SHARED) $(LIB_TADL_SHARED) $(LIB_ONIG_SHARED) $(LIB_PG_SHARED) $(LIB_MOZ_SHARED) $(LIB_NSPR_SHARED) $(LIB_CONF_SHARED) $(LIB_Z_SHARED)
 LIBS = 	$(call sharedLibFileToParam, $(LIB_PICOEV_SHARED)) \
 		$(call sharedLibFileToParam, $(LIB_H3_SHARED)) \
 		$(call sharedLibFileToParam, $(LIB_CLOG_SHARED)) \
@@ -96,7 +107,8 @@ LIBS = 	$(call sharedLibFileToParam, $(LIB_PICOEV_SHARED)) \
 		$(call sharedLibFileToParam, $(LIB_PG_SHARED)) \
 		$(call sharedLibFileToParam, $(LIB_MOZ_SHARED)) \
 		$(call sharedLibFileToParam, $(LIB_NSPR_SHARED)) \
-		$(call sharedLibFileToParam, $(LIB_CONF_SHARED)) 
+		$(call sharedLibFileToParam, $(LIB_CONF_SHARED)) \
+		$(call sharedLibFileToParam, $(LIB_Z_SHARED)) 
 endif
 
 ifeq ($(HAS_MYSQL),yes)

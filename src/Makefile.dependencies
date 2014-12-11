@@ -1,6 +1,9 @@
 include Makefile_common.mk
-
+###############################################################################
+# For the master of the Makefiles
+###############################################################################
 NSPR_PATH = $(shell pwd)/$(DIR_NSPR)
+ZLIB_PATH = $(shell pwd)/$(DIR_Z)
 
 ifdef LINUX_BUILD
 PICOEV_SOURCE = picoev_epoll.c
@@ -14,6 +17,23 @@ endif
 
 deps: $(DEPS)
 
+###############################################################################
+# zlib: A Massively Spiffy Yet Delicately Unobtrusive Compression Library
+###############################################################################
+# wow there are 4 versions in use here: `find . -type f|grep /zlib.h`|grep define
+# it appears that firefox is most recent (1.2.8)
+$(LIB_Z_STATIC): $(DIR_Z) 
+$(LIB_Z_SHARED): $(DIR_Z) 
+	@echo $@
+	@cd $(DIR_Z) &&\
+	./configure && \
+	make
+		
+$(DIR_Z): 
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://zlib.net/zlib-$(VER_Z).tar.gz && \
+	tar -xaf zlib-$(VER_Z).tar.gz
 ###############################################################################
 # picoev: a tiny event loop for network applications, faster than libevent or libev
 ###############################################################################
@@ -185,11 +205,11 @@ $(DIR_MYS):
 ###############################################################################
 # mysql: mysql c connection
 ###############################################################################
-$(LIB_MY_STATIC): $(DIR_MY)
-$(LIB_MY_SHARED): $(DIR_MY)
+$(LIB_MY_STATIC): $(DIR_MY) $(LIB_Z_STATIC)
+$(LIB_MY_SHARED): $(DIR_MY) $(LIB_Z_SHARED)
 	@echo $@
 	@cd $(DIR_MY)/ && \
-	cmake . -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 && \
+	cmake . -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 -DENABLED_PROFILING=0 -DWITHOUT_SERVER=1 -DWITH_VALGRIND=0 -DWITH_UNIT_TESTS=0 -DENABLE_GCOV=0 -DENABLE_GPROF=0 -DWITH_ZLIB=system&& \
 	make
 	@touch $@
 
@@ -207,7 +227,11 @@ $(LIB_NSPR_STATIC): $(DIR_MOZ)
 $(LIB_NSPR_SHARED): $(DIR_MOZ)
 	@echo $@
 	@cd $(DIR_NSPR) && \
-	./configure && \
+	./configure \
+		--enable-optimize=-O2 \
+		--disable-debug \
+		--enable-strip \
+		--disable-symbian-target && \
 	make 
 	@cp $(DIR_NSPR)/config/nspr-config $(DIR_NSPR)/dist/bin/
 
@@ -220,8 +244,8 @@ $(DIR_NSPR): $(DIR_MOZ)
 ###############################################################################
 # spidermonkey: embedded javascript interpreter
 ###############################################################################
-$(LIB_MOZ_STATIC): $(LIB_NSPR_STATIC)
-$(LIB_MOZ_SHARED): $(LIB_NSPR_SHARED)
+$(LIB_MOZ_STATIC): $(LIB_NSPR_STATIC) $(LIB_Z_STATIC)
+$(LIB_MOZ_SHARED): $(LIB_NSPR_SHARED) $(LIB_Z_SHARED)
 	@echo $@
 	@cd $(DIR_MOZ)/js/src && \
 		autoconf2.13 && \
@@ -244,6 +268,8 @@ $(LIB_MOZ_SHARED): $(LIB_NSPR_SHARED)
 		--enable-shared-js \
 		--enable-valgrind \
 		--enable-threadsafe \
+		--enable-release \
+		--with-system-zlib=$(ZLIB_PATH) \
 		--disable-nspr-build \
 		--with-nspr-prefix=$(NSPR_PATH) --with-nspr-cflags="-I$(NSPR_PATH)/dist/include/nspr" --with-nspr-libs="-lrt -L .$(NSPR_PATH)/dist/lib/ -lnspr4 -lplds4 -lplc4 $(NSPR_PATH)/dist/lib/libnspr4.a $(NSPR_PATH)/dist/lib/libplds4.a $(NSPR_PATH)/dist/lib/libplc4.a" \
 		$(DEBUG) \
