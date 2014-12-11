@@ -172,7 +172,7 @@ struct core_t * Core_New( cfg_t * config ) {
 #else
 		core->logger.logLevel = PR_LOG_LOG_LEVEL;
 #endif
-		if ( cfg_getbool( mainSection, "loop_daemon" ) ) {
+		if ( cfg_getbool( mainSection, "loop_daemon" ) == cfg_true ) {
 			 get_syslog_logger( & core->logger.logFun, 0, &core->logger.logMask);
 		} else {
 			//  we log to the stderr in interactive mode
@@ -235,7 +235,7 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 		cleanUp.signal = 1;
 		signal( SIGUSR2, signalHandler );
 		daemonize = cfg_getbool( mainSection, "loop_daemon" );
-		if ( daemonize )  {
+		if ( daemonize == cfg_true )  {
 			if (0 != fork( ) ) {
 				exit( 0 );
 			}

@@ -199,8 +199,8 @@ static bool JsnWebserverClassConstructor( JSContext * cx, unsigned argc, JS::Val
 		cleanUp.good = ( ( cServerIp = JS_EncodeString( cx, jServerIp ) ) != NULL );
 	}
 	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vpn ) );
-	if ( ! thisObj ) {
-		cleanUp.good = 0;
+	if ( thisObj != NULL ) {
+		cleanUp.good = 1;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( thisObj ) ) != NULL );
@@ -489,27 +489,25 @@ static bool JsnGlobalInclude( JSContext * cx, unsigned argc, JS::Value * vpn ) {
 
 static int TimerHandler_cb( void * cbArgs ) {
 	struct JsPayload * payload;
-	JSContext *cx;
 	int again;
 	//JSCompartment * oldCompartment;
 
 	payload = ( struct JsPayload * ) cbArgs;
 	JS::RootedValue args( payload->cx );
 	JS::RootedValue retVal( payload->cx );
-	cx = payload->cx;
 	JS_BeginRequest( payload->cx );
 
 	//oldCompartment = JS_EnterCompartment( payload->cx, payload->obj );
 	JS_CallFunctionValue( payload->cx, payload->obj, *payload->fnVal, JS::HandleValueArray( args ), &retVal );
-	if ( ! payload->repeat ) {
+	if ( payload->repeat ) {
+		again = 1;
+	} else {
 		JsPayload_Delete( payload );
 		again = 0;
-	} else {
-		again = 1;
 	}
 
-	//JS_LeaveCompartment( cx, oldCompartment );
-	JS_EndRequest( cx );
+	//JS_LeaveCompartment( payload->cx, oldCompartment );
+	JS_EndRequest( payload->cx );
 
 	return again;
 }
@@ -744,13 +742,18 @@ BOILERPLATE
 ===============================================================================
 */
 static void JsnReportError( JSContext * cx, const char * message, JSErrorReport * report ) {
-	int where;
+	struct javascript_t * javascript;
+	const char * fileName;
+	const char * state;
+	int level;
+
+	javascript = (struct javascript_t *) JS_GetContextPrivate( cx );
 	//  http://egachine.berlios.de/embedding-sm-best-practice/ar01s02.html#id2464522
-	fprintf( stderr, "%s:%u:%s\n",
-		report->filename ? report->filename : "[no filename]",
-		( unsigned int ) report->lineno,
-		message );
+	fileName = (report->filename != NULL)? report->filename : "<no filename>";
+#ifdef VERBOSE
 	if ( report->linebuf ) {
+		int where;
+
 		if ( report->tokenptr ) {
 			where = report->tokenptr - report->linebuf;
 			if ( ( where >= 0 ) && ( where < 80 ) ) {
@@ -763,17 +766,24 @@ static void JsnReportError( JSContext * cx, const char * message, JSErrorReport 
 			}
 		}
 	}
+#endif
+	level = LOG_ERR;
+	state = "Error";
 	if (JSREPORT_IS_WARNING( report->flags)  ) {
-		fprintf( stderr, " WARNING" );
-	}
-	if (JSREPORT_IS_EXCEPTION( report->flags ) ) {
-		fprintf( stderr, " EXCEPTION" );
+		state = "Warning";
+		level = LOG_WARNING;
 	}
 	if (JSREPORT_IS_STRICT( report->flags ) ) {
-		fprintf( stderr, " STRICT" );
+		state = "Strict";
+		level = LOG_ERR;
 	}
-	fprintf( stderr, " (Error number: %d)\n", report->errorNumber );
+	if (JSREPORT_IS_EXCEPTION( report->flags ) ) {
+		state = "Exception";
+		level = LOG_CRIT;
+	}
+	LOG( javascript->core, level, "[%s:%d] : %s/%d: %s", fileName, report->lineno, state, report->errorNumber, message );
 }
+
 /**
  * Function that is called when the first Javascript file is loaded correctly.
  *
@@ -896,6 +906,7 @@ struct javascript_t * Javascript_New( struct core_t * core, const char * path, c
 	}
 	if ( cleanUp.good ) {
 		cleanUp.context = 1;
+		JS_SetContextPrivate( javascript->context, (void *)javascript );
 		/*unsigned int options;
 
 		options = JSOPTION_VAROBJFIX| JSOPTION_EXTRA_WARNINGS | JSOPTION_NO_SCRIPT_RVAL | JSOPTION_UNROOTED_GLOBAL | JSOPTION_COMPILE_N_GO;

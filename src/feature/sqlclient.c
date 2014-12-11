@@ -181,7 +181,7 @@ static void Postgresql_HandleWrite_cb( picoev_loop* loop, int fd, int events, vo
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
 		//  Let's get some work
 		query = Sqlclient_PopQuery( sqlclient );
-		if ( query ) {
+		if ( query != NULL ) {
 			if ( query->paramCount == 0 ) {
 				cleanUp.good = ( PQsendQuery( sqlclient->connection.pg, query->statement ) == 1 );
 			} else {
@@ -369,7 +369,7 @@ static void	Mysql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* c
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
 		//  Let's get some work
 		query = Sqlclient_PopQuery( sqlclient );
-		if ( query ) {
+		if ( query != NULL ) {
 			picoev_del( loop, fd ) ;
 			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleSetParams_cb, cbArg );
 			cleanUp.ev = 1;

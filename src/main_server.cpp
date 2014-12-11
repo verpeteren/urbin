@@ -19,7 +19,7 @@ int main( int argc, const char ** argv ) {
 	int fds;
 	struct module_t * webserverModule, *javascriptModule, *pgSqlclientModule;
 #if HAVE_MYSQL == 1
-	struct module_t mySqlclientModule;
+	struct module_t * mySqlclientModule;
 #endif
 	struct {
 		unsigned int good:1;

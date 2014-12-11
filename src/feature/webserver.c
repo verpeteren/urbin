@@ -225,7 +225,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 	struct route_t * route;
 
 	route = webclient->route;
-	if ( ! route ) {
+	if ( route == NULL ) {
 		Webclient_RenderNotFound( webclient );
 	} else {
 		if ( route->routeType == ROUTETYPE_DYNAMIC ) {
@@ -378,7 +378,7 @@ static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
 }
 
 static void Webclient_Reset( struct webclient_t * webclient ) {
-	if ( webclient->header )  {
+	if ( webclient->header != NULL )  {
 		h3_request_header_free( webclient->header ); webclient->header = NULL;
 	}
 	memset( webclient->buffer, '\0', strlen( webclient->buffer ) );
@@ -394,7 +394,7 @@ static void Webclient_Reset( struct webclient_t * webclient ) {
 	webclient->connection = CONNECTION_CLOSE;
 	webclient->mode = MODE_GET;
 	onig_region_free( webclient->webserver->region, 0 );
-	if ( webclient->response.content ) {
+	if ( webclient->response.content != NULL ) {
 		free( webclient->response.content ); webclient->response.content = NULL;
 	}
 }
@@ -406,7 +406,7 @@ static void Webclient_CloseConn( struct webclient_t * webclient ) {
 }
 
 static void Webclient_Delete( struct webclient_t * webclient ) {
-	if ( webclient->header )  {
+	if ( webclient->header != NULL )  {
 		h3_request_header_free( webclient->header );
 	}
 	webclient->route = NULL;
@@ -420,7 +420,7 @@ static void Webclient_Delete( struct webclient_t * webclient ) {
 	webclient->connection = CONNECTION_CLOSE;
 	webclient->response.contentType = CONTENTTYPE_BUFFER;
 	webclient->mode = MODE_GET;
-	if ( webclient->response.content )  {
+	if ( webclient->response.content != NULL )  {
 		free( webclient->response.content ); webclient->response.content = NULL;
 	}
 

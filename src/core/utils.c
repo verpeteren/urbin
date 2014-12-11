@@ -19,7 +19,7 @@ char * FileGetContents( const char * fileName ) {
 
 	contents = NULL;
 	fp = fopen( fileName, "rb" );
-	if ( fp ) {
+	if ( fp != NULL ) {
 		fseek( fp, 0, SEEK_END );
 		size = (size_t) ftell( fp );
 		if ( ( contents = malloc( size + 1 ) ) != NULL ) {
