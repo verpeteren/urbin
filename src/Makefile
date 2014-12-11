@@ -1,16 +1,14 @@
-include ./Makefile_common.mk
 include ./Makefile.dependencies
 
 OPTMIZATIONLEVEL = -O0
 
-#STDCPP = c++ox
 STDCPP = gnu++11
 STDC = gnu99
 
-CC_FLAGS = $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
+CC_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
 CC_DEBUG_FLAGS = $(CC_FLAGS)
 CC_RELEASE_FLAG = $(CC_FLAGS)
-LD_FLAGS  = -lpthread -lstdc++ -lrt -ldl -lz
+LD_FLAGS += -lpthread -lstdc++ -lrt -ldl -lz -lm
 LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now $(LD_FLAGS)
 LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now $(LD_FLAGS)
  
@@ -42,7 +40,7 @@ FEAT_DIR=./feature
 GLOT_DIR=./glot
 BIN_DIR=../bin
 
-COMMON_HEADERS = common.h platform.h $(DIRS)
+COMMON_HEADERS = common.h platform.h $(DIRS) 
 FEATURE_HEADERS = $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h
 GLOT_HEADERS = $(GLOT_DIR)/javascript.h
 
@@ -57,6 +55,7 @@ THE_EXECUTABLE = $(BIN_DIR)/ronja
 
 all: 	$(THE_EXECUTABLE) 
 tests:	$(TST_EXECUTABLE) 
+deps:	$(DEPS)
 docs:   ../doc/Api.txt
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
@@ -67,6 +66,7 @@ $(OBJ_DIR)/core.o:					EXCEPTION = -Wno-unused-result
 $(OBJ_DIR)/utils.o:					EXCEPTION = -Wno-unused-result
 ifeq ($(CC),gcc)
 else 
+$(OBJ_DIR)/main_server.o:			EXCEPTION +=
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/javascript.o:			EXCEPTION += 
@@ -76,38 +76,39 @@ $(OBJ_DIR)/configuration.o:			EXCEPTION +=
 endif
 
 ###############################################################################
-# LINKING
-###############################################################################
-$(THE_EXECUTABLE): 			$(OBJ_DIR)/main_server.o $(CODE_OBJECTS) $(FEAT_OBJECTS) $(LIBS)
-	@echo "\tLD\t"$@
-	@$(CC) $(INC) $(LDFLAGS) -o $@ $^ -lm
-
-###############################################################################
 # KNOW-HOW
 ###############################################################################
-$(OBJ_DIR)/sqlclient.o:			$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(COMMON_HEADERS) 
-$(OBJ_DIR)/webserver.o:			$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(CORE_DIR)/utils.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
-$(OBJ_DIR)/javascript.o:		$(GLOT_DIR)/javascript.cpp $(GLOT_DIR)/javascript.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS) 
-$(OBJ_DIR)/core.o:				$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
-$(OBJ_DIR)/utils.o:				$(CORE_DIR)/utils.c  $(CORE_DIR)/utils.h $(COMMON_HEADERS)
-$(OBJ_DIR)/configuration.o:		$(CORE_DIR)/configuration.c $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
+$(OBJ_DIR)/sqlclient.o:				$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(COMMON_HEADERS) 
+$(OBJ_DIR)/webserver.o:				$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/configuration.h $(CORE_DIR)/core.h $(CORE_DIR)/utils.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
+$(OBJ_DIR)/javascript.o:			$(GLOT_DIR)/javascript.cpp $(GLOT_DIR)/javascript.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS) 
+$(OBJ_DIR)/core.o:					$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
+$(OBJ_DIR)/utils.o:					$(CORE_DIR)/utils.c  $(CORE_DIR)/utils.h $(COMMON_HEADERS)
+$(OBJ_DIR)/configuration.o:			$(CORE_DIR)/configuration.c $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
+$(OBJ_DIR)/main_server.o:			./main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADERS) $(GLOT_HEADERS) $(COMMON_HEADERS)
+
+###############################################################################
+# LINKING
+###############################################################################
+$(THE_EXECUTABLE): 					$(CODE_OBJECTS) $(DEPS) docs tags
+	@echo "\tLD\t"$@
+	@$(CC) $(INC) $(LDFLAGS) -o $@ 	$(CODE_OBJECTS) $(LIBS)
 
 ###############################################################################
 # OBJECTS
 ###############################################################################
-$(OBJ_DIR)/main_server.o:		main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADERS) $(GLOT_HEADERS) $(COMMON_HEADERS)
+$(OBJ_DIR)/main_%.o:				./main_%.cpp
 	@echo "\tCC\t"$@:
 	@$(CC) -std=$(STDCPP) $(INC) $(CFLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
-$(OBJ_DIR)/%.o:					$(FEAT_DIR)/%.c
+$(OBJ_DIR)/%.o:						$(FEAT_DIR)/%.c
 	@echo "\tCC\t"$@
 	@$(CC) -std=$(STDC) $(INC) $(CFLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
-$(OBJ_DIR)/%.o:					$(CORE_DIR)/%.c
+$(OBJ_DIR)/%.o:						$(CORE_DIR)/%.c
 	@echo "\tCC\t"$@
 	@$(CC) -std=$(STDC) $(INC) $(CFLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
-$(OBJ_DIR)/%.o:					$(GLOT_DIR)/%.cpp
+$(OBJ_DIR)/%.o:						$(GLOT_DIR)/%.cpp
 	@echo "\tCC\t"$@
 	@$(CC) -std=$(STDCPP) $(INC) $(CFLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 

@@ -12,19 +12,25 @@ ifdef GENERIC_BUILD
 PICOEV_SOURCE = picoev_selectl.c
 endif
 
-
-
-all: $(LIBS)
+deps: $(DEPS)
 
 ###############################################################################
 # picoev: a tiny event loop for network applications, faster than libevent or libev
 ###############################################################################
-$(LIB_PICOEV): $(DIR_PICOEV)
+$(LIB_PICOEV_STATIC): $(DIR_PICOEV)
 	@echo $@
 	@cd $(DIR_PICOEV) && \
-	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o picoev.o $(PICOEV_SOURCE) && \
-	$(AR) cr libpicoev.a picoev.o && \
+	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o picoev_static.o $(PICOEV_SOURCE) && \
+	$(AR) cr libpicoev.a picoev_static.o && \
 	$(RANLIB) libpicoev.a
+	@touch $@
+
+$(LIB_PICOEV_SHARED): $(DIR_PICOEV)
+	@echo $@
+	@cd $(DIR_PICOEV) && \
+	$(CC) $(SPEEDFLAGS) $(DEVFLAGS) -fPIC -c -o picoev_shared.o $(PICOEV_SOURCE) && \
+	$(CC) -shared -Wl,-soname,libpicoev.so -o libpicoev.so picoev_shared.o
+	@touch $@
 
 $(DIR_PICOEV):
 	@echo $@
@@ -39,12 +45,20 @@ $(DIR_PICOEV):
 ###############################################################################
 # clog: A syslog-compatible stderr logging mechanism
 ###############################################################################
-$(LIB_CLOG): $(DIR_CLOG)
+$(LIB_CLOG_STATIC): $(DIR_CLOG)
 	@echo $@
 	@cd $(DIR_CLOG) && \
-	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o logging.o logging.c && \
-	$(AR) cr libclog.a logging.o && \
+	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o logging_static.o logging.c && \
+	$(AR) cr libclog.a logging_static.o && \
 	$(RANLIB) libclog.a
+	@touch $@
+
+$(LIB_CLOG_SHARED): $(DIR_CLOG)
+	@echo $@
+	@cd $(DIR_CLOG) && \
+	$(CC) $(SPEEDFLAGS) $(DEVFLAGS) -fPIC -c -o logging_shared.o logging.c && \
+	$(CC) -shared -Wl,-soname,libclog.so -o libclog.so logging_shared.o
+	@touch $@
 
 $(DIR_CLOG):
 	@echo $@
@@ -56,27 +70,41 @@ $(DIR_CLOG):
 ###############################################################################
 # H3 - The Fast HTTP header parser library  
 ###############################################################################
-$(LIB_H3): $(DIR_H3)
+$(LIB_H3_STATIC): $(DIR_H3)
+$(LIB_H3_SHARED): $(DIR_H3)
 	@echo $@
 	@cd $(DIR_H3) && \
-	make -f Makefile.dist
+	make -f Makefile.dist libh3 
+	@touch $@
 
 $(DIR_H3):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q https://github.com/c9s/h3/archive/master.zip -O h3.zip && \
 	unzip -qq h3.zip && \
-	mv h3-master h3
+	mv h3-master h3 && \
+	mv h3/Makefile.dist h3/Makefile.dist.org && \
+	sed -e "s/.*-o libh3\.a.*/&\n&/" h3/Makefile.dist.org | \
+		sed -e"1,/-o libh3.a/s/-o libh3.a/-Wl,-soname,libh3.so -o libh3.so/" > h3/Makefile.dist
 
 ###############################################################################
 # TADns - Tiny Asyncronous Dns Lookup library
 ###############################################################################
-$(LIB_TADL): $(DIR_TADL)
+$(LIB_TADL_STATIC): $(DIR_TADL)
+	@echo $@
+	@cd $(DIR_TADL) && \
+	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o tadns_static.o tadns.c && \
+	$(AR) cr libtadns.a tadns_static.o && \
+	$(RANLIB) libtadns.a
+	@touch $@
+
+$(LIB_TADL_SHARED): $(DIR_TADL)
 	@echo $@
 	@cd $(DIR_TADL) && \
 	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o tadns.o tadns.c && \
-	$(AR) cr libtadns.a tadns.o && \
-	$(RANLIB) libtadns.a
+	$(CC) $(SPEEDFLAGS) $(DEVFLAGS) -fPIC -c -o tadns_shared.o tadns.c && \
+	$(CC) -shared -Wl,-soname,libtadns.so -o libtadns.so tadns_shared.o
+	@touch $@
 
 $(DIR_TADL):
 	@echo $@
@@ -87,7 +115,8 @@ $(DIR_TADL):
 ###############################################################################
 # oniguruma: an regular expression engine
 ###############################################################################
-$(LIB_ONIG): $(DIR_ONIG)
+$(LIB_ONIG_STATIC): $(DIR_ONIG)
+$(LIB_ONIG_SHARED): $(DIR_ONIG)
 	@echo $@
 	@cd $(DIR_ONIG) && \
 	./configure --with-pic --with-gnu-ld --enable-static --enable-shared && \
@@ -103,7 +132,8 @@ $(DIR_ONIG):
 ###############################################################################
 # libpq: native postgresql connector
 ###############################################################################
-$(LIB_PG): $(DIR_PG)
+$(LIB_PG_STATIC): $(DIR_PG)
+$(LIB_PG_SHARED): $(DIR_PG)
 	@echo $@
 	@cd $(DIR_PG) && \
 	./configure --without-readline --without-zlib --with-gnu-ld --without-libxml --without-libxslt --without-openssl --without-bonjour --without-ldap --without-pam --without-krb5 --without-gssapi --without-python --without-perl --without-tcl&& \
@@ -120,10 +150,11 @@ $(DIR_PG):
 ###############################################################################
 # mysac: mysql simple asynchronous client 
 ###############################################################################
-$(LIB_MYS): $(DIR_MYS) $(DIR_MY)
+$(LIB_MYS_STATIC): $(DIR_MYS) $(DIR_MY)
+$(LIB_MYS_SHARED): $(DIR_MYS) $(DIR_MY)
 	@echo $@
 	@cd $(DIR_MYS) && \
-	make libmysac-static.a
+	make libmysac-static.a libmysac.so
 	@touch $@
 
 $(DIR_MYS):
@@ -147,7 +178,8 @@ $(DIR_MYS):
 ###############################################################################
 # mysql: mysql c connection
 ###############################################################################
-$(LIB_MY): $(DIR_MY)
+$(LIB_MY_STATIC): $(DIR_MY)
+$(LIB_MY_SHARED): $(DIR_MY)
 	@echo $@
 	@cd $(DIR_MY)/ && \
 	cmake . -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 && \
@@ -164,7 +196,8 @@ $(DIR_MY):
 ###############################################################################
 # NSPR
 ###############################################################################
-$(LIB_NSPR): $(DIR_MOZ)
+$(LIB_NSPR_STATIC): $(DIR_MOZ)
+$(LIB_NSPR_SHARED): $(DIR_MOZ)
 	@echo $@
 	@cd $(DIR_NSPR) && \
 	./configure && \
@@ -180,7 +213,8 @@ $(DIR_NSPR): $(DIR_MOZ)
 ###############################################################################
 # spidermonkey: embedded javascript interpreter
 ###############################################################################
-$(LIB_MOZ): $(LIB_NSPR)
+$(LIB_MOZ_STATIC): $(LIB_NSPR_STATIC)
+$(LIB_MOZ_SHARED): $(LIB_NSPR_SHARED)
 	@echo $@
 	@cd $(DIR_MOZ)/js/src && \
 		autoconf2.13 && \
@@ -218,7 +252,8 @@ $(DIR_MOZ):
 #############################################################################
 # libconfuse: configuration file library 
 #############################################################################
-$(LIB_CONF): $(DIR_CONF)
+$(LIB_CONF_STATIC): $(DIR_CONF)
+$(LIB_CONF_SHARED): $(DIR_CONF)
 	@echo $@
 	@cd $(DIR_CONF) && \
 	./configure --with-gnu-ld --disable-examples --disable-nls --disable-rpath --enable-shared --enable-static && \
@@ -237,10 +272,10 @@ $(DIR_CONF):
 .PHONEY: depclean deppropperclean
 
 depclean:
-	@echo cleaning some
-	@rm -rf $(LIBS)
+	@echo cleaning some dependencies
+	@rm -rf $(DEPS)
 
 deppropperclean:
-	@echo cleaning all
+	@echo cleaning all dependencies
 	@rm -rf $(shell find $(DEP_DIR)/* -type d)
 
