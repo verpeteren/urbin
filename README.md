@@ -44,7 +44,7 @@ H3. Tools needed
 
 These tools are needed to complie the dependencies to build, but after that, they are not needed anymore
 
-sudo apt-get install autoconf2.13 wget git sed unzip build-essential g++ make cmake python2.7 head tail cat tac ar ranlib tr echo cut basename dirname echo
+sudo apt-get install autoconf2.13 wget git sed unzip build-essential g++ make cmake python2.7 head tail cat tac ar ranlib tr echo cut basename dirname echo strip
 
 H3. Integrated libraries
 

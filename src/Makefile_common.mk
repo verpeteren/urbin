@@ -3,8 +3,9 @@ include ./Makefile_platform.mk
 AR = ar
 RANLIB = ranlib
 CTAGS = ctags
-#CC = clang
+STRIP = strip
 CC = gcc
+#CC = clang
 
 CC_FLAGS =
 LD_FLAGS = 
@@ -14,11 +15,11 @@ sharedLibFileToParam = -L$(shell dirname $1) -l$(shell basename $1 .so|cut -b 4-
 OBJ_DIR = .objects
 DEP_DIR = ../deps
 
-HAS_MYSQL = yes
-#HAS_MYSQL = no
+#HAS_MYSQL = yes
+HAS_MYSQL = no
 
-#MAKE_STATIC_LIBS =yes
-MAKE_STATIC_LIBS = no
+MAKE_STATIC_LIBS =yes
+#MAKE_STATIC_LIBS = no
 
 DIR_PICOEV = $(DEP_DIR)/picoev
 INC_PICOEV = -isystem$(DIR_PICOEV)/
@@ -145,3 +146,4 @@ else
 	
 endif
 
+all: 

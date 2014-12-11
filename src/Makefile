@@ -5,12 +5,12 @@ OPTMIZATIONLEVEL = -O0
 STDCPP = gnu++11
 STDC = gnu99
 
-CC_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
-CC_DEBUG_FLAGS = $(CC_FLAGS)
-CC_RELEASE_FLAG = $(CC_FLAGS)
-LD_FLAGS += -lpthread -lstdc++ -lrt -ldl -lz -lm
-LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now $(LD_FLAGS)
-LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now $(LD_FLAGS)
+CC_FLAGS =
+CC_DEBUG_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
+CC_RELEASE_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
+LD_FLAGS += -shared -lpthread -lstdc++ -lrt -ldl -lz -lm
+LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now
+LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now
  
 ifdef STAGING_DEBUG
 CC_DEBUG_FLAGS += -g -g3 -ggdb \
@@ -31,8 +31,8 @@ else
 endif
 
 endif
-CFLAGS = $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS)
-LDFLAGS = $(LD_RELEASE_FLAGS) $(LD_DEBUG_FLAGS)
+CC_FLAGS += $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS)
+LD_FLAGS += $(LD_RELEASE_FLAGS) $(LD_DEBUG_FLAGS)
 HAVES = $(HAVE_MYSQL)
 
 CORE_DIR=./core
@@ -49,7 +49,7 @@ FEAT_OBJECTS = $(OBJ_DIR)/webserver.o $(OBJ_DIR)/sqlclient.o
 GLOT_OBJECTS = $(OBJ_DIR)/javascript.o
 MAIN_OBJECTS = $(OBJ_DIR)/main_server.o
 
-CODE_OBJECTS = $(CORE_OBJECTS) $(FEAT_OBJECTS) $(GLOT_OBJECTS) $(MAIN_OBJECTS) 
+CODE_OBJECTS = $(MAIN_OBJECTS) $(GLOT_OBJECTS) $(FEAT_OBJECTS) $(CORE_OBJECTS)
 
 THE_EXECUTABLE = $(BIN_DIR)/ronja
 
@@ -59,7 +59,7 @@ deps:	$(DEPS)
 docs:   ../doc/Api.txt
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
-$(OBJ_DIR)/sqlclient.o:				EXCEPTION =
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION = 
 $(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion
 $(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return
 $(OBJ_DIR)/core.o:					EXCEPTION = -Wno-unused-result
@@ -70,7 +70,7 @@ $(OBJ_DIR)/main_server.o:			EXCEPTION +=
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/javascript.o:			EXCEPTION += 
-$(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code -Wno-cast-align
+$(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code -Wno-cast-align -Wno-format-nonliteral
 $(OBJ_DIR)/utils.o:					EXCEPTION += 
 $(OBJ_DIR)/configuration.o:			EXCEPTION += 
 endif
@@ -90,27 +90,33 @@ $(OBJ_DIR)/main_server.o:			./main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADE
 # LINKING
 ###############################################################################
 $(THE_EXECUTABLE): 					$(CODE_OBJECTS) $(DEPS) docs tags
-	@echo "\tLD\t"$@
-	@$(CC) $(INC) $(LDFLAGS) -o $@ 	$(CODE_OBJECTS) $(LIBS)
-
+ifeq ($(MAKE_STATIC_LIBS),yes)
+	@echo "\tLD.a :\t"$@
+else
+	@echo "\tLD.so:\t"$@
+endif
+	@$(CC) $(INC) $(LD_FLAGS) -o $@ 	$(CODE_OBJECTS) $(LIBS)
+ifdef STAGING_RELEASE
+	@$(STRIP) $@ $(DEPS)
+endif
 ###############################################################################
 # OBJECTS
 ###############################################################################
 $(OBJ_DIR)/main_%.o:				./main_%.cpp
 	@echo "\tCC\t"$@:
-	@$(CC) -std=$(STDCPP) $(INC) $(CFLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDCPP) $(INC) $(CC_FLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 $(OBJ_DIR)/%.o:						$(FEAT_DIR)/%.c
 	@echo "\tCC\t"$@
-	@$(CC) -std=$(STDC) $(INC) $(CFLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDC) $(INC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 $(OBJ_DIR)/%.o:						$(CORE_DIR)/%.c
 	@echo "\tCC\t"$@
-	@$(CC) -std=$(STDC) $(INC) $(CFLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDC) $(INC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 $(OBJ_DIR)/%.o:						$(GLOT_DIR)/%.cpp
 	@echo "\tCC\t"$@
-	@$(CC) -std=$(STDCPP) $(INC) $(CFLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDCPP) $(INC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 ###############################################################################
 # DEPENDENCIES

@@ -658,7 +658,7 @@ static struct query_t * Sqlclient_PopQuery ( struct sqlclient_t * sqlclient ) {
 	if ( sqlclient->currentQuery == NULL ) {
 		if ( sqlclient->queries != NULL ) {
 			query = sqlclient->queries;
-			next = &query->mLink;
+			next = query->mLink.next;
 			if ( next == &query->mLink ) {
 				sqlclient->queries = NULL;
 			} else {
@@ -666,9 +666,9 @@ static struct query_t * Sqlclient_PopQuery ( struct sqlclient_t * sqlclient ) {
 				query = FROM_NEXT_TO_ITEM( struct query_t );
 			}
 			PR_REMOVE_AND_INIT_LINK( next );
+			sqlclient->currentQuery = query;
+			return sqlclient->currentQuery;
 		}
-		sqlclient->currentQuery = query;
-		return sqlclient->currentQuery;
 	}
 	return NULL;
 }
