@@ -18,7 +18,7 @@ struct javascript_t {
 	const char *				path;
 	JSRuntime *					runtime;
 	JSContext *					context;
-	JS::RootedObject			globalObj;
+	JS::PersistentRootedObject	globalObj;
 	struct core_t *				core;
 };
 
