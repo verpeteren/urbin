@@ -1,11 +1,15 @@
-include ./Makefile.dependencies
+include ./Makefile_dependencies.mk
 ###############################################################################
 # For the tweaker
 ###############################################################################
 ifdef STAGING_RELEASE
 OPTMIZATIONLEVEL = -O2
+CC_RELEASE_FLAGS += 
+LD_RELEASE_FLAGS = 
 else
 OPTMIZATIONLEVEL = -O0
+CC_DEBUG_FLAGS += 
+LD_DEBUG_FLAGS  = 
 endif
 
 ###############################################################################
@@ -14,13 +18,9 @@ endif
 STDCPP = gnu++11
 STDC = gnu99
 
-CC_FLAGS +=
-CC_DEBUG_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
-CC_RELEASE_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
-LD_FLAGS += -shared -lpthread -lstdc++ -lrt -ldl -lm
-LD_DEBUG_FLAGS  = -Wl,-z,relro -Wl,-z,now
-LD_RELEASE_FLAGS = -Wl,-z,relro -Wl,-z,now
- 
+CC_FLAGS += $(GET_OFF_MY_LAWN) -D_GNU_SOURCE
+LD_FLAGS += -lpthread -lstdc++ -lrt -ldl -lm -Wl,-z,relro -Wl,-z,now
+
 ifdef STAGING_DEBUG
 CC_DEBUG_FLAGS += -g -g3 -ggdb \
 	-Wstack-protector -fstack-protector-all \
@@ -104,7 +104,7 @@ ifeq ($(MAKE_STATIC_LIBS),yes)
 else
 	@echo "\tLD.so:\t"$@
 endif
-	@$(CC) $(INC) $(LD_FLAGS) -o $@ 	$(CODE_OBJECTS) $(LIBS)
+	@$(CC) -o $@ $(CODE_OBJECTS) $(LIBS) $(LD_FLAGS)
 ifdef STAGING_RELEASE
 	@$(STRIP) $@ $(DEPS)
 endif
@@ -153,7 +153,7 @@ check:
 tags:	$(shell ls *.[ch]) 
 	@$(CTAGS) --if0=no --languages=c,c++ -f $@ --fields=+Snf --extra=+q --exclude=$(DEP_DIR) -R . 2>/dev/null
 
-.PHONEY: clean propperclean check
+.PHONY: clean propperclean check
 
 clean:
 	@echo cleaning

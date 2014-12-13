@@ -92,11 +92,11 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 	struct route_t * route;
 	OnigErrorInfo einfo;
 	UChar* pat;
-	struct { unsigned int good:1;
-			unsigned int route:1;
-			unsigned int onig:1;
-			unsigned int documentRoot:1;
-			unsigned int orgPattern:1;
+	struct { unsigned char good:1;
+			unsigned char route:1;
+			unsigned char onig:1;
+			unsigned char documentRoot:1;
+			unsigned char orgPattern:1;
 			} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -159,8 +159,8 @@ static void Route_Delete ( struct route_t * route ) {
 /*****************************************************************************/
 static struct webclient_t * Webclient_New( struct webserver_t * webserver, int socketFd) {
 	struct webclient_t * webclient;
-	struct {unsigned int good:1;
-			unsigned int webclient:1; } cleanUp;
+	struct {unsigned char good:1;
+			unsigned char webclient:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( webclient = malloc( sizeof( *webclient) ) ) != NULL );
@@ -194,8 +194,8 @@ static struct webclient_t * Webclient_New( struct webserver_t * webserver, int s
 
 #define WEBCLIENT_RENDER( name, webpage ) \
 static void Webclient_Render##name( struct webclient_t * webclient) { \
-	struct {unsigned int good:1; \
-			unsigned int content:1; } cleanUp; \
+	struct {unsigned char good:1; \
+			unsigned char content:1; } cleanUp; \
 	\
 	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
 	if ( webclient->response.contentType == CONTENTTYPE_FILE && webclient->response.content ) { \
@@ -238,9 +238,9 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 			size_t fullPathLength, pathLength;
 			int exists;
 			size_t j, len;
-			struct {unsigned int good:1;
-					unsigned int fullPath:1;
-					unsigned int requestedPath:1; } cleanUp;
+			struct {unsigned char good:1;
+					unsigned char fullPath:1;
+					unsigned char requestedPath:1; } cleanUp;
 
 			memset( &cleanUp, '\0', sizeof( cleanUp ) );
 			fullPath = NULL;
@@ -334,9 +334,9 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
 	HeaderField * field;
 	size_t i;
-	struct {unsigned int good:1;
-			unsigned int h3:1;
-			unsigned int content:1;} cleanUp;
+	struct {unsigned char good:1;
+			unsigned char h3:1;
+			unsigned char content:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( webclient->header = h3_request_header_new( ) ) != NULL );
@@ -432,8 +432,8 @@ static void Webclient_Delete( struct webclient_t * webclient ) {
 /*****************************************************************************/
 int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot ) {
 	struct route_t * route;
-	struct { unsigned int good:1;
-			unsigned int route:1;} cleanUp;
+	struct { unsigned char good:1;
+			unsigned char route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DOCUMENTROOT, (void * ) documentRoot, webserver->regexOptions ) ) != NULL);
@@ -452,8 +452,8 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 
 int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handlerCb ) {
 	struct route_t * route;
-	struct { unsigned int good:1;
-			unsigned int route:1;} cleanUp;
+	struct { unsigned char good:1;
+			unsigned char route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions ) ) != NULL);
@@ -574,8 +574,8 @@ static void Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, voi
 			} else {
 				int fileHandle;
 				ssize_t wroteContent;
-				struct {unsigned int good:1;
-						unsigned int fileHandle:1;
+				struct {unsigned char good:1;
+						unsigned char fileHandle:1;
 				} cleanUp;
 
 				memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -638,11 +638,11 @@ struct webserver_t * Webserver_New( struct core_t * core, const char * ip, const
 	struct sockaddr_in listenAddr;
 	struct cfg_t * webserverSection, * modulesSection;
 	int flag, listenBacklog;
-	struct {unsigned int good:1;
-		unsigned int ip:1;
-		unsigned int socket:1;
-		unsigned int onig:1;
-		unsigned int webserver:1;} cleanUp;
+	struct {unsigned char good:1;
+			unsigned char ip:1;
+			unsigned char socket:1;
+			unsigned char onig:1;
+			unsigned char webserver:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	flag = 1;
@@ -761,8 +761,8 @@ static void  Webserver_FindRoute( struct webserver_t * webserver, struct webclie
 	unsigned char * range, * end, * start;
 	int r, found, len;
 	char * url;
-	struct {unsigned int good:1;
-			unsigned int url; }cleanUp;
+	struct {unsigned char good:1;
+			unsigned char url; }cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webclient->route = NULL;

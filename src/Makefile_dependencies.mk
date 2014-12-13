@@ -28,6 +28,7 @@ $(LIB_Z_SHARED): $(DIR_Z)
 	@cd $(DIR_Z) &&\
 	./configure && \
 	make
+	@touch $@
 		
 $(DIR_Z): 
 	@echo $@
@@ -234,6 +235,7 @@ $(LIB_NSPR_SHARED): $(DIR_MOZ)
 		--disable-symbian-target && \
 	make 
 	@cp $(DIR_NSPR)/config/nspr-config $(DIR_NSPR)/dist/bin/
+	@touch $@
 
 $(DIR_NSPR): $(DIR_MOZ)
 	@echo $@
@@ -256,31 +258,43 @@ $(LIB_MOZ_SHARED): $(LIB_NSPR_SHARED) $(LIB_Z_SHARED)
 		--disable-metro \
 		--without-x \
 		--disable-trace-malloc \
+		--disable-trace-jscalls \
+		--disable-gc-trace \
 		--disable-wrap-malloc \
+		--disable-arm-simulator \
+		--disable-mips-simulator \
+		--disable-jprof \
 		--disable-shark \
-		--disable-instrument \
+		--disable-instruments \
 		--disable-callgrind \
 		--disable-vtune \
 		--disable-perf \
 		--disable-js-diagnostics \
-		--without-ccache \
-		--enable-strip \
+		--disable-nspr-build \
+		--disable-clang-plugin \
+		--disable-oom-breakpoint \
+		--disable-more-deterministic \
+		--disable-strip \
+		--disable-install-strip \
+		--disable-tests \
 		--enable-shared-js \
 		--enable-valgrind \
 		--enable-threadsafe \
 		--enable-release \
+		--without-ccache \
 		--with-system-zlib=$(ZLIB_PATH) \
-		--disable-nspr-build \
-		--with-nspr-prefix=$(NSPR_PATH) --with-nspr-cflags="-I$(NSPR_PATH)/dist/include/nspr" --with-nspr-libs="-lrt -L .$(NSPR_PATH)/dist/lib/ -lnspr4 -lplds4 -lplc4 $(NSPR_PATH)/dist/lib/libnspr4.a $(NSPR_PATH)/dist/lib/libplds4.a $(NSPR_PATH)/dist/lib/libplc4.a" \
-		$(DEBUG) \
-		&&make 
+		--with-nspr-prefix=$(NSPR_PATH) --with-nspr-cflags="-I$(NSPR_PATH)/dist/include/nspr" --with-nspr-libs="-lrt -L$(NSPR_PATH)/dist/lib/ -lnspr4 -lplds4 -lplc4" \
+		$(DEBUG) 
+		
+	#&&make 
+	#@touch $@
 
 $(DIR_MOZ):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q https://ftp.mozilla.org/pub/mozilla.org/firefox/candidates/$(VER_MOZ)-candidates/build1/source/firefox-$(VER_MOZ).source.tar.bz2 && \
 	tar -xaf firefox-$(VER_MOZ).source.tar.bz2 && \
-	$(shell mv mozilla-@(build|beta) mozilla )
+	mv mozilla-beta mozilla 
 
 #############################################################################
 # libconfuse: configuration file library 
@@ -302,13 +316,13 @@ $(DIR_CONF):
 ###############################################################################
 # Boilerplate
 ###############################################################################
-.PHONEY: depclean deppropperclean
+.PHONY: depclean deppropperclean
 
 depclean:
 	@echo cleaning some dependencies
 	@rm -rf $(DEPS)
 
-deppropperclean:
+deppropperclean: depclean
 	@echo cleaning all dependencies
 	@rm -rf $(shell find $(DEP_DIR)/* -type d)
 

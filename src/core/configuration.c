@@ -80,8 +80,8 @@ cfg_t * ProcessCommandline( int argc, const char ** argv ) {
 	cfg_t * config;
 	char * arg;
 	const char * progName, * fileName;
-	struct {unsigned int good:1;
-			unsigned int config:1; } cleanUp;
+	struct {unsigned char good:1;
+			unsigned char config:1; } cleanUp;
 
 	progName = PR_NAME;
 	memset( &cleanUp, 0, sizeof( cleanUp ) );

@@ -23,12 +23,12 @@ static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient
 void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, size_t paramCount, const char ** paramValues, queryHandler_cb_t callback, void * args ) {
 	struct query_t * query;
 	size_t i, j;
-	struct {unsigned int good:1;
-			unsigned int query:1;
-			unsigned int statement:1;
-			unsigned int length:1;
-			unsigned int values:1;
-			unsigned int params:1;
+	struct {unsigned char good:1;
+			unsigned char query:1;
+			unsigned char statement:1;
+			unsigned char length:1;
+			unsigned char values:1;
+			unsigned char params:1;
 			} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -134,7 +134,7 @@ static void							Postgresql_HandleConnect_cb	( picoev_loop* loop, int fd, int e
 static void Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArg ) {
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
-	struct {unsigned int good:1;} cleanUp;
+	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	sqlclient = (struct sqlclient_t *) cbArg;
@@ -171,7 +171,7 @@ static void Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, vo
 static void Postgresql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArg ) {
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
-	struct {unsigned int good:1;} cleanUp;;
+	struct {unsigned char good:1;} cleanUp;;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	sqlclient = (struct sqlclient_t *) cbArg;
@@ -280,7 +280,7 @@ static void	Mysql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* c
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	int retCode;
-	struct {unsigned int good:1; } cleanUp;
+	struct {unsigned char good:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
 	sqlclient = (struct sqlclient_t *) cbArg;
@@ -312,9 +312,9 @@ static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, voi
 	  //  @TODO:  check memory handling of resBUf and vars
 	MYSAC_BIND * vars;
 	char resBuf[MYSQL_BUFS];
-	struct { unsigned int good:1;
-			unsigned int vars:1;
-			unsigned int ev:1;} cleanUp;
+	struct { unsigned char good:1;
+			unsigned char vars:1;
+			unsigned char ev:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	sqlclient = (struct sqlclient_t *) cbArg;
@@ -359,8 +359,8 @@ static void	Mysql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* c
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	int retCode;
-	struct { unsigned int good:1;
-			unsigned int ev:1;} cleanUp;
+	struct { unsigned char good:1;
+			unsigned char ev:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	sqlclient = (struct sqlclient_t *) cbArg;
@@ -443,13 +443,13 @@ struct sqlclient_t * Mysql_New( struct core_t * core, const char * hostName, con
 /*****************************************************************************/
 static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter_t adapter, const char * hostName, const char * ip, uint16_t port, const char * loginName, const char *password, const char * dbName, const unsigned char timeoutSec ) {
 	struct sqlclient_t * sqlclient;
-	struct {unsigned int sqlclient:1;
-			unsigned int hostName:1;
-			unsigned int ip:1;
-			unsigned int loginName:1;
-			unsigned int password:1;
-			unsigned int dbName:1;
-			unsigned int good:1;
+	struct {unsigned char sqlclient:1;
+			unsigned char hostName:1;
+			unsigned char ip:1;
+			unsigned char loginName:1;
+			unsigned char password:1;
+			unsigned char dbName:1;
+			unsigned char good:1;
 			} cleanUp;
 
 	sqlclient = NULL;
@@ -543,10 +543,10 @@ static struct sqlclient_t * Sqlclient_New( struct core_t * core, enum sqlAdapter
 static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 	char * connString;
 	size_t len;
-	struct {unsigned int conn:1;
-			unsigned int connString:1;
-			unsigned int socket:1;
-			unsigned int good:1;} cleanUp;
+	struct {unsigned char conn:1;
+			unsigned char connString:1;
+			unsigned char socket:1;
+			unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	connString = NULL;

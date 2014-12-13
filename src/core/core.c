@@ -15,9 +15,6 @@
 /*****************************************************************************/
 /* Global things                                                             */
 /*****************************************************************************/
-
-extern cfg_opt_t allCfgOpts[];
-
 void Boot( int fds) {
 	if ( fds == 0 ) {
 		fds = PR_CFG_LOOP_MAX_FDS;
@@ -293,7 +290,7 @@ void Core_Loop( struct core_t * core ) {
 		} while( next != NULL );
 	}
 	core->keepOnRunning = 1;
-	while ( core->keepOnRunning )  {
+	while ( core->keepOnRunning == 1 )  {
 		Core_ProcessTick( core );
 		picoev_loop_once( core->loop, 0 );
 	}

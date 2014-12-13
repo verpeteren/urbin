@@ -38,7 +38,7 @@ struct timing_t {
 	timerHandler_cb_t			clearFunc_cb;
 	void *						cbArg;
 	PRUint32					due;
-	unsigned int				repeat:1;
+	unsigned char				repeat:1;
 	PRCList						mLink;
 };
 
@@ -64,7 +64,7 @@ struct core_t {
 							}	logger;
 	uint32_t					maxIdentifier;
 	unsigned char				processTicksMs;
-	unsigned int				keepOnRunning:1;
+	unsigned char				keepOnRunning:1;
 };
 
 void							Boot					( int maxFds );

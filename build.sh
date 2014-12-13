@@ -9,7 +9,7 @@ rm -f ${MK_PLATFORM} ${C_PLATFORM}
 
 if [ -n "$1" ] && [ "$1" = "clean" ]; then
 	cd ./src
-	make -f Makefile.dependencies clean
+	make -f Makefile_dependencies.mk clean
 	make clean
 else
 	OS_TARGET=`uname -s`
@@ -43,7 +43,7 @@ else
 		echo -e "\n\n#endif  // SRC_PLATFORM_H_\n" >> ${C_PLATFORM}
 	fi
 	cd ./src
-	make -f Makefile.dependencies && make
+	make -f Makefile_dependencies.mk && make
 fi
 
 

@@ -7,7 +7,7 @@
 #include "./glot/javascript.h"
 
 
-struct core_t * core;
+static struct core_t * core;
 
 static void SignalHandler( int sign ) {
 	fprintf( stdout, "Shutting down...\n" );
@@ -74,7 +74,7 @@ int main( int argc, const char ** argv ) {
 		Core_AddModule( core, javascriptModule );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.javascript = 1;
+	cleanUp.javascript = 1;
 		cleanUp.good = ( Core_PrepareDaemon( core, SignalHandler ) == 1 );
 	}
 	if ( cleanUp.good ) {

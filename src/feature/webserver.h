@@ -107,15 +107,15 @@ struct webclient_t{
 	RequestHeader *	 			header;
 	char						buffer[HTTP_BUFF_LENGTH];
 	struct {
-			unsigned int			headersSent:1;
-			unsigned int			contentSent:1;
-			int						contentLength;
-			enum httpCode_t			httpCode;
-			enum mimeType_t			mimeType;
-			enum contentType_t		contentType;
-			char *	 				content;
 			time_t					start;
 			time_t					end;
+			int						contentLength;
+			enum contentType_t		contentType;
+			enum httpCode_t			httpCode;
+			enum mimeType_t			mimeType;
+			unsigned char			headersSent:1;
+			unsigned char			contentSent:1;
+			char *	 				content;
 							}	response;
 };
 
