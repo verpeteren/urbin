@@ -9,8 +9,8 @@
 extern "C" {
 #endif
 
-void								Usage					( const char * prog_name, int code ) __attribute__( ( noreturn ) );
-cfg_t *								ProcessCommandline			( int argc, const char ** argv );
+void								Usage					( const char * prog_name, const int code ) __attribute__( ( noreturn ) );
+cfg_t *								ProcessCommandline		( const int argc, const char ** argv );
 
 #ifdef __cplusplus
 }

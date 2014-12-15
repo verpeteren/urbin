@@ -9,7 +9,7 @@
 
 static struct core_t * core;
 
-static void SignalHandler( int sign ) {
+static void SignalHandler( const int signal ) {
 	fprintf( stdout, "Shutting down...\n" );
 	core->keepOnRunning = 0;
 }

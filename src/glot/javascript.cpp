@@ -14,10 +14,10 @@ struct payload_t {
 	bool							repeat;
 };
 
-static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, bool repeat );
+static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, const bool repeat );
 static int 							Payload_Timing_ResultHandler_cb	( void * cbArgs );
 static void 						Payload_Delete					( struct payload_t * payload );
-static bool 						Javascript_IncludeScript		( struct javascript_t * javascript, const char * cfile );
+static bool 						Javascript_IncludeScript		( const struct javascript_t * javascript, const char * cfile );
 
 static int jsInterpretersAlive = 0;
 
@@ -48,14 +48,14 @@ static int jsInterpretersAlive = 0;
  * @returns	{null}
  *
  * @example
- * this.Hard.onLoad = function(){
- * 	console.log("loaded" );
+ * this.Hard.onLoad = function( ) {
+ * 	console.log( "loaded" );
  * };
  *
  * @see	Hard.onReady
  * @see	Hard.onUnload
  */
-void * JavascriptModule_Load( struct core_t * core ) {
+void * JavascriptModule_Load( const struct core_t * core ) {
 	struct javascript_t * javascript;
 	cfg_t * glotSection, * javascriptSection;
 	char * path, * name;
@@ -63,7 +63,7 @@ void * JavascriptModule_Load( struct core_t * core ) {
 			unsigned char javascript:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	glotSection = cfg_getnsec( core->config, "glot", 0 );
+	glotSection = cfg_getnsec( (cfg_t *) core->config, "glot", 0 );
 	javascriptSection = cfg_getnsec( glotSection, "Javascript", 0 );
 	path = cfg_getstr( javascriptSection, (char *) "path" );
 	name = cfg_getstr( javascriptSection, (char *) "main" );
@@ -91,14 +91,14 @@ void * JavascriptModule_Load( struct core_t * core ) {
  * @returns	{null}
  *
  * @example
- * this.Hard.onReady = function(){
+ * this.Hard.onReady = function( ) {
  * 	console.log("loaded and ready" );
  * };
  *
  * @see	Hard.onLoad
  * @see	Hard.onUnload
  */
-void JavascriptModule_Ready( struct core_t * core, void * args ) {
+void JavascriptModule_Ready( const struct core_t * core, void * args ) {
 	struct javascript_t * javascript;
 	struct {unsigned char good:1;} cleanUp;
 
@@ -117,15 +117,15 @@ void JavascriptModule_Ready( struct core_t * core, void * args ) {
  * @returns	{null}
  *
  * @example
- * this.Hard.onUnload = function(){
- * 	console.log("unloading" );
+ * this.Hard.onUnload = function( ) {
+ * 	console.log( "unloading" );
  * };
  *
  * @see	Hard.onLoad
  * @see	Hard.onReady
  * @see	Hard.shutdown
 */
-void JavascriptModule_Unload( struct core_t * core, void * args ) {
+void JavascriptModule_Unload( const struct core_t * core, void * args ) {
 	struct javascript_t * javascript;
 	struct {unsigned char good:1;} cleanUp;
 
@@ -157,7 +157,7 @@ void JavascriptModule_Unload( struct core_t * core, void * args ) {
 		} else { \
 			cleanUp.good = 0; \
 		} \
-	} while( 0 );
+	} while ( 0 );
 
 #define CONNOBJ_GET_PROP_NR( property, var) do { \
 		if ( JS_GetProperty(cx, connObjHandle, property, valueMut ) ) { \
@@ -174,7 +174,7 @@ void JavascriptModule_Unload( struct core_t * core, void * args ) {
 		} else { \
 			cleanUp.good = 0; \
 		} \
-	} while( 0 );
+	} while ( 0 );
 
 #define SQL_CLASS_CONSTRUCTOR( engine_new, jsnClass, jsnMethods ) do { \
 		struct sqlclient_t * sqlclient; \
@@ -243,7 +243,7 @@ void JavascriptModule_Unload( struct core_t * core, void * args ) {
  */
 
 #define SQL_CLIENT_QUERY_RESULT_HANDLER_CB( formatter, sub) do { \
-	struct payload_t * payload; \
+		struct payload_t * payload; \
 		JSContext * cx; \
 		JSCompartment * oldCompartment; \
 		JSObject * resultObj, * globalObj; \
@@ -368,8 +368,8 @@ void JavascriptModule_Unload( struct core_t * core, void * args ) {
 			cleanUp.statement = 1; \
 			Query_New( sqlclient, cStatement, nParams, cParamValues, handler, ( void * ) payload ); \
 		} \
-		/*  always cleanup*/ \
-		for ( i = 0;  i < nParams; i++ ) { \
+		/*  always cleanup  */ \
+		for ( i = 0; i < nParams; i++ ) { \
 			JS_free( cx, ( char * ) cParamValues[i] ); cParamValues[i] = NULL; \
 		} \
 		if ( cleanUp.params ) { \
@@ -399,8 +399,8 @@ void JavascriptModule_Unload( struct core_t * core, void * args ) {
 
 static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * myqlObj );
 
-static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, void * rawRes );
-static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, void * rawRes ) {
+static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * rawRes );
+static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * rawRes ) {
 	JSObject * recordObj, * resultArray;
 	JSString * jstr;
 	MYSAC_ROW *row;
@@ -463,7 +463,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, void * rawRes ) 
 	return resultArray;
 }
 
-static void Mysqlclient_Query_ResultHandler_cb( struct query_t * query ) {
+static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
 	SQL_CLIENT_QUERY_RESULT_HANDLER_CB( Mysqlclient_Query_ResultToJS, my )
 }
 /**
@@ -546,9 +546,9 @@ static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * v
 }
 
 static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * mysqlObj ) {
-	struct sqlclient_t *mysql;
+	struct sqlclient_t * mysql;
 
-	if ( ( mysql = (struct sqlclient_t*) JS_GetPrivate( mysqlObj ) ) != NULL ) {
+	if ( ( mysql = (struct sqlclient_t *) JS_GetPrivate( mysqlObj ) ) != NULL ) {
 		delete mysql; mysql = NULL;
 	}
 }
@@ -561,8 +561,8 @@ static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * mysqlObj ) {
 
 static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresqlObj );
 
-static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, void * rawRes );
-static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, void * rawRes ) {
+static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void * rawRes );
+static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void * rawRes ) {
 	JSObject * resultArray;
 	ExecStatusType status;
 	PGresult * result;
@@ -592,7 +592,7 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, void * rawR
 			case PGRES_FATAL_ERROR:
 				//  @code = -1;
 				break;
-			case PGRES_EMPTY_QUERY:       //  FT
+			case PGRES_EMPTY_QUERY:		  //  FT
 			case PGRES_COMMAND_OK:
 			default:
 				break;
@@ -601,7 +601,7 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, void * rawR
 				rowCount = ( unsigned int ) PQntuples( result );
 				colCount = PQnfields( result );
 				for ( rowId = 0; rowId < rowCount; rowId++ ) {
-					JSObject *recordObj;
+					JSObject * recordObj;
 					jsval currentVal;
 					jsval jValue;
 
@@ -679,7 +679,7 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, void * rawR
 	return resultArray;
 }
 
-static void Postgresqlclient_Query_ResultHandler_cb( struct query_t* query ) {
+static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
 	SQL_CLIENT_QUERY_RESULT_HANDLER_CB( Postgresqlclient_Query_ResultToJS, pg )
 }
 
@@ -765,9 +765,9 @@ static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsva
 }
 
 static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresqlObj ) {
-	struct sqlclient_t *postgresql;
+	struct sqlclient_t * postgresql;
 
-	if ( ( postgresql = (struct sqlclient_t*) JS_GetPrivate( postgresqlObj ) ) != NULL ) {
+	if ( ( postgresql = (struct sqlclient_t *) JS_GetPrivate( postgresqlObj ) ) != NULL ) {
 		delete postgresql; postgresql = NULL;
 	}
 }
@@ -786,8 +786,8 @@ extern const char * MethodDefinitions[ ];
  */
 static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
 
-static JSObject * Webserver_Route_ResultToJS( JSContext * cx, struct webclient_t * webclient );
-static JSObject * Webserver_Route_ResultToJS( JSContext * cx, struct webclient_t * webclient ) {
+static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webclient_t * webclient );
+static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webclient_t * webclient ) {
 	JSObject * clientObj, * responseObj;
 	JSString * jIp, * jUrl, * jMethod;
 	const char * ip, * url;
@@ -875,7 +875,7 @@ static JSObject * Webserver_Route_ResultToJS( JSContext * cx, struct webclient_t
 	return clientObj;
 }
 
-static void Webserver_Route_ResultHandler_cb( struct webclient_t * webclient ) {
+static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclient ) {
 	JSObject * clientObj;
 	jsval clientObjVal, retVal;
 	struct payload_t * payload;
@@ -888,7 +888,7 @@ static void Webserver_Route_ResultHandler_cb( struct webclient_t * webclient ) {
 		JS_BeginRequest( payload->cx );
 		oldCompartment = JS_EnterCompartment( payload->cx, payload->objRoot );
 		JS::RootedObject 		clientObjRoot( payload->cx, clientObj );
-		clientObj =  Webserver_Route_ResultToJS( payload->cx, webclient );
+		clientObj = Webserver_Route_ResultToJS( payload->cx, webclient );
 		JS::RootedValue 		clientValRoot( payload->cx, clientObjVal );
 		JS::RootedValue 		retValRoot( payload->cx, retVal );
 		JS::MutableHandleValue 	retValMut( &retValRoot );
@@ -1085,7 +1085,7 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 	struct javascript_t * javascript;
 	JSString * jServerIp;
 	JS::CallArgs args;
-	const char * cDocumentRoot, *cPath;
+	const char * cDocumentRoot, * cPath;
 	char * cServerIp;
 	int port, timeoutSec;
 	struct {unsigned char good:1;} cleanUp;
@@ -1112,7 +1112,7 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 
 		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, (unsigned char) timeoutSec ) ) != NULL );
 	}
-	if ( cleanUp.good ){
+	if ( cleanUp.good ) {
 		cleanUp.good = ( Webserver_DocumentRoot( webserver, cPath, cDocumentRoot )== 1);
 	}
 	if ( cleanUp.good ) {
@@ -1166,7 +1166,7 @@ static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @example
  *Hard.shutdown( 10 );
  */
-static bool JsnHard_Shutdown( JSContext * cx, unsigned argc, /*JS::MutableHandleValue*/ jsval * vpn ) {
+static bool JsnHard_Shutdown( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct javascript_t * javascript;
 	JS::CallArgs args;
 	int timeout;
@@ -1232,9 +1232,9 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	JSObject * consoleObj;
 	JSString * jString;
 	JS::CallArgs args;
-	const char *fileName;
+	const char * fileName;
 	unsigned int lineNo;
-	char *cString;
+	char * cString;
 	struct {unsigned char good:1;
 			unsigned char cstring:1;} cleanUp;
 
@@ -1253,7 +1253,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	}
 	if ( cleanUp.good ) {
 #if DEBUG && 0
-		JSScript *script;
+		JSScript * script;
 		//  @FIXME:  act on this depending on the compiled javascript debug build
 		JS_DescribeScriptedCaller( cx, &script, &lineNo );
 		fileName = JS_GetScriptFilename( cx, script );
@@ -1297,14 +1297,14 @@ static void Payload_Delete( struct payload_t * payload ) {
 	JS_free( payload->cx, payload ); payload = NULL;
 }
 
-static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, bool repeat ) {
+static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, const bool repeat ) {
 	struct payload_t * payload;
 	struct {unsigned char good:1;
 			unsigned char payload:1;
 			unsigned char args:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( payload = (struct payload_t* ) JS_malloc( cx, sizeof( * payload ) ) ) != NULL );
+	cleanUp.good = ( ( payload = (struct payload_t *) JS_malloc( cx, sizeof( *payload ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
 		payload->cx = cx;
@@ -1560,7 +1560,7 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
 * @see	setTimeout
 * @see	clearTimeout
 */
-static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, /*JS::MutableHandleValue*/ jsval * vpn ) {
+static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct javascript_t * javascript;
 	unsigned int identifier;
 	JSObject * globalObj;
@@ -1600,7 +1600,7 @@ static const JSFunctionSpec jsmGlobal[ ] = {
 BOILERPLATE
 ===============================================================================
 */
-static bool Javascript_IncludeScript( struct javascript_t * javascript, const char * cfile ) {
+static bool Javascript_IncludeScript( const struct javascript_t * javascript, const char * cfile ) {
 	char fileNameWithPath[512];
 	struct { unsigned char good:1;} cleanUp;
 
@@ -1625,7 +1625,7 @@ static bool Javascript_IncludeScript( struct javascript_t * javascript, const ch
 	if ( cleanUp.good ) {
 		LOG( javascript->core, LOG_INFO, "[%14s] Failed loading script %s", __FILE__, fileNameWithPath );
 	}
-	if ( ! cleanUp.good ){
+	if ( ! cleanUp.good ) {
 	}
 	return ( cleanUp.good ) ? true : false;
 }
@@ -1645,12 +1645,12 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	JS::RootedValue rVal( javascript->context );
 	JS::MutableHandleValue rValMut( &rVal );
 
-	JS::RootedObject consoleObj( javascript->context, JS_NewObject( javascript->context, &jscConsole, JS::NullPtr( ), JS::NullPtr( ) ));
+	JS::RootedObject consoleObj( javascript->context, JS_NewObject( javascript->context, &jscConsole, JS::NullPtr( ), JS::NullPtr( ) ) );
 	JS::HandleObject consoleObjHandle( consoleObj );
 	JS_SetPrivate( consoleObj, (void * ) javascript );
 	JS_DefineFunctions( javascript->context, consoleObjHandle, jsmConsole );
 
-	JS::RootedObject hardObj( javascript->context, JS_NewObject( javascript->context, &jscHard, JS::NullPtr( ), JS::NullPtr( ) ));
+	JS::RootedObject hardObj( javascript->context, JS_NewObject( javascript->context, &jscHard, JS::NullPtr( ), JS::NullPtr( ) ) );
 	JS::HandleObject hardObjHandle( consoleObj );
 	JS_SetPrivate( hardObj, (void * ) javascript );
 	JS_DefineFunctions( javascript->context, hardObjHandle, jsmHard );
@@ -1664,7 +1664,7 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	return 0;
 }
 
-static int Javascript_Init( struct javascript_t * javascript, struct core_t * core ) {
+static int Javascript_Init( struct javascript_t * javascript ) {
 	struct {unsigned char good:1;
 			unsigned char global:1;
 			unsigned char standard:1;} cleanUp;
@@ -1673,7 +1673,7 @@ static int Javascript_Init( struct javascript_t * javascript, struct core_t * co
 	JSAutoRequest ar = JSAutoRequest( javascript->context );
 	JS::CompartmentOptions compartmentOptions;
 	compartmentOptions.setVersion( JSVERSION_LATEST );
-	JS::PersistentRootedObject globalObj( javascript->context, JS_NewGlobalObject( javascript->context, &jscGlobal, nullptr, JS::DontFireOnNewGlobalHook, compartmentOptions ));
+	JS::PersistentRootedObject globalObj( javascript->context, JS_NewGlobalObject( javascript->context, &jscGlobal, nullptr, JS::DontFireOnNewGlobalHook, compartmentOptions ) );
 	JS::HandleObject globalHandle( globalObj );
 	cleanUp.good = ( globalObj != NULL );
 	if ( cleanUp.good ) {
@@ -1738,7 +1738,7 @@ static void JsnReport_Error( JSContext * cx, const char * message, JSErrorReport
 	LOG( javascript->core, level, "[%s:%d] : %s/%d: %s", fileName, report->lineno, state, report->errorNumber, message );
 }
 
-struct javascript_t * Javascript_New( struct core_t * core, const char * path, const char * fileName ) {
+struct javascript_t * Javascript_New( const struct core_t * core, const char * path, const char * fileName ) {
 	struct javascript_t * javascript;
 #define MAX_PATH_LENGTH 512
 	char fullPath[MAX_PATH_LENGTH];
@@ -1754,6 +1754,7 @@ struct javascript_t * Javascript_New( struct core_t * core, const char * path, c
 	cleanUp.good = ( ( javascript = (struct javascript_t *) malloc( sizeof( * javascript ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.javascript = 1;
+		javascript->core = ( struct core_t *) core;
 		cleanUp.good = ( ( javascript->path = strdup( path ) ) != NULL );
 	}
 	if 	( cleanUp.good ) {
@@ -1788,7 +1789,7 @@ struct javascript_t * Javascript_New( struct core_t * core, const char * path, c
 		options.setWerror( true );
 #endif
 		JS_SetErrorReporter( javascript->runtime, JsnReport_Error );
-		cleanUp.good = ( Javascript_Init( javascript, core ) == 1 );
+		cleanUp.good = ( Javascript_Init( javascript ) == 1 );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.init = 1;
@@ -1814,6 +1815,7 @@ struct javascript_t * Javascript_New( struct core_t * core, const char * path, c
 			free( (char *) javascript->path ); javascript->path = NULL;
 		}
 		if ( cleanUp.javascript ) {
+			javascript->core = NULL;
 			free( javascript ); javascript = NULL;
 		}
 	}
@@ -1829,6 +1831,7 @@ void Javascript_Delete( struct javascript_t * javascript ) {
 	JS_DestroyRuntime( javascript->runtime );
 
 	free( (char *) javascript->path ); javascript->path = NULL;
+	javascript->core = NULL;
 	free( javascript ); javascript = NULL;
 
 	if ( jsInterpretersAlive > 0 ) {

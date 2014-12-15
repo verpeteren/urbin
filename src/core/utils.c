@@ -4,7 +4,7 @@
 
 #include "utils.h"
 
-int FullPath( char target[], size_t size, const char * path, const char * filename ) {
+int FullPath( char target[], const size_t size, const char * path, const char * filename ) {
 	char * first;
 
 	first = &target[0];
@@ -13,7 +13,7 @@ int FullPath( char target[], size_t size, const char * path, const char * filena
 }
 
 char * FileGetContents( const char * fileName ) {
-	FILE *fp;
+	FILE * fp;
 	char * contents;
 	size_t size;
 

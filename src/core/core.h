@@ -17,13 +17,13 @@
 extern "C" {
 #endif
 
-typedef void 				( * signalAction_cb_t )		( int );
+typedef void 				( * signalAction_cb_t )		( const int signal );
 typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
 typedef void 				( * moduleHandler_cb_t )	( void * cbArgs );
 
-#define LOG( core, level, ... ) do {Core_Log( (core), level, __VA_ARGS__ ); } while( 0 );
+#define LOG( core, level, ... ) do { Core_Log( (core), level, __VA_ARGS__ ); } while ( 0 );
 
-#define FROM_NEXT_TO_ITEM( type )  ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
+#define FROM_NEXT_TO_ITEM( type )( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
 
 #define FEATURE_JOINCORE( Feat, feature ) \
 void Feat##_JoinCore( struct feature##_t * feature ) { \
@@ -53,7 +53,7 @@ struct module_t {
 
 struct core_t {
 	picoev_loop *				loop;
-	cfg_t *						config;
+	const cfg_t *				config;
 	struct dns *				dns;
 	struct module_t *			modules;
 	struct timing_t *			timings;
@@ -67,19 +67,19 @@ struct core_t {
 	unsigned char				keepOnRunning:1;
 };
 
-void							Boot					( int maxFds );
+void							Boot					( const int maxFds );
 void							Shutdown				( );
-void							SetupSocket				( int fd );
+void							SetupSocket				( const int fd );
 
-struct module_t *				Module_New				( const char *name, moduleHandler_cb_t onLoad,  moduleHandler_cb_t onReady, moduleHandler_cb_t onUnload, void * data ) ;
+struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data ) ;
 void 							Module_Delete			( struct module_t * module );
-struct core_t *					Core_New				( cfg_t * config );
-void 							Core_Log				( struct core_t * core, int logLevel, const char * fmt, ... );
+struct core_t *					Core_New				( const cfg_t * config );
+void 							Core_Log				( const struct core_t * core, int logLevel, const char * fmt, ... );
 void							Core_Loop				( struct core_t * core );
-int 							Core_PrepareDaemon		( struct core_t * core, signalAction_cb_t signalHandler );
+int 							Core_PrepareDaemon		( const struct core_t * core, const signalAction_cb_t signalHandler );
 void							Core_AddModule			( struct core_t * core, struct module_t * module );
 void							Core_DelModule			( struct core_t * core, struct module_t * module );
-struct timing_t *				Core_AddTiming 			( struct core_t * core, unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArgs );
+struct timing_t *				Core_AddTiming 			( struct core_t * core, const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs );
 void 							Core_DelTimingId		( struct core_t * core, uint32_t id );
 void 							Core_DelTiming 			( struct core_t * core, struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );
