@@ -42,11 +42,11 @@ void SetupSocket( int fd ) {
 /*****************************************************************************/
 /* Modules                                                                   */
 /*****************************************************************************/
-struct module_t * Module_New ( const char *name, moduleHandler_cb_t onLoad,  moduleHandler_cb_t onReady, moduleHandler_cb_t onUnload, void * cbArg ) {
+struct module_t * Module_New ( const char *name, moduleHandler_cb_t onLoad,  moduleHandler_cb_t onReady, moduleHandler_cb_t onUnload, void * cbArgs ) {
 	struct module_t * module;
-	struct {unsigned int good:1;
-			unsigned int name:1;
-			unsigned int module:1;} cleanUp;
+	struct {unsigned char good:1;
+			unsigned char name:1;
+			unsigned char module:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( module = malloc( sizeof( *module ) ) ) != NULL );
@@ -55,7 +55,7 @@ struct module_t * Module_New ( const char *name, moduleHandler_cb_t onLoad,  mod
 		module->onLoad = onLoad;
 		module->onReady = onReady;
 		module->onUnload = onUnload;
-		module->cbArg = cbArg;
+		module->cbArgs = cbArgs;
 		PR_INIT_CLIST( &module->mLink );
 		cleanUp.name = ( ( module->name = strdup( name ) ) != NULL );
 	}
@@ -81,16 +81,16 @@ void Module_Delete ( struct module_t * module ) {
 /*****************************************************************************/
 /* Timings                                                                    */
 /*****************************************************************************/
-static struct timing_t *			Timing_New 					( unsigned int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
+static struct timing_t *			Timing_New 					( unsigned int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArgs );
 static void 						Timer_CalculateDue			( struct timing_t * timing, PRUint32 nowOrHorizon );
 static void 						Timing_Delete				( struct timing_t * timing );
 
-static struct timing_t * Timing_New ( unsigned int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
+static struct timing_t * Timing_New ( unsigned int ms, uint32_t identifier, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArgs ) {
 	struct timing_t * timing;
 	PRUint32 horizon;
 	PRIntervalTime now;
-	struct {unsigned int good:1;
-			unsigned timing:1; } cleanUp;
+	struct {unsigned char good:1;
+			unsigned char timing:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
 	cleanUp.good = ( ( timing = malloc( sizeof(* timing ) ) ) != NULL );
@@ -100,7 +100,7 @@ static struct timing_t * Timing_New ( unsigned int ms, uint32_t identifier, unsi
 		timing->repeat = ( repeat == 1 ) ? 1: 0;
 		timing->identifier = identifier;
 		timing->timerHandler_cb = timerHandler_cb;
-		timing->cbArg = cbArg;
+		timing->cbArgs = cbArgs;
 		now = PR_IntervalNow( );
 		horizon = PR_IntervalToMicroseconds( now );
 		Timer_CalculateDue( timing, horizon );
@@ -120,14 +120,14 @@ static void Timer_CalculateDue ( struct timing_t * timing, PRUint32 nowOrHorizon
 
 static void Timing_Delete( struct timing_t * timing ) {
 	if ( timing->clearFunc_cb != NULL ) {
-		timing->clearFunc_cb( timing->cbArg);
+		timing->clearFunc_cb( timing->cbArgs);
 	}
 	timing->ms = 0;
 	timing->repeat = 0;
 	timing->identifier = 0;
 	timing->timerHandler_cb = NULL;
 	timing->clearFunc_cb= NULL;
-	timing->cbArg = NULL;
+	timing->cbArgs = NULL;
 	free( timing ); timing = NULL;
 }
 
@@ -138,10 +138,10 @@ struct core_t * Core_New( cfg_t * config ) {
 	struct core_t * core;
 	cfg_t * mainSection;
 	int timeoutSec;
-	struct {unsigned int good:1;
-		unsigned int loop:1;
-		unsigned int config:1;
-		unsigned int core:1;} cleanUp;
+	struct {unsigned char good:1;
+			unsigned char loop:1;
+			unsigned char config:1;
+			unsigned char core:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( core = malloc( sizeof( * core ) ) ) != NULL );
@@ -186,7 +186,7 @@ struct core_t * Core_New( cfg_t * config ) {
 			picoev_destroy_loop( core->loop );
 		}
 		if ( cleanUp.config ) {
-			cfg_free( core->config );
+			cfg_free( core->config ); core->config = NULL;
 		}
 		if ( cleanUp.core ) {
 			core->modules = NULL;
@@ -206,7 +206,7 @@ void Core_Log( struct core_t * core, int logLevel, const char * fmt, ... ) {
 	va_end( val );
 	core->logger.logFun( logLevel, "%", message );
 
-	free( message );
+	free( message ); message = NULL;
 }
 
 int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler ) {
@@ -214,9 +214,9 @@ int Core_PrepareDaemon( struct core_t * core , signalAction_cb_t signalHandler )
 	cfg_t * mainSection;
 	cfg_bool_t daemonize;
 	int fds;
-	struct {unsigned int good:1;
-			unsigned int fds:1;
-			unsigned int signal:1;} cleanUp;
+	struct {unsigned char good:1;
+			unsigned char fds:1;
+			unsigned char signal:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	mainSection = cfg_getnsec( core->config, "main", 0 );
@@ -285,7 +285,7 @@ void Core_Loop( struct core_t * core ) {
 			module = FROM_NEXT_TO_ITEM( struct module_t );
 			next = module->mLink.next;
 			if ( module->onReady != NULL )  {
-					module->onReady ( module->cbArg );
+					module->onReady ( module->cbArgs );
 			}
 		} while( next != NULL );
 	}
@@ -304,7 +304,7 @@ void Core_AddModule( struct core_t * core, struct module_t * module ) {
 			PR_APPEND_LINK( &core->modules->mLink, &module->mLink );
 		}
 		if ( module->onLoad != NULL ) {
-			module->onLoad( module->cbArg );
+			module->onLoad( module->cbArgs );
 		}
 	}
 }
@@ -325,20 +325,20 @@ void Core_DelModule( struct core_t * core, struct module_t * module ) {
 		}
 		PR_REMOVE_AND_INIT_LINK( &module->mLink );
 		if ( module->onUnload != NULL ) {
-			module->onUnload( module->cbArg );
+			module->onUnload( module->cbArgs );
 		}
-		Module_Delete( module );
+		Module_Delete( module ); module = NULL;
 	}
 }
 
-struct timing_t *  Core_AddTiming ( struct core_t * core , unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg ) {
+struct timing_t *  Core_AddTiming ( struct core_t * core , unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArgs ) {
 	struct timing_t * timing;
-	struct {unsigned int good:1;
-			unsigned timing:1; } cleanUp;
+	struct {unsigned char good:1;
+			unsigned char timing:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
 	core->maxIdentifier++;
-	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArg ) ) != NULL );
+	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArgs ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.timing = 1;
 		if ( core->timings == NULL ) {
@@ -371,7 +371,7 @@ void Core_DelTiming( struct core_t * core, struct timing_t * timing ) {
 			}
 		}
 		PR_REMOVE_AND_INIT_LINK( &timing->mLink );
-		Timing_Delete( timing );
+		Timing_Delete( timing ); timing = NULL;
 	}
 
 }
@@ -423,7 +423,7 @@ void Core_Delete( struct core_t * core ) {
 	picoev_destroy_loop( core->loop );
 	core->modules = NULL;
 	core->modules = 0;
-	cfg_free( core->config );
-	free( core );
+	cfg_free( core->config ); core->config = NULL;
+	free( core ); core = NULL;
 }
 

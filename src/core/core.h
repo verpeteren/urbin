@@ -36,7 +36,7 @@ struct timing_t {
 	uint32_t					identifier;
 	timerHandler_cb_t 			timerHandler_cb;
 	timerHandler_cb_t			clearFunc_cb;
-	void *						cbArg;
+	void *						cbArgs;
 	PRUint32					due;
 	unsigned char				repeat:1;
 	PRCList						mLink;
@@ -47,7 +47,7 @@ struct module_t {
 	moduleHandler_cb_t			onLoad;
 	moduleHandler_cb_t			onReady;
 	moduleHandler_cb_t			onUnload;
-	void *						cbArg;
+	void *						cbArgs;
 	PRCList						mLink;
 };
 
@@ -79,7 +79,7 @@ void							Core_Loop				( struct core_t * core );
 int 							Core_PrepareDaemon		( struct core_t * core, signalAction_cb_t signalHandler );
 void							Core_AddModule			( struct core_t * core, struct module_t * module );
 void							Core_DelModule			( struct core_t * core, struct module_t * module );
-struct timing_t *				Core_AddTiming 			( struct core_t * core, unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArg );
+struct timing_t *				Core_AddTiming 			( struct core_t * core, unsigned int ms, unsigned int repeat, timerHandler_cb_t timerHandler_cb, void * cbArgs );
 void 							Core_DelTimingId		( struct core_t * core, uint32_t id );
 void 							Core_DelTiming 			( struct core_t * core, struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );

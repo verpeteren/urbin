@@ -127,17 +127,17 @@ void Query_Delete ( struct query_t * query ) {
 /* POSTGRESQL                                                                */
 /*****************************************************************************/
 
-static void							Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
-static void							Postgresql_HandleWrite_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
-static void							Postgresql_HandleConnect_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
+static void							Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void							Postgresql_HandleWrite_cb	( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void							Postgresql_HandleConnect_cb	( picoev_loop* loop, int fd, int events, void* cbArgs );
 
-static void Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArg ) {
+static void Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArgs ) {
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	query = sqlclient->currentQuery;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
@@ -164,17 +164,17 @@ static void Postgresql_HandleRead_cb	( picoev_loop* loop, int fd, int events, vo
 		//  We're done with this query, go back to start and collect 20k
 		sqlclient->currentQuery = NULL;
 		picoev_del( loop, fd ) ;
-		picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArg );
+		picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
 	}
 }
 
-static void Postgresql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArg ) {
+static void Postgresql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArgs ) {
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	struct {unsigned char good:1;} cleanUp;;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_WRITE ) != 0 ) {
@@ -187,7 +187,7 @@ static void Postgresql_HandleWrite_cb( picoev_loop* loop, int fd, int events, vo
 			} else {
 				//  Send out the query and the parameters to the datebase engine
 				picoev_del( loop, fd ) ;
-				picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleRead_cb, cbArg );
+				picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleRead_cb, cbArgs );
 				//  only Version 2 protocoll, and only one command per statement
 				cleanUp.good = ( PQsendQueryParams( sqlclient->connection.pg, query->statement, (int) query->paramCount, NULL, query->paramValues, (const int *) query->paramLengths, NULL, 0 ) == 1 );
 			}
@@ -200,10 +200,10 @@ static void Postgresql_HandleWrite_cb( picoev_loop* loop, int fd, int events, vo
 	}
 }
 
-static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, void* cbArg ) {
+static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, void* cbArgs ) {
 	struct sqlclient_t * sqlclient;
 
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT) != 0 )  {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
@@ -221,7 +221,7 @@ static void Postgresql_HandleConnect_cb( picoev_loop* loop, int fd, int events, 
 				} else {
 					//  We are connected ( and have the database ), we are good to go.
 					picoev_del( loop, fd ) ;
-					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArg );
+					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
 				}
 			} else {
 				Sqlclient_CloseConn( sqlclient );
@@ -270,20 +270,20 @@ struct sqlclient_t * Postgresql_New( struct core_t * core, const char * hostName
 /*****************************************************************************/
 /* MYSQL                                                                     */
 /*****************************************************************************/
-static void							Mysql_HandleRead_cb		( picoev_loop* loop, int fd, int events, void* cbArg );
-static void							Mysql_HandleWrite_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
-static void							Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, void* cbArg );
-static void							Mysql_HandleSetDb_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
-static void							Mysql_HandleConnect_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
+static void							Mysql_HandleRead_cb		( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void							Mysql_HandleWrite_cb	( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void							Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void							Mysql_HandleSetDb_cb	( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void							Mysql_HandleConnect_cb	( picoev_loop* loop, int fd, int events, void* cbArgs );
 
-static void	Mysql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArg ) {
+static void	Mysql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArgs ) {
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	int retCode;
 	struct {unsigned char good:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	query = sqlclient->currentQuery;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
@@ -300,11 +300,11 @@ static void	Mysql_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* c
 		//  We're done with this query, go back to start and collect 20k
 		sqlclient->currentQuery = NULL;
 		picoev_del( loop, fd ) ;
-		picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArg );
+		picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArgs );
 	}
 }
 
-static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, void* cbArg ){
+static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, void* cbArgs ){
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	int retCode;
@@ -317,7 +317,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, voi
 			unsigned char ev:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	query = sqlclient->currentQuery;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
@@ -342,7 +342,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, voi
 		if ( cleanUp.good ) {
 			//  Send out the query and the parameters to the datebase engine
 			picoev_del( loop, fd );
-			picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Mysql_HandleRead_cb, cbArg );
+			picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Mysql_HandleRead_cb, cbArgs );
 			cleanUp.ev = 1;
 			retCode = mysac_io( sqlclient->connection.my );
 			cleanUp.good = ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ );
@@ -355,7 +355,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop* loop, int fd, int events, voi
 	}
 }
 
-static void	Mysql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArg ){
+static void	Mysql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArgs ){
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	int retCode;
@@ -363,7 +363,7 @@ static void	Mysql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* c
 			unsigned char ev:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_WRITE ) != 0 ) {
@@ -372,7 +372,7 @@ static void	Mysql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* c
 		query = Sqlclient_PopQuery( sqlclient );
 		if ( query != NULL ) {
 			picoev_del( loop, fd ) ;
-			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleSetParams_cb, cbArg );
+			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleSetParams_cb, cbArgs );
 			cleanUp.ev = 1;
 			//  Mysac needs to perpare the statement
 			cleanUp.good = ( mysac_b_set_stmt_prepare( sqlclient->connection.my, &query->statementId, query->statement, (int) strlen( query->statement ) ) == 0 );
@@ -389,11 +389,11 @@ static void	Mysql_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* c
 	}
 }
 
-static void Mysql_HandleSetDb_cb( picoev_loop* loop, int fd, int events, void* cbArg ) {
+static void Mysql_HandleSetDb_cb( picoev_loop* loop, int fd, int events, void* cbArgs ) {
 	struct sqlclient_t * sqlclient;
 	int retCode;
 
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT) != 0 )  {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
@@ -402,18 +402,18 @@ static void Mysql_HandleSetDb_cb( picoev_loop* loop, int fd, int events, void* c
 		if ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ ) {
 			//  yes, we are connected and have a database, we are good to go
 			picoev_del( loop, fd );
-			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArg );
+			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArgs );
 		} else {
 			Sqlclient_CloseConn( sqlclient );
 		}
 	}
 }
 
-static void Mysql_HandleConnect_cb( picoev_loop* loop, int fd, int events, void* cbArg ) {
+static void Mysql_HandleConnect_cb( picoev_loop* loop, int fd, int events, void* cbArgs ) {
 	struct sqlclient_t * sqlclient;
 	int retCode;
 
-	sqlclient = (struct sqlclient_t *) cbArg;
+	sqlclient = (struct sqlclient_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT) != 0 )  {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
@@ -421,7 +421,7 @@ static void Mysql_HandleConnect_cb( picoev_loop* loop, int fd, int events, void*
 		retCode = mysac_io( sqlclient->connection.my );
 		if ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ ) {
 			picoev_del( loop, fd );
-			picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleSetDb_cb, cbArg );
+			picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleSetDb_cb, cbArgs );
 			//  Yes, we are connected, now set the database, as mysac needs that first
 			mysac_set_database( sqlclient->connection.my, sqlclient->dbName );
 			if ( mysac_send_database( sqlclient->connection.my ) == MYERR_BAD_STATE ) {

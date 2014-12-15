@@ -15,6 +15,7 @@
 #include "webserver.h"
 #include "../core/utils.h"
 
+
 /*****************************************************************************/
 /* Module                                                                    */
 /*****************************************************************************/
@@ -68,12 +69,12 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								strlen( PR_VERSION ) \
 								- ( 2 * 7 ) + 1 )
 
-static struct route_t * 		Route_New				( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions );
+static struct route_t * 		Route_New				( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs );
 static void						Route_Delete			( struct route_t * route );
 
-static void						Webserver_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArg );
-static void						Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArg );
-static void						Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cbArg );
+static void						Webserver_HandleRead_cb	( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void						Webserver_HandleWrite_cb( picoev_loop* loop, int fd, int events, void* cbArgs );
+static void						Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, void* cbArgs );
 static void 					Webserver_FindRoute		( struct webserver_t * webserver, struct webclient_t * webclient );
 static void						Webserver_AddRoute		( struct webserver_t * webserver, struct route_t * route );
 static void						Webserver_DelRoute		( struct webserver_t * webserver, struct route_t * route );
@@ -88,7 +89,7 @@ static void 					Webclient_Delete		( struct webclient_t * webclient );
 /*****************************************************************************/
 /* Route                                                                    */
 /*****************************************************************************/
-static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions ) {
+static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs ) {
 	struct route_t * route;
 	OnigErrorInfo einfo;
 	UChar* pat;
@@ -103,6 +104,7 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 	cleanUp.good = ( ( route = malloc( sizeof( *route ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.route = 1;
+		route->cbArgs = cbArgs;
 		cleanUp.good = ( ( route->orgPattern = strdup( pattern ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -139,6 +141,7 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 			free( (char * ) route->orgPattern ); route->orgPattern = NULL;
 		}
 		if ( cleanUp.route ) {
+			route->cbArgs = NULL;
 			free( route ); route = NULL;
 		}
 	}
@@ -151,6 +154,7 @@ static void Route_Delete ( struct route_t * route ) {
 	}
 	onig_free( route->urlRegex ); route->urlRegex = NULL;
 	free( (char *) route->orgPattern ); route->orgPattern = NULL;
+	route->cbArgs = NULL;
 	free( route ); route = NULL;
 }
 
@@ -191,6 +195,54 @@ static struct webclient_t * Webclient_New( struct webserver_t * webserver, int s
 
 	return webclient;
 }
+const char * Webclient_GetUrl( const struct webclient_t * webclient ) {
+	char * url;
+	int len;
+	struct {unsigned char good:1;
+			unsigned char url:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	len =  webclient->header->RequestURILen;
+	cleanUp.good = ( ( url = malloc( len + 1 ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.url = 1;
+		snprintf( url, len + 1, "%s", webclient->header->RequestURI );
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.url ) {
+			free( url ); url = NULL;
+		}
+	}
+	return url;
+}
+
+const char * Webclient_GetIp( const struct webclient_t * webclient ) {
+	char * ip;
+	struct sockaddr_storage addr;
+	socklen_t len;
+	struct {unsigned char good:1;
+			unsigned char ip:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( ip = malloc( INET6_ADDRSTRLEN ) ) != NULL );
+	if ( cleanUp.good ) {
+		len = sizeof addr;
+		getpeername( webclient->socketFd, (struct sockaddr*) &addr, &len );
+		if (addr.ss_family == AF_INET) {
+			struct sockaddr_in *s = (struct sockaddr_in *) &addr;
+			inet_ntop(AF_INET, &s->sin_addr, ip, INET6_ADDRSTRLEN );
+		} else { // AF_INET6
+			struct sockaddr_in6 *s = (struct sockaddr_in6 *)&addr;
+			inet_ntop(AF_INET6, &s->sin6_addr, ip, INET6_ADDRSTRLEN );
+		}
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.ip ) {
+			free( ip ); ip = NULL;
+		}
+	}
+	return ip;
+}
 
 #define WEBCLIENT_RENDER( name, webpage ) \
 static void Webclient_Render##name( struct webclient_t * webclient) { \
@@ -229,7 +281,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 		Webclient_RenderNotFound( webclient );
 	} else {
 		if ( route->routeType == ROUTETYPE_DYNAMIC ) {
-			route->details.handlerCb( webclient );
+			route->details.handlerCb( route->cbArgs );
 		} else if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
 			struct stat fileStat;
 			const char * documentRoot;
@@ -261,7 +313,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 			}
 			cleanUp.good = ( webclient->response.httpCode == HTTPCODE_OK );
 			if ( cleanUp.good ) {
-					fullPathLength = strlen( documentRoot ) + pathLength + 13;  //  13: that is  '/' + '/' + 'index.html' + '\0'
+				fullPathLength = strlen( documentRoot ) + pathLength + 13;  //  13: that is  '/' + '/' + 'index.html' + '\0'
 				cleanUp.good = ( ( fullPath = malloc( fullPathLength ) ) != NULL );   //  if all goes successfull, this is stored in ->content, wich is free'd normally
 
 			}
@@ -372,7 +424,7 @@ static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
 			webclient->response.contentLength = 0;
 		}
 		if ( cleanUp.h3 ) {
-			h3_request_header_free( webclient->header );
+			h3_request_header_free( webclient->header ); webclient->header = NULL;
 		}
 	}
 }
@@ -407,7 +459,7 @@ static void Webclient_CloseConn( struct webclient_t * webclient ) {
 
 static void Webclient_Delete( struct webclient_t * webclient ) {
 	if ( webclient->header != NULL )  {
-		h3_request_header_free( webclient->header );
+		h3_request_header_free( webclient->header ); webclient->header = NULL;
 	}
 	webclient->route = NULL;
 	webclient->response.httpCode = HTTPCODE_NONE;
@@ -436,7 +488,7 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 			unsigned char route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DOCUMENTROOT, (void * ) documentRoot, webserver->regexOptions ) ) != NULL);
+	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DOCUMENTROOT, (void * ) documentRoot, webserver->regexOptions, NULL ) ) != NULL);
 	if ( cleanUp.good ){
 		cleanUp.route = 1;
 		Webserver_AddRoute( webserver, route );
@@ -450,13 +502,13 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 	return ( cleanUp.good == 1 );
 }
 
-int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handlerCb ) {
+int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handlerCb, void * cbArgs ) {
 	struct route_t * route;
 	struct { unsigned char good:1;
 			unsigned char route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions ) ) != NULL);
+	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions, cbArgs ) ) != NULL);
 	if ( cleanUp.good ){
 		cleanUp.route = 1;
 		Webserver_AddRoute( webserver, route );
@@ -477,6 +529,7 @@ static void Webserver_HandleAccept_cb( picoev_loop* loop, int fd, int events, vo
 	webserver = (struct webserver_t *) ws_arg;
 	newFd  = accept( fd, NULL, NULL );
 	if (newFd != -1) {
+
 		SetupSocket( newFd );
 		webclient  = Webclient_New( webserver, newFd );
 		picoev_add( loop, newFd, PICOEV_READ, webserver->timeoutSec , Webserver_HandleRead_cb, (void *) webclient  );
@@ -759,18 +812,18 @@ static void  Webserver_FindRoute( struct webserver_t * webserver, struct webclie
 	struct route_t * route;
 	PRCList * next;
 	unsigned char * range, * end, * start;
-	int r, found, len;
-	char * url;
+	int r, found;
+	const char * url;
 	struct {unsigned char good:1;
 			unsigned char url; }cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webclient->route = NULL;
-	len =  webclient->header->RequestURILen;
-	cleanUp.good = ( ( url = malloc( len + 1 ) ) != NULL );
+
+	cleanUp.good = ( ( url = Webclient_GetIp( webclient ) ) != NULL );
+
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
-		snprintf( url, len + 1, "%s", webclient->header->RequestURI );
 		start = ( unsigned char * ) url;
 		end = start + strlen( url );
 		range = end;
@@ -790,7 +843,7 @@ static void  Webserver_FindRoute( struct webserver_t * webserver, struct webclie
 	}
 	if ( cleanUp.url ) {
 		//  allways clean up
-		free( url ); url = NULL;
+		free( (char *) url ); url = NULL;
 	}
 	if ( ! cleanUp.good ) {
 	}
@@ -819,6 +872,6 @@ void Webserver_Delete( struct webserver_t * webserver ) {
 	close( webserver->socketFd );
 	webserver->socketFd = 0;
 	free( (char *) webserver->ip ); webserver->ip = NULL;
-	free( webserver );
+	free( webserver ); webserver = NULL;
 }
 

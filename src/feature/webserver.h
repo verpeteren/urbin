@@ -62,7 +62,7 @@ enum mimeType_t {
 
 struct webclient_t;
 
-typedef void				(* dynamicHandler_cb_t)	( struct webclient_t * webclient );
+typedef void 				(* dynamicHandler_cb_t)	( struct webclient_t * webclient );
 
 enum routeType_t {
 	ROUTETYPE_DOCUMENTROOT,
@@ -77,6 +77,7 @@ struct route_t {
 		const char * 				documentRoot;
 		dynamicHandler_cb_t			handlerCb;
 							}	details;
+	void *						cbArgs;
 	struct PRCListStr			mLink;
 };
 
@@ -119,8 +120,11 @@ struct webclient_t{
 							}	response;
 };
 
+const char *					Webclient_GetUrl		( const struct webclient_t * webclient );
+const char *					Webclient_GetIp			( const struct webclient_t * webclient );
+
 int 							Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
-int 							Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handlerCb );
+int 							Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, dynamicHandler_cb_t handlerCb, void * cbArgs );
 
 struct webserver_t *			Webserver_New			( struct core_t * core, const char * ip, const uint16_t port, const unsigned char timeoutSec );
 void 							Webserver_JoinCore		( struct webserver_t * webserver );

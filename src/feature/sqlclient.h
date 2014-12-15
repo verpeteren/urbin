@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 
+#include "../core/core.h"
+
 #include <libpq-fe.h>
 #if HAVE_MYSQL == 1
 #include <mysac.h>
 #endif
-
-#include "../core/core.h"
 
 #ifdef __cplusplus
 extern "C" {
