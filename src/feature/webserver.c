@@ -784,32 +784,31 @@ static void Webserver_AddRoute( struct webserver_t * webserver, struct route_t *
 		if ( webserver->routes == NULL ) {
 			webserver->routes = route;
 		} else {
-			PR_APPEND_LINK( &webserver->routes->mLink, &route->mLink );
+			PR_APPEND_LINK( &route->mLink, &webserver->routes->mLink );
 		}
 	}
 }
 
 static void Webserver_DelRoute( struct webserver_t * webserver, struct route_t * route ) {
-	struct route_t * routeNext;
+	struct route_t * routeFirst, * routeNext;
 	PRCList * next;
 
-	if ( route != NULL ) {
-		if ( route == webserver->routes ) {
-			next = route->mLink.next;
-			if ( next == &route->mLink ) {
-				webserver->routes = NULL;
-			} else {
-				routeNext = FROM_NEXT_TO_ITEM( struct route_t );
-				webserver->routes = routeNext;
-			}
+	routeFirst = webserver->routes;
+	if ( route == routeFirst ){
+		next = PR_NEXT_LINK( &route->mLink );
+		if ( next  == &route->mLink ) {
+			webserver->routes = NULL;
+		} else {
+			routeNext = FROM_NEXT_TO_ITEM( struct route_t );
+			webserver->routes = routeNext;
 		}
-		PR_REMOVE_AND_INIT_LINK( &route->mLink );
-		Route_Delete( route );
 	}
+	PR_REMOVE_AND_INIT_LINK( &route->mLink );
+	Route_Delete( route ); route = NULL;
 }
 
 static void Webserver_FindRoute( struct webserver_t * webserver, struct webclient_t * webclient ) {
-	struct route_t * route;
+	struct route_t * route, *firstRoute;
 	PRCList * next;
 	unsigned char * range, * end, * start;
 	int r, found;
@@ -819,26 +818,24 @@ static void Webserver_FindRoute( struct webserver_t * webserver, struct webclien
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webclient->route = NULL;
-
 	cleanUp.good = ( ( url = Webclient_GetIp( webclient ) ) != NULL );
-
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
 		start = ( unsigned char * ) url;
 		end = start + strlen( url );
 		range = end;
-		next = webserver->routes->mLink.next;
-		if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
+		firstRoute = route = webserver->routes;
+		if ( firstRoute != NULL ) {
 			do {
-				route = FROM_NEXT_TO_ITEM( struct route_t );
-				next = route->mLink.next;
+				next = PR_NEXT_LINK( &route->mLink );
 				r = onig_search( route->urlRegex, ( unsigned char * ) url, end, start, range, webserver->region, webserver->regexOptions );
 				found = ( r >= 0 );
 				if ( found ) {
 					webclient->route = webserver->routes;
 					break;
 				}
-			} while ( next != NULL );
+				route = FROM_NEXT_TO_ITEM( struct route_t );
+			} while ( route != firstRoute );
 		}
 	}
 	if ( cleanUp.url ) {
@@ -850,18 +847,13 @@ static void Webserver_FindRoute( struct webserver_t * webserver, struct webclien
 }
 
 void Webserver_Delete( struct webserver_t * webserver ) {
-	struct route_t * route;
-	PRCList * next;
+	struct route_t * firstRoute;
 	//  clean the routes
-	next = webserver->routes->mLink.next;
-	if ( PR_CLIST_IS_EMPTY( next ) != 0 ) {
-		do {
-			route = FROM_NEXT_TO_ITEM( struct route_t );
-			next = route->mLink.next;
-			Webserver_DelRoute( webserver, route );
-		} while ( next != NULL );
+	firstRoute = webserver->routes;
+	while  ( firstRoute != NULL ) {
+		Webserver_DelRoute( webserver, firstRoute );
+		firstRoute = webserver->routes;
 	}
- 	webserver->routes = NULL;
 	//  clean the rest
 	onig_region_free( webserver->region, 1 ); webserver->region = NULL;
 	webserver->regexOptions = 0;

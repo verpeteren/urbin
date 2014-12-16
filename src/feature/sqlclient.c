@@ -654,31 +654,28 @@ static void Sqlclient_PushQuery ( struct sqlclient_t * sqlclient, struct query_t
 		if ( sqlclient->queries == NULL ) {
 			sqlclient->queries = query;
 		} else {
-			PR_APPEND_LINK( &sqlclient->queries->mLink, &query->mLink );
+			PR_APPEND_LINK( &query->mLink, &sqlclient->queries->mLink );
 		}
 	}
 }
 
 static struct query_t * Sqlclient_PopQuery ( struct sqlclient_t * sqlclient ) {
-	struct query_t * query;
 	PRCList * next;
 
 	if ( sqlclient->currentQuery == NULL ) {
 		if ( sqlclient->queries != NULL ) {
-			query = sqlclient->queries;
-			next = query->mLink.next;
-			if ( next == &query->mLink ) {
+			sqlclient->currentQuery = sqlclient->queries;
+			next = PR_NEXT_LINK( &sqlclient->currentQuery->mLink );
+			if ( next == PR_LIST_HEAD( &sqlclient->currentQuery->mLink ) ) {
 				sqlclient->queries = NULL;
 			} else {
 				next = PR_NEXT_LINK( next );
-				query = FROM_NEXT_TO_ITEM( struct query_t );
+				sqlclient->queries = FROM_NEXT_TO_ITEM( struct query_t );
 			}
-			PR_REMOVE_AND_INIT_LINK( next );
-			sqlclient->currentQuery = query;
-			return sqlclient->currentQuery;
+			PR_REMOVE_AND_INIT_LINK( &sqlclient->currentQuery->mLink );
 		}
 	}
-	return NULL;
+	return sqlclient->currentQuery;
 }
 
 void Sqlclient_Delete ( struct sqlclient_t * sqlclient ) {

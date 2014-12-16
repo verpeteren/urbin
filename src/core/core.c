@@ -66,6 +66,11 @@ struct module_t * Module_New ( const char * name, const moduleHandler_cb_t onLoa
 		if ( cleanUp.name ) {
 			free( (char * ) module->name ); module->name = NULL;
 		}
+		module->cbArgs = NULL,
+		module->onLoad = NULL;
+		module->onReady = NULL;
+		module->onUnload = NULL;
+		PR_INIT_CLIST( &module->mLink );
 		if ( cleanUp.module ) {
 			free( module ); module = NULL;
 		}
@@ -75,6 +80,11 @@ struct module_t * Module_New ( const char * name, const moduleHandler_cb_t onLoa
 
 void Module_Delete ( struct module_t * module ) {
 	free( (char * ) module->name ); module->name = NULL;
+	module->cbArgs = NULL,
+	module->onLoad = NULL;
+	module->onReady = NULL;
+	module->onUnload = NULL;
+	PR_INIT_CLIST( &module->mLink );
 	free( module ); module = NULL;
 }
 
@@ -250,19 +260,18 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 }
 
 static void Core_ProcessTick( struct core_t * core ) {
-	struct timing_t * timing;
+	struct timing_t * timing, *firstTiming;
 	PRCList * next;
 	PRUint32 horizon;
 	PRIntervalTime now;
 	int needToFire;
 
-	if ( core->timings != NULL ) {
+	firstTiming = timing = core->timings;
+	if ( firstTiming != NULL ) {
 		now = PR_IntervalNow( );
 		horizon = PR_IntervalToMicroseconds( now ) + core->processTicksMs;
-		next = core->timings->mLink.next;
 		do {
-			timing = FROM_NEXT_TO_ITEM( struct timing_t );
-			next = timing->mLink.next;
+			next = PR_NEXT_LINK( &timing->mLink );
 			needToFire = ( timing->due < horizon && timing->due != 0 );
 			if ( needToFire ) {
 				if ( timing->repeat ) {
@@ -271,23 +280,24 @@ static void Core_ProcessTick( struct core_t * core ) {
 					Core_DelTiming( core, timing );
 				}
 			}
-		} while ( next != NULL );
+			timing = FROM_NEXT_TO_ITEM( struct timing_t );
+		} while ( timing != firstTiming );
 	}
 }
 
 void Core_Loop( struct core_t * core ) {
-	struct module_t * module;
+	struct module_t * module, * firstModule;
 	PRCList * next;
 
-	if ( core->modules != NULL ) {
-		next = core->modules->mLink.next;
+	firstModule = module = core->modules;
+	if ( firstModule != NULL ) {
 		do {
-			module = FROM_NEXT_TO_ITEM( struct module_t );
-			next = module->mLink.next;
+			next = PR_NEXT_LINK( &module->mLink );
 			if ( module->onReady != NULL )  {
 					module->onReady ( module->cbArgs );
 			}
-		} while ( next != NULL );
+			module = FROM_NEXT_TO_ITEM( struct module_t );
+		} while ( module != firstModule );
 	}
 	core->keepOnRunning = 1;
 	while ( core->keepOnRunning == 1 )  {
@@ -301,7 +311,7 @@ void Core_AddModule( struct core_t * core, struct module_t * module ) {
 		if ( core->modules == NULL ) {
 			core->modules = module;
 		} else {
-			PR_APPEND_LINK( &core->modules->mLink, &module->mLink );
+			PR_APPEND_LINK( &module->mLink, &core->modules->mLink );
 		}
 		if ( module->onLoad != NULL ) {
 			module->onLoad( module->cbArgs );
@@ -310,25 +320,24 @@ void Core_AddModule( struct core_t * core, struct module_t * module ) {
 }
 
 void Core_DelModule( struct core_t * core, struct module_t * module ) {
-	struct module_t * moduleNext;
+	struct module_t * moduleFirst, * moduleNext;
 	PRCList * next;
 
-	if ( module != NULL ) {
-		if ( module == core->modules ) {
-			next = module->mLink.next;
-			if ( next == &module->mLink ) {
-				core->modules = NULL;
-			} else {
-				moduleNext = FROM_NEXT_TO_ITEM( struct module_t );
-				core->modules = moduleNext;
-			}
+	moduleFirst = core->modules;
+	if ( module == moduleFirst ){
+		next = PR_NEXT_LINK( &module->mLink );
+		if ( next  == &module->mLink ) {
+			core->modules = NULL;
+		} else {
+			moduleNext = FROM_NEXT_TO_ITEM( struct module_t );
+			core->modules = moduleNext;
 		}
-		PR_REMOVE_AND_INIT_LINK( &module->mLink );
-		if ( module->onUnload != NULL ) {
-			module->onUnload( module->cbArgs );
-		}
-		Module_Delete( module ); module = NULL;
 	}
+	PR_REMOVE_AND_INIT_LINK( &module->mLink );
+	if ( module->onUnload != NULL ) {
+		module->onUnload( module->cbArgs );
+	}
+	Module_Delete( module ); module = NULL;
 }
 
 struct timing_t * Core_AddTiming ( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs ) {
@@ -344,7 +353,7 @@ struct timing_t * Core_AddTiming ( struct core_t * core , const unsigned int ms,
 		if ( core->timings == NULL ) {
 			core->timings = timing;
 		} else {
-			PR_APPEND_LINK( &core->timings->mLink, &timing->mLink );
+			PR_APPEND_LINK( &timing->mLink, &core->timings->mLink );
 		}
 	}
 	if ( ! cleanUp.good ) {
@@ -357,72 +366,59 @@ struct timing_t * Core_AddTiming ( struct core_t * core , const unsigned int ms,
 }
 
 void Core_DelTiming( struct core_t * core, struct timing_t * timing ) {
-	struct timing_t * timingNext;
+	struct timing_t * timingFirst;
 	PRCList * next;
 
-	if ( timing != NULL ) {
-		if ( timing == core->timings ) {
-			next = timing->mLink.next;
-			if ( next == &timing->mLink ) {
-				core->timings = NULL;
-			} else {
-				timingNext = FROM_NEXT_TO_ITEM( struct timing_t );
-				core->timings = timingNext;
-			}
+	timingFirst = core->timings;
+	if ( timing == timingFirst ){
+		next = PR_NEXT_LINK( &timing->mLink );
+		if ( next  == &timing->mLink ) {
+			core->timings = NULL;
+		} else {
+			timingFirst = FROM_NEXT_TO_ITEM( struct timing_t );
+			core->timings = timingFirst;
 		}
-		PR_REMOVE_AND_INIT_LINK( &timing->mLink );
-		Timing_Delete( timing ); timing = NULL;
 	}
-
+	PR_REMOVE_AND_INIT_LINK( &timing->mLink );
+	Timing_Delete( timing ); timing = NULL;
 }
 
 void Core_DelTimingId ( struct core_t * core , uint32_t id ) {
-	struct timing_t * timing;
+	struct timing_t * timing, *firstTiming;
 	PRCList * next;
 
-	if ( core->timings != NULL ) {
-		next = core->timings->mLink.next;
+	firstTiming = timing = core->timings;
+	if ( firstTiming != NULL ) {
 		do {
-			timing = FROM_NEXT_TO_ITEM( struct timing_t );
+			next = PR_NEXT_LINK( &timing->mLink );
 			if ( timing->identifier == id ) {
 				Core_DelTiming( core, timing );
 				break;
 			}
-			next = timing->mLink.next;
-		} while ( next != NULL );
+			timing = FROM_NEXT_TO_ITEM( struct timing_t );
+		} while ( timing != firstTiming );
 	}
 }
 
 void Core_Delete( struct core_t * core ) {
-	struct timing_t * timing;
-	struct module_t * module;
-	PRCList * next;
+	struct timing_t * firstTiming;
+	struct module_t * firstModule;
 
 	//  cleanup the modules
-	if ( core->modules != NULL ) {
-		next = core->modules->mLink.next;
-		do {
-			module = FROM_NEXT_TO_ITEM( struct module_t );
-			next = module->mLink.next;
-			Core_DelModule( core, module );
-		} while ( next != NULL );
+	firstModule = core->modules;
+	while ( firstModule != NULL) {
+		Core_DelModule( core, firstModule);
+		firstModule = core->modules;
 	}
-	core->modules = NULL;
-	//  cleanup the timers
-	if ( core->timings != NULL ) {
-		next = core->timings->mLink.next;
-		do {
-			timing = FROM_NEXT_TO_ITEM( struct timing_t );
-			next = timing->mLink.next;
-			Core_DelTiming( core, timing );
-		} while ( next != NULL );
+	firstTiming = core->timings;
+	while ( firstTiming != NULL ) {
+		Core_DelTiming( core, firstTiming );
+		firstTiming = core->timings;
 	}
 	core->timings = NULL;
 	//  cleanup the rest
 	core->processTicksMs = 0;
 	picoev_destroy_loop( core->loop );
-	core->modules = NULL;
-	core->modules = 0;
 	cfg_free( (cfg_t *) core->config ); core->config = NULL;
 	free( core ); core = NULL;
 }
