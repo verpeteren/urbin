@@ -232,6 +232,8 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 #define SET_DEFAULTS_FOR_CONN( type, sectionName ) do { \
 	struct cfg_t * sqlSection, * modulesSection; \
 	\
+	prt = 0; \
+	timeSec = 0; \
 	modulesSection = cfg_getnsec( (cfg_t *) core->config, "modules", 0 ); \
 	sqlSection = cfg_getnsec( modulesSection, sectionName, 0 ); \
 	if ( ip == NULL ) { \

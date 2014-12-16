@@ -188,6 +188,7 @@ void JavascriptModule_Unload( const struct core_t * core, void * args ) {
 		memset( &cleanUp, 0, sizeof( cleanUp ) ); \
 		args = CallArgsFromVp( argc, vpn ); \
 		cUserName = NULL; \
+		cHostName = NULL; \
 		cIp = NULL; \
 		cUserName = NULL; \
 		cPassword = NULL; \
@@ -287,6 +288,8 @@ void JavascriptModule_Unload( const struct core_t * core, void * args ) {
 				unsigned char payload:1; } cleanUp; \
 		 \
 		memset( &cleanUp, 0, sizeof( cleanUp ) ); \
+		fnVal = JSVAL_NULL; \
+		paramList = JSVAL_NULL; \
 		JS::RootedValue 		fnValRoot( cx, fnVal ); \
 		JS::HandleValue 		fnValHandle( fnValRoot ); \
 		JS::MutableHandleValue 	fnValMut( &fnValRoot ); \
@@ -328,7 +331,8 @@ void JavascriptModule_Unload( const struct core_t * core, void * args ) {
 				JSObject * paramObj, * paramIter; \
 				jsid indexId; \
 				bool success; \
-		 \
+				\
+				indexId = JSID_VOID; \
 				paramObj = &paramList.toObject( ); \
 				JS::RootedObject 		paramObjRoot( cx, paramObj ); \
 				JS::HandleObject 		paramObjHandle ( paramObjRoot ); \
@@ -605,6 +609,7 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void 
 					jsval currentVal;
 					jsval jValue;
 
+					recordObj = NULL;
 					JS::RootedObject 		recordObjRoot( cx, recordObj );
 					JS::HandleObject 		recordObjHandle( recordObjRoot );
 					cleanUp.good = ( (recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
@@ -612,14 +617,14 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void 
 						currentVal = OBJECT_TO_JSVAL( recordObj );
 						JS::RootedValue 	currentValRoot( cx, currentVal );
 						JS::HandleValue 	currentValHandle( currentValRoot );
-						JS_SetElement( cx, resultArrayHandle, rowId, currentValHandle );
+						JS_SetElement( cx, resultArrayHandle, (uint32_t) rowId, currentValHandle );
 						for ( colId = 0; colId < colCount; colId++ ) {
 							cFieldName = PQfname( result, colId );  //  speedup might be possible by caching this
 							dataType = PQftype( result, colId );
-							if ( PQgetisnull( result, rowId, colId ) == 1 ) {
+							if ( PQgetisnull( result, (int) rowId, colId ) == 1 ) {
 								jValue = JSVAL_NULL;
 							} else {
-								cValue = PQgetvalue( result, rowId, colId );
+								cValue = PQgetvalue( result, (int) rowId, colId );
 								switch ( dataType ) {
 								//  it is possible to make a even better mapping to postgresql data types to JSAPI DATA TYPES: this relies on the settings in /usr/include/postgresql/catalog/pg_type.h
 								case 16:      //  bool
@@ -803,6 +808,8 @@ static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webcl
 	//  @TODO call autocompartment, begin request etc.
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	clientObj = NULL;
+	jIp = jUrl = jMethod = NULL;
+	ip = url = NULL;
 	cleanUp.good = ( ( ip = Webclient_GetIp( webclient ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
@@ -1017,6 +1024,7 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 	args = CallArgsFromVp( argc, vpn );
 	jLocation = NULL;
 	jDocumentRoot = NULL;
+	cDocumentRoot = NULL;
 	cLocation = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "SS", &jDocumentRoot, &jLocation ) == true );
 	if ( cleanUp.good ) {

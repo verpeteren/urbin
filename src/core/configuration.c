@@ -56,7 +56,7 @@ static const cfg_opt_t javascriptCfgOpts[] = {
 	CFG_END()
 };
 
-static const const cfg_opt_t modulesCfgOpts[] = {
+static const cfg_opt_t modulesCfgOpts[] = {
 	CFG_SEC( (char * ) "webserver", 		(cfg_opt_t *) webserverCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char * ) "mysqlclient", 		(cfg_opt_t *) mysqlclientCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char * ) "postgresqlclient",	(cfg_opt_t *) pgsqlclientCfgOpts, CFGF_MULTI | CFGF_TITLE),

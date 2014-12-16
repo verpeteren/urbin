@@ -19,7 +19,7 @@ void Boot( const int fds ) {
 	int fdMax;
 
 	fdMax = ( fds == 0 ) ? PR_CFG_LOOP_MAX_FDS : fds;
-	fprintf( stdout, "Starting\n" );
+	fprintf( stdout, "Starting with %d slots\n", fdMax );
 	picoev_init( fdMax );
 }
 

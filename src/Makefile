@@ -44,10 +44,10 @@ CC_FLAGS += $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS)
 LD_FLAGS += $(LD_RELEASE_FLAGS) $(LD_DEBUG_FLAGS)
 HAVES = $(HAVE_MYSQL)
 
-CORE_DIR=./core
-FEAT_DIR=./feature
-GLOT_DIR=./glot
-BIN_DIR=../bin
+CORE_DIR = ./core
+FEAT_DIR = ./feature
+GLOT_DIR = ./glot
+BIN_DIR = ../bin
 
 COMMON_HEADERS = common.h platform.h $(DIRS) 
 FEATURE_HEADERS = $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h
@@ -104,7 +104,11 @@ ifeq ($(MAKE_STATIC_LIBS),yes)
 else
 	@echo "\tLD.so:\t"$@
 endif
-	@$(CC) -o $@ $(CODE_OBJECTS) $(LIBS) $(LD_FLAGS)
+	@$(CC) -o $@ $(CODE_OBJECTS) $(LIBS) $(LD_FLAGS) && \
+	cd $(BIN_DIR) && \
+	ln -fs $(DEPS) -t . && \
+	chmod  +x $@ lib* && \
+	export LD_LIBRARY_PATH=$(BIN_DIR)
 ifdef STAGING_RELEASE
 	@$(STRIP) $@ $(DEPS)
 endif
