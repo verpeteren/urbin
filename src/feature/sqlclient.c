@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../core/utils.h"
 #include "sqlclient.h"
 
 
@@ -43,7 +44,7 @@ void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, cons
 		PR_INIT_CLIST( &query->mLink );
 		query->sqlclient = sqlclient;
 		query->statementId = 0;
-		cleanUp.good = ( ( query->statement = strdup( sqlStatement ) ) != NULL );
+		cleanUp.good = ( ( query->statement = Xstrdup( sqlStatement ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.statement = 1;
@@ -60,7 +61,7 @@ void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, cons
 		cleanUp.values = 1;
 		for ( i = 0; i < query->paramCount; i++ ) {
 			query->paramLengths[i] = strlen( paramValues[i] );
-			cleanUp.good = ( ( query->paramValues[i] = strdup( paramValues[i] ) ) != NULL );
+			cleanUp.good = ( ( query->paramValues[i] = Xstrdup( paramValues[i] ) ) != NULL );
 			if ( ! cleanUp.good ) {
 				break;
 			}
@@ -494,22 +495,22 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 	if ( dbName == NULL ) {
 		dbName = "";
 	}
-		cleanUp.good = ( ( sqlclient->hostName = strdup( hostName ) ) != NULL );
+		cleanUp.good = ( ( sqlclient->hostName = Xstrdup( hostName ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.hostName = 1;
-			cleanUp.good = ( ( sqlclient->ip = strdup( ip ) ) != NULL );
+			cleanUp.good = ( ( sqlclient->ip = Xstrdup( ip ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
-		cleanUp.good = ( ( sqlclient->loginName = strdup( loginName ) ) != NULL );
+		cleanUp.good = ( ( sqlclient->loginName = Xstrdup( loginName ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.loginName = 1;
-		cleanUp.good = ( ( sqlclient->password = strdup( password ) ) != NULL );
+		cleanUp.good = ( ( sqlclient->password = Xstrdup( password ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.password = 1;
-		cleanUp.good = ( ( sqlclient->dbName = strdup( dbName) ) != NULL );
+		cleanUp.good = ( ( sqlclient->dbName = Xstrdup( dbName) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.dbName = 1;

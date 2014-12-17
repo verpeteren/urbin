@@ -12,6 +12,15 @@ int FullPath( char target[], const size_t size, const char * path, const char * 
 	return snprintf( first, size, "%s%s%s", path, "/", filename );
 }
 
+char * Xstrdup( const char* str ) {
+#ifdef POSIX
+	//  http://stackoverflow.com/questions/482375/strdup-function
+	return strdup( str );
+#else
+	return strcpy( malloc( strlen( str ) + 1), str );
+#endif
+}
+
 char * FileGetContents( const char * fileName ) {
 	FILE * fp;
 	char * contents;

@@ -17,6 +17,7 @@ extern "C" {
 struct javascript_t {
 	struct core_t *				core;
 	const char *				path;
+	const char *				fileName;
 	JSRuntime *					runtime;
 	JSContext *					context;
 	JS::PersistentRootedObject	globalObj;
@@ -25,9 +26,9 @@ struct javascript_t {
 struct javascript_t *			Javascript_New						( const struct core_t * core, const char * path, const char * fileName );
 void							Javascript_Delete					( struct javascript_t * javascript );
 
-void *							JavascriptModule_Load				( const struct core_t * core );
-void							JavascriptModule_Ready				( const struct core_t * core, void * args );
-void							JavascriptModule_Unload				( const struct core_t * core, void * args );
+unsigned char	 				JavascriptModule_Load				( const struct core_t * core, struct module_t * module, void * args );
+unsigned char					JavascriptModule_Ready				( const struct core_t * core, struct module_t * module, void * args );
+unsigned char					JavascriptModule_Unload				( const struct core_t * core, struct module_t * module, void * args );
 
 #ifdef __cplusplus
 }

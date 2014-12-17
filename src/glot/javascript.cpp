@@ -6,6 +6,8 @@
 #include "../feature/webserver.h"
 #include "../core/utils.h"
 
+#define MAIN_OBJ_NAME "Hard"
+
 struct payload_t {
 	JSContext *						cx;
 	JS::RootedObject 				objRoot;
@@ -21,22 +23,30 @@ static bool 						Javascript_IncludeScript		( const struct javascript_t * javasc
 
 static int jsInterpretersAlive = 0;
 
-#define JAVASCRIPT_MODULE_ACTION( action ) do { \
-		JSAutoRequest			ar( javascript->context ); \
-		JSAutoCompartment		ac( javascript->context, javascript->globalObj ); \
-		JS::HandleObject		globalObjHandle( javascript->globalObj ); \
-		JS::RootedValue			rVal( javascript->context ); \
-		JS::MutableHandleValue	rValMut( &rVal); \
-		JS::RootedValue			hardVal( javascript->context ); \
-		JS::HandleValue			hardValHandle( hardVal ); \
-		JS::MutableHandleValue	hardValMut( &hardVal ); \
-		JS::RootedObject		hardObj( javascript->context ); \
-		JS::HandleObject		hardObjHandle( hardObj ); \
-		JS::MutableHandleObject	hardObjMut( &hardObj ); \
-		JS_GetProperty( javascript->context, globalObjHandle, "Hard", hardValMut ); \
-		cleanUp.good = ( ( JS_ValueToObject( javascript->context, hardValHandle, hardObjMut ) ) == true ); \
-		JS_CallFunctionName( javascript->context, hardObjHandle, action, JS::HandleValueArray::empty(), rValMut ); \
+/*#  @TODO:  from inline back to macro   define JAVASCRIPT_MODULE_ACTION( action ) \*/
+inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, const char * action ) {
+	do { \
+		JSObject * hardObj;
+		jsval hardVal;
+
+		hardObj = NULL;
+		JSAutoRequest			ar( javascript->context );
+		JSAutoCompartment		ac( javascript->context, javascript->globalObj );
+		JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
+		JS::HandleObject		globalObjHandle( globalObjRoot );
+		JS::RootedValue			rValRoot( javascript->context );
+		JS::MutableHandleValue	rValMut( &rValRoot );
+		JS::RootedValue			hardValRoot( javascript->context, hardVal );
+		JS::HandleValue			hardValHandle( hardValRoot );
+		JS::MutableHandleValue	hardValMut( &hardValRoot );
+		JS::RootedObject		hardObjRoot( javascript->context, hardObj );
+		JS::HandleObject		hardObjHandle( hardObjRoot );
+		JS::MutableHandleObject	hardObjMut( &hardObjRoot );
+		JS_GetProperty( javascript->context, globalObjHandle, MAIN_OBJ_NAME, hardValMut );
+		JS_ValueToObject( javascript->context, hardValHandle, hardObjMut );
+		JS_CallFunctionName( javascript->context, hardObjHandle, action, JS::HandleValueArray::empty(), rValMut );
 	} while ( 0 );
+}
 
 /**
  * The spidermonkey module is loaded.
@@ -55,7 +65,7 @@ static int jsInterpretersAlive = 0;
  * @see	Hard.onReady
  * @see	Hard.onUnload
  */
-void * JavascriptModule_Load( const struct core_t * core ) {
+unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t * module, void * cbArgs ) {
 	struct javascript_t * javascript;
 	cfg_t * glotSection, * javascriptSection;
 	char * path, * name;
@@ -64,21 +74,24 @@ void * JavascriptModule_Load( const struct core_t * core ) {
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	glotSection = cfg_getnsec( (cfg_t *) core->config, "glot", 0 );
-	javascriptSection = cfg_getnsec( glotSection, "Javascript", 0 );
+	javascriptSection = cfg_getnsec( glotSection, "javascript", 0 );
 	path = cfg_getstr( javascriptSection, (char *) "path" );
 	name = cfg_getstr( javascriptSection, (char *) "main" );
-	cleanUp.good = ( ( javascript = Javascript_New( core, path, name ) ) != NULL );
+	if ( module->instance == NULL ) {
+		//  this should not happen!
+		cleanUp.good = ( ( javascript = Javascript_New( core, path, name ) ) != NULL );
+	}
 	if ( cleanUp.good ) {
 		cleanUp.javascript = 1;
-		JAVASCRIPT_MODULE_ACTION( "onLoad" )
+		module->instance = ( void * ) javascript;
+		JAVASCRIPT_MODULE_ACTION( javascript, "onLoad" );
 	}
 	if (! cleanUp.good ) {
 		if ( cleanUp.javascript ) {
-			Javascript_Delete( javascript );
+			Javascript_Delete( javascript ); javascript = NULL;
 		}
 	}
-
-	return (void *) javascript;
+	return ( cleanUp.good ) ? 1: 0;
 }
 
 /**
@@ -98,13 +111,16 @@ void * JavascriptModule_Load( const struct core_t * core ) {
  * @see	Hard.onLoad
  * @see	Hard.onUnload
  */
-void JavascriptModule_Ready( const struct core_t * core, void * args ) {
+unsigned char JavascriptModule_Ready( const struct core_t * core, struct module_t * module, void * args ) {
 	struct javascript_t * javascript;
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	javascript = (struct javascript_t * ) args;
-	JAVASCRIPT_MODULE_ACTION( "onReady" )
+	if ( module->instance != NULL ) {
+		javascript = (struct javascript_t * ) module->instance;
+		JAVASCRIPT_MODULE_ACTION( javascript, "onReady" );
+	}
+	return 1;
 }
 
 /**
@@ -124,117 +140,120 @@ void JavascriptModule_Ready( const struct core_t * core, void * args ) {
  * @see	Hard.onLoad
  * @see	Hard.onReady
  * @see	Hard.shutdown
-*/
-void JavascriptModule_Unload( const struct core_t * core, void * args ) {
+ */
+unsigned char JavascriptModule_Unload( const struct core_t * core, struct module_t * module, void * args ) {
 	struct javascript_t * javascript;
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	javascript = (struct javascript_t * ) args;
-	JAVASCRIPT_MODULE_ACTION( "onUnload" )
-
-	Javascript_Delete( javascript );
+	if ( module->instance != NULL ) {
+		javascript = (struct javascript_t * ) module->instance;
+		JAVASCRIPT_MODULE_ACTION( javascript, "onUnload" );
+		Javascript_Delete( javascript ); javascript = NULL;
+		module->instance = NULL;
+	}
+	return 1;
 }
 /*
- ===============================================================================
- Sqlclient OBJECT
- ===============================================================================
- */
+   ===============================================================================
+   Sqlclient OBJECT
+   ===============================================================================
+   */
 
 #define SET_PROPERTY_ON( handle, key, value ) do {\
 	JS::RootedValue valRoot( cx, value ); \
 	JS::HandleValue valHandle( valRoot ); \
 	cleanUp.good = ( JS_DefineProperty( cx, handle, key, valHandle, attrs, JS_PropertyStub, JS_StrictPropertyStub ) == true ); \
-	} while ( 0 );
+} while ( 0 );
 
 #define CONNOBJ_GET_PROP_STRING( property, var) do { \
-		if ( JS_GetProperty(cx, connObjHandle, property, valueMut ) ) { \
-			if ( value.isString( ) ) { \
-				cleanUp.good = ( ( var = JS_EncodeString(cx, value.toString( ) ) ) != NULL ); \
-			} else { \
-				cleanUp.good = 0; \
-			} \
+	if ( JS_GetProperty(cx, connObjHandle, property, valueMut ) ) { \
+		if ( value.isString( ) ) { \
+			cleanUp.good = ( ( var = JS_EncodeString(cx, value.toString( ) ) ) != NULL ); \
 		} else { \
 			cleanUp.good = 0; \
 		} \
-	} while ( 0 );
+	} else { \
+		cleanUp.good = 0; \
+	} \
+} while ( 0 );
 
 #define CONNOBJ_GET_PROP_NR( property, var) do { \
-		if ( JS_GetProperty(cx, connObjHandle, property, valueMut ) ) { \
-			if ( value.isNumber( ) ) { \
-				var = ( int ) value.toNumber( ); \
-			} else if ( value.isString( ) ) { \
-				char * dummy; \
-				cleanUp.good = ( ( dummy = JS_EncodeString(cx, value.toString( ) ) ) != NULL ); \
-				var = atoi( dummy );\
-				JS_free( cx, dummy ); dummy = NULL; \
-			} else { \
-				cleanUp.good = 0; \
-			} \
+	if ( JS_GetProperty(cx, connObjHandle, property, valueMut ) ) { \
+		if ( value.isNumber( ) ) { \
+			var = ( int ) value.toNumber( ); \
+		} else if ( value.isString( ) ) { \
+			char * dummy; \
+			cleanUp.good = ( ( dummy = JS_EncodeString(cx, value.toString( ) ) ) != NULL ); \
+			var = atoi( dummy );\
+			JS_free( cx, dummy ); dummy = NULL; \
 		} else { \
 			cleanUp.good = 0; \
 		} \
-	} while ( 0 );
+	} else { \
+		cleanUp.good = 0; \
+	} \
+} while ( 0 );
 
 #define SQL_CLASS_CONSTRUCTOR( engine_new, jsnClass, jsnMethods ) do { \
-		struct sqlclient_t * sqlclient; \
-		struct javascript_t * instance; \
-		JSObject * globalObj, * sqlclientObj, * connObj, * thisObj; \
-		char * cHostName, * cIp, * cUserName, *cPassword, * cDbName; \
-		int port, timeoutSec; \
-		JS::CallArgs args; \
-		struct {unsigned char good:1;} cleanUp; \
-		 \
-		memset( &cleanUp, 0, sizeof( cleanUp ) ); \
-		args = CallArgsFromVp( argc, vpn ); \
-		cUserName = NULL; \
-		cHostName = NULL; \
-		cIp = NULL; \
-		cUserName = NULL; \
-		cPassword = NULL; \
-		cDbName = NULL; \
-		timeoutSec = 0; \
-		port = 0; \
-		cleanUp.good = ( JS_ConvertArguments( cx, args, "o/i", &connObj, &timeoutSec ) == true ); \
-		if ( cleanUp.good ) { \
-			JS::RootedObject connObjRoot( cx, connObj ); \
-			JS::HandleObject connObjHandle( connObjRoot ); \
-			jsval value; \
-			JS::RootedValue valueRoot( cx, value ); \
-			JS::MutableHandleValue valueMut( &valueRoot ); \
-			/*  Refer to http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS for more details. */ \
-			CONNOBJ_GET_PROP_STRING( "host", cHostName ); \
-			CONNOBJ_GET_PROP_STRING( "ip", cIp ); \
-			CONNOBJ_GET_PROP_STRING( "user", cUserName ); \
-			CONNOBJ_GET_PROP_STRING( "password", cPassword ); \
-			CONNOBJ_GET_PROP_STRING( "db", cDbName ); \
-			CONNOBJ_GET_PROP_NR( "port", port ); \
-		} \
-		thisObj = JS_THIS_OBJECT( cx, vpn ); \
-		if ( cleanUp.good ) { \
-			cleanUp.good = ( thisObj != NULL ); \
-		} \
-		JS::RootedObject thisObjRoot( cx, thisObj ); \
-		if ( cleanUp.good ) { \
-			globalObj = JS_GetGlobalForObject( cx, thisObj ); \
-			instance = (struct javascript_t * ) JS_GetPrivate( globalObj ); \
-			cleanUp.good = ( ( sqlclient = engine_new( instance->core, cHostName, cIp, (uint16_t) port, cUserName, cPassword, cDbName, (unsigned char) timeoutSec ) ) != NULL ); \
-		} \
-		if ( cleanUp.good ) { \
-			sqlclientObj = JS_NewObjectForConstructor( cx, jsnClass, args ); \
-			JS::RootedObject 	sqlclientObjRoot( cx, sqlclientObj ); \
-			JS::HandleObject 	sqlclientObjHandle( sqlclientObjRoot ); \
-			JS_DefineFunctions( cx, sqlclientObjHandle, jsnMethods ); \
-			JS_SetPrivate( sqlclientObj, ( void * ) sqlclient ); \
-			args.rval().setObject( *sqlclientObj ); \
-		} else { \
-			args.rval().setNull( ); \
-		} \
-		\
-		memset( cPassword, '\0', strlen( cPassword ) ); /*  @TODO:  clean jPassword */ \
-		JS_free( cx, cPassword ); cPassword = NULL; \
-		return ( cleanUp.good ) ? true : false; \
-	} while ( 0 );
+	struct sqlclient_t * sqlclient; \
+	struct javascript_t * instance; \
+	JSObject * globalObj, * sqlclientObj, * connObj, * thisObj; \
+	char * cHostName, * cIp, * cUserName, *cPassword, * cDbName; \
+	int port, timeoutSec; \
+	JS::CallArgs args; \
+	struct {unsigned char good:1;} cleanUp; \
+	\
+	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
+	args = CallArgsFromVp( argc, vpn ); \
+	cUserName = NULL; \
+	cHostName = NULL; \
+	cIp = NULL; \
+	cUserName = NULL; \
+	cPassword = NULL; \
+	cDbName = NULL; \
+	timeoutSec = 0; \
+	port = 0; \
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "o/i", &connObj, &timeoutSec ) == true ); \
+	if ( cleanUp.good ) { \
+		JS::RootedObject connObjRoot( cx, connObj ); \
+		JS::HandleObject connObjHandle( connObjRoot ); \
+		jsval value; \
+		JS::RootedValue valueRoot( cx, value ); \
+		JS::MutableHandleValue valueMut( &valueRoot ); \
+		/*  Refer to http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS for more details. */ \
+		CONNOBJ_GET_PROP_STRING( "host", cHostName ); \
+		CONNOBJ_GET_PROP_STRING( "ip", cIp ); \
+		CONNOBJ_GET_PROP_STRING( "user", cUserName ); \
+		CONNOBJ_GET_PROP_STRING( "password", cPassword ); \
+		CONNOBJ_GET_PROP_STRING( "db", cDbName ); \
+		CONNOBJ_GET_PROP_NR( "port", port ); \
+	} \
+	thisObj = JS_THIS_OBJECT( cx, vpn ); \
+	if ( cleanUp.good ) { \
+		cleanUp.good = ( thisObj != NULL ); \
+	} \
+	JS::RootedObject thisObjRoot( cx, thisObj ); \
+	if ( cleanUp.good ) { \
+		globalObj = JS_GetGlobalForObject( cx, thisObj ); \
+		instance = (struct javascript_t * ) JS_GetPrivate( globalObj ); \
+		cleanUp.good = ( ( sqlclient = engine_new( instance->core, cHostName, cIp, (uint16_t) port, cUserName, cPassword, cDbName, (unsigned char) timeoutSec ) ) != NULL ); \
+	} \
+	if ( cleanUp.good ) { \
+		sqlclientObj = JS_NewObjectForConstructor( cx, jsnClass, args ); \
+		JS::RootedObject 	sqlclientObjRoot( cx, sqlclientObj ); \
+		JS::HandleObject 	sqlclientObjHandle( sqlclientObjRoot ); \
+		JS_DefineFunctions( cx, sqlclientObjHandle, jsnMethods ); \
+		JS_SetPrivate( sqlclientObj, ( void * ) sqlclient ); \
+		args.rval().setObject( *sqlclientObj ); \
+	} else { \
+		args.rval().setNull( ); \
+	} \
+	\
+	memset( cPassword, '\0', strlen( cPassword ) ); /*  @TODO:  clean jPassword */ \
+	JS_free( cx, cPassword ); cPassword = NULL; \
+	return ( cleanUp.good ) ? true : false; \
+} while ( 0 );
 /**
  * Sql client connection object.
  *
@@ -244,162 +263,162 @@ void JavascriptModule_Unload( const struct core_t * core, void * args ) {
  */
 
 #define SQL_CLIENT_QUERY_RESULT_HANDLER_CB( formatter, sub) do { \
-		struct payload_t * payload; \
-		JSContext * cx; \
-		JSCompartment * oldCompartment; \
-		JSObject * resultObj, * globalObj; \
-		jsval paramValArray[1], retVal; \
-		\
-		payload = ( struct payload_t * ) query->cbArgs; \
-		globalObj = NULL; \
-		cx = payload->cx; \
-		JS_BeginRequest( cx ); \
-		oldCompartment = JS_EnterCompartment( cx, globalObj ); \
-		globalObj = JS_GetGlobalForObject( cx, payload->objRoot ); \
-		JS::RootedValue paramValArrayRoot( cx, paramValArray[0] ); \
-		resultObj = formatter( cx, query->result.sub ); \
-		paramValArray[0] = OBJECT_TO_JSVAL( resultObj ); \
-		JS::HandleValueArray 	paramValArrayHandle( paramValArrayRoot ); \
-		JS::HandleValue 		fnValHandle( *payload->fnValRoot ); \
-		JS::HandleObject 		objHandle( payload->objRoot ); \
-		JS::RootedValue 		retValRoot( cx, retVal ); \
-		JS::MutableHandleValue 	retValMut( &retValRoot ); \
-		JS_CallFunctionValue( cx, objHandle, fnValHandle, paramValArrayHandle, retValMut ); \
-		 \
-		delete payload; 		payload = NULL; \
-		JS_LeaveCompartment( cx, oldCompartment ); \
-		JS_EndRequest( cx ); \
-	} while ( 0);
+	struct payload_t * payload; \
+	JSContext * cx; \
+	JSCompartment * oldCompartment; \
+	JSObject * resultObj, * globalObj; \
+	jsval paramValArray[1], retVal; \
+	\
+	payload = ( struct payload_t * ) query->cbArgs; \
+	globalObj = NULL; \
+	cx = payload->cx; \
+	JS_BeginRequest( cx ); \
+	oldCompartment = JS_EnterCompartment( cx, globalObj ); \
+	globalObj = JS_GetGlobalForObject( cx, payload->objRoot ); \
+	JS::RootedValue paramValArrayRoot( cx, paramValArray[0] ); \
+	resultObj = formatter( cx, query->result.sub ); \
+	paramValArray[0] = OBJECT_TO_JSVAL( resultObj ); \
+	JS::HandleValueArray 	paramValArrayHandle( paramValArrayRoot ); \
+	JS::HandleValue 		fnValHandle( *payload->fnValRoot ); \
+	JS::HandleObject 		objHandle( payload->objRoot ); \
+	JS::RootedValue 		retValRoot( cx, retVal ); \
+	JS::MutableHandleValue 	retValMut( &retValRoot ); \
+	JS_CallFunctionValue( cx, objHandle, fnValHandle, paramValArrayHandle, retValMut ); \
+	\
+	delete payload; 		payload = NULL; \
+	JS_LeaveCompartment( cx, oldCompartment ); \
+	JS_EndRequest( cx ); \
+} while ( 0);
 
 #define SQL_CLIENT_QUERY( handler ) do { \
-		struct payload_t * payload; \
-		struct sqlclient_t * sqlclient; \
-		jsval paramList, value, fnVal; \
-		JSObject * sqlObj; \
-		JSString * jStatement; \
-		JS::CallArgs args; \
-		unsigned int nParams, i; \
-		 \
-		const char ** cParamValues; \
-		char * cStatement; \
-		struct {unsigned char good:1; \
-				unsigned char params:1; \
-				unsigned char statement:1; \
-				unsigned char payload:1; } cleanUp; \
-		 \
-		memset( &cleanUp, 0, sizeof( cleanUp ) ); \
-		fnVal = JSVAL_NULL; \
-		paramList = JSVAL_NULL; \
-		JS::RootedValue 		fnValRoot( cx, fnVal ); \
-		JS::HandleValue 		fnValHandle( fnValRoot ); \
-		JS::MutableHandleValue 	fnValMut( &fnValRoot ); \
-		JS::RootedValue 		paramListRoot( cx, paramList ); \
-		JS::HandleValue 		paramListHandle( paramListRoot ); \
-		JS::HandleValueArray 	paramListHandleArray( paramListRoot); \
-		i = 0; \
-		sqlclient = NULL; \
-		nParams = 0; \
-		cParamValues = NULL; \
-		cStatement = NULL; \
-		payload = NULL; \
-		args = CallArgsFromVp( argc, vpn ); \
-		sqlObj = JS_THIS_OBJECT( cx, vpn ); \
-		cleanUp.good = ( ( sqlclient = (struct sqlclient_t *) JS_GetPrivate( sqlObj ) ) != NULL ); \
-		if ( cleanUp.good ) { \
-			cleanUp.good = ( JS_ConvertArguments( cx, args, "S*f", &jStatement, &paramListRoot, &fnValRoot ) == true ); \
-		} \
-		if ( cleanUp.good ) { \
-			cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true ); \
-		} \
-		if ( cleanUp.good ) { \
-			if ( paramList.isNullOrUndefined( ) ) { \
-				/*  it is a query like "SELECT user FROM users WHERE user_id = 666", 				null, 		function( result ) {console.log( result );} ); */\
-				nParams = 0; \
-			} else if ( paramList.isString( ) || paramList.isNumber( ) ) { \
-				/*  it is a query like "SELECT user FROM users WHERE user_id = $1",				 	666, 		function( result ) {console.log( result );} ); */ \
-				nParams = 1; \
+	struct payload_t * payload; \
+	struct sqlclient_t * sqlclient; \
+	jsval paramList, value, fnVal; \
+	JSObject * sqlObj; \
+	JSString * jStatement; \
+	JS::CallArgs args; \
+	unsigned int nParams, i; \
+	\
+	const char ** cParamValues; \
+	char * cStatement; \
+	struct {unsigned char good:1; \
+		unsigned char params:1; \
+		unsigned char statement:1; \
+		unsigned char payload:1; } cleanUp; \
+	\
+	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
+	fnVal = JSVAL_NULL; \
+	paramList = JSVAL_NULL; \
+	JS::RootedValue 		fnValRoot( cx, fnVal ); \
+	JS::HandleValue 		fnValHandle( fnValRoot ); \
+	JS::MutableHandleValue 	fnValMut( &fnValRoot ); \
+	JS::RootedValue 		paramListRoot( cx, paramList ); \
+	JS::HandleValue 		paramListHandle( paramListRoot ); \
+	JS::HandleValueArray 	paramListHandleArray( paramListRoot); \
+	i = 0; \
+	sqlclient = NULL; \
+	nParams = 0; \
+	cParamValues = NULL; \
+	cStatement = NULL; \
+	payload = NULL; \
+	args = CallArgsFromVp( argc, vpn ); \
+	sqlObj = JS_THIS_OBJECT( cx, vpn ); \
+	cleanUp.good = ( ( sqlclient = (struct sqlclient_t *) JS_GetPrivate( sqlObj ) ) != NULL ); \
+	if ( cleanUp.good ) { \
+		cleanUp.good = ( JS_ConvertArguments( cx, args, "S*f", &jStatement, &paramListRoot, &fnValRoot ) == true ); \
+	} \
+	if ( cleanUp.good ) { \
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true ); \
+	} \
+	if ( cleanUp.good ) { \
+		if ( paramList.isNullOrUndefined( ) ) { \
+			/*  it is a query like "SELECT user FROM users WHERE user_id = 666", 				null, 		function( result ) {console.log( result );} ); */\
+			nParams = 0; \
+		} else if ( paramList.isString( ) || paramList.isNumber( ) ) { \
+			/*  it is a query like "SELECT user FROM users WHERE user_id = $1",				 	666, 		function( result ) {console.log( result );} ); */ \
+			nParams = 1; \
+			cleanUp.good = ( ( cParamValues = ( const char ** ) new char*[nParams] ) != NULL ); \
+			if ( cleanUp.good ) { \
+				cleanUp.params = 1; \
+				if ( paramList.isNumber( ) ) { \
+					paramList.setString( paramList.toString( ) ); \
+				} \
+				cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, value.toString( ) ) ) != NULL ); \
+			} \
+		} else { \
+			/*  it is a query like "SELECT user FROM users WHERE user_id BETWEEN $1 AND $2",	[664, 668],	function( result ) {console.log( result );} ); */ \
+			JSObject * paramObj, * paramIter; \
+			jsid indexId; \
+			bool success; \
+			\
+			indexId = JSID_VOID; \
+			paramObj = &paramList.toObject( ); \
+			JS::RootedObject 		paramObjRoot( cx, paramObj ); \
+			JS::HandleObject 		paramObjHandle ( paramObjRoot ); \
+			JS_GetArrayLength( cx, paramObjHandle, &nParams ); \
+			if ( nParams > 0 ) { \
 				cleanUp.good = ( ( cParamValues = ( const char ** ) new char*[nParams] ) != NULL ); \
 				if ( cleanUp.good ) { \
 					cleanUp.params = 1; \
-					if ( paramList.isNumber( ) ) { \
-						paramList.setString( paramList.toString( ) ); \
-					} \
-					cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, value.toString( ) ) ) != NULL ); \
-				} \
-			} else { \
-				/*  it is a query like "SELECT user FROM users WHERE user_id BETWEEN $1 AND $2",	[664, 668],	function( result ) {console.log( result );} ); */ \
-				JSObject * paramObj, * paramIter; \
-				jsid indexId; \
-				bool success; \
-				\
-				indexId = JSID_VOID; \
-				paramObj = &paramList.toObject( ); \
-				JS::RootedObject 		paramObjRoot( cx, paramObj ); \
-				JS::HandleObject 		paramObjHandle ( paramObjRoot ); \
-				JS_GetArrayLength( cx, paramObjHandle, &nParams ); \
-				if ( nParams > 0 ) { \
-					cleanUp.good = ( ( cParamValues = ( const char ** ) new char*[nParams] ) != NULL ); \
-					if ( cleanUp.good ) { \
-						cleanUp.params = 1; \
-						paramIter = JS_NewPropertyIterator( cx, paramObjHandle ); \
-						if ( paramIter != NULL ) { \
-							do { \
-								JS::RootedId			indexIdRoot( cx, indexId ); \
-								JS::HandleId			indexIdHandle( indexIdRoot ); \
-								JS::MutableHandleId		indexIdMut( &indexIdRoot ); \
-								JS::RootedValue 		valueRoot( cx, value ); \
-								JS::MutableHandleValue	valueMut( &valueRoot ); \
-								success = JS_NextProperty( cx, paramObjHandle, indexIdMut ); \
-								if ( JS_GetPropertyById( cx, paramObjHandle, indexIdHandle, valueMut ) ) { \
-									cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, value.toString( ) ) ) != NULL ); \
-									i++; \
-								} \
-							} while ( success == true && indexId != JSID_VOID && cleanUp.good ); \
-						} \
+					paramIter = JS_NewPropertyIterator( cx, paramObjHandle ); \
+					if ( paramIter != NULL ) { \
+						do { \
+							JS::RootedId			indexIdRoot( cx, indexId ); \
+							JS::HandleId			indexIdHandle( indexIdRoot ); \
+							JS::MutableHandleId		indexIdMut( &indexIdRoot ); \
+							JS::RootedValue 		valueRoot( cx, value ); \
+							JS::MutableHandleValue	valueMut( &valueRoot ); \
+							success = JS_NextProperty( cx, paramObjHandle, indexIdMut ); \
+							if ( JS_GetPropertyById( cx, paramObjHandle, indexIdHandle, valueMut ) ) { \
+								cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, value.toString( ) ) ) != NULL ); \
+								i++; \
+							} \
+						} while ( success == true && indexId != JSID_VOID && cleanUp.good ); \
 					} \
 				} \
 			} \
 		} \
-		if ( cleanUp.good ) { \
-			JS::HandleValueArray dummy = JS::HandleValueArray::empty(); \
-			cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, &fnValRoot, &dummy, false) ) != NULL ); \
+	} \
+	if ( cleanUp.good ) { \
+		JS::HandleValueArray dummy = JS::HandleValueArray::empty(); \
+		cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, &fnValRoot, &dummy, false) ) != NULL ); \
+	} \
+	if ( cleanUp.good ) { \
+		cleanUp.payload = 1; \
+		cleanUp.good = ( ( cStatement = JS_EncodeString( cx, jStatement ) ) != NULL ); \
+	} \
+	if ( cleanUp.good ) { \
+		cleanUp.statement = 1; \
+		Query_New( sqlclient, cStatement, nParams, cParamValues, handler, ( void * ) payload ); \
+	} \
+	/*  always cleanup  */ \
+	for ( i = 0; i < nParams; i++ ) { \
+		JS_free( cx, ( char * ) cParamValues[i] ); cParamValues[i] = NULL; \
+	} \
+	if ( cleanUp.params ) { \
+		delete[ ] cParamValues; 	cParamValues = NULL; \
+	} \
+	if ( cleanUp.statement ) { \
+		JS_free( cx, cStatement ); 	cStatement = NULL; \
+	} \
+	/*  get ready to return */ \
+	if ( cleanUp.good ) { \
+		args.rval().setBoolean( true ); \
+	} else { \
+		if ( cleanUp.payload ) { \
+			delete payload; payload = NULL; \
 		} \
-		if ( cleanUp.good ) { \
-			cleanUp.payload = 1; \
-			cleanUp.good = ( ( cStatement = JS_EncodeString( cx, jStatement ) ) != NULL ); \
-		} \
-		if ( cleanUp.good ) { \
-			cleanUp.statement = 1; \
-			Query_New( sqlclient, cStatement, nParams, cParamValues, handler, ( void * ) payload ); \
-		} \
-		/*  always cleanup  */ \
-		for ( i = 0; i < nParams; i++ ) { \
-			JS_free( cx, ( char * ) cParamValues[i] ); cParamValues[i] = NULL; \
-		} \
-		if ( cleanUp.params ) { \
-			delete[ ] cParamValues; 	cParamValues = NULL; \
-		} \
-		if ( cleanUp.statement ) { \
-			JS_free( cx, cStatement ); 	cStatement = NULL; \
-		} \
-		/*  get ready to return */ \
-		if ( cleanUp.good ) { \
-			args.rval().setBoolean( true ); \
-		} else { \
-			if ( cleanUp.payload ) { \
-				delete payload; payload = NULL; \
-			} \
-			args.rval().setBoolean( false ); \
-		} \
-		return ( cleanUp.good ) ? true : false; \
-	} while ( 0 );
+		args.rval().setBoolean( false ); \
+	} \
+	return ( cleanUp.good ) ? true : false; \
+} while ( 0 );
 
 #if HAVE_MYSQL == 1
 /*
- ===============================================================================
- Mysql OBJECT
- ===============================================================================
- */
+   ===============================================================================
+   Mysql OBJECT
+   ===============================================================================
+   */
 
 static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * myqlObj );
 
@@ -558,10 +577,10 @@ static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * mysqlObj ) {
 }
 #endif
 /*
- ===============================================================================
- Postgresql OBJECT
- ===============================================================================
- */
+   ===============================================================================
+   Postgresql OBJECT
+   ===============================================================================
+   */
 
 static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresqlObj );
 
@@ -586,95 +605,95 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void 
 		if ( result != NULL ) {
 			status = PQresultStatus( result );
 			switch ( status ) {
-			case PGRES_COPY_OUT:		  //  FT
-			case PGRES_COPY_IN:			  //  FT
-			case PGRES_COPY_BOTH:		  //  FT
-				//  for the moment, we do not handle all these at all
-				break;
-			case PGRES_NONFATAL_ERROR:	  //  FT
-			case PGRES_BAD_RESPONSE: 	  //  FT
-			case PGRES_FATAL_ERROR:
-				//  @code = -1;
-				break;
-			case PGRES_EMPTY_QUERY:		  //  FT
-			case PGRES_COMMAND_OK:
-			default:
-				break;
-			case PGRES_SINGLE_TUPLE:	  //  FT
-			case PGRES_TUPLES_OK:
-				rowCount = ( unsigned int ) PQntuples( result );
-				colCount = PQnfields( result );
-				for ( rowId = 0; rowId < rowCount; rowId++ ) {
-					JSObject * recordObj;
-					jsval currentVal;
-					jsval jValue;
+				case PGRES_COPY_OUT:		  //  FT
+				case PGRES_COPY_IN:			  //  FT
+				case PGRES_COPY_BOTH:		  //  FT
+					//  for the moment, we do not handle all these at all
+					break;
+				case PGRES_NONFATAL_ERROR:	  //  FT
+				case PGRES_BAD_RESPONSE: 	  //  FT
+				case PGRES_FATAL_ERROR:
+					//  @code = -1;
+					break;
+				case PGRES_EMPTY_QUERY:		  //  FT
+				case PGRES_COMMAND_OK:
+				default:
+					break;
+				case PGRES_SINGLE_TUPLE:	  //  FT
+				case PGRES_TUPLES_OK:
+					rowCount = ( unsigned int ) PQntuples( result );
+					colCount = PQnfields( result );
+					for ( rowId = 0; rowId < rowCount; rowId++ ) {
+						JSObject * recordObj;
+						jsval currentVal;
+						jsval jValue;
 
-					recordObj = NULL;
-					JS::RootedObject 		recordObjRoot( cx, recordObj );
-					JS::HandleObject 		recordObjHandle( recordObjRoot );
-					cleanUp.good = ( (recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
-					if ( ! cleanUp.good ) {
-						currentVal = OBJECT_TO_JSVAL( recordObj );
-						JS::RootedValue 	currentValRoot( cx, currentVal );
-						JS::HandleValue 	currentValHandle( currentValRoot );
-						JS_SetElement( cx, resultArrayHandle, (uint32_t) rowId, currentValHandle );
-						for ( colId = 0; colId < colCount; colId++ ) {
-							cFieldName = PQfname( result, colId );  //  speedup might be possible by caching this
-							dataType = PQftype( result, colId );
-							if ( PQgetisnull( result, (int) rowId, colId ) == 1 ) {
-								jValue = JSVAL_NULL;
-							} else {
-								cValue = PQgetvalue( result, (int) rowId, colId );
-								switch ( dataType ) {
-								//  it is possible to make a even better mapping to postgresql data types to JSAPI DATA TYPES: this relies on the settings in /usr/include/postgresql/catalog/pg_type.h
-								case 16:      //  bool
-									jValue = ( strcmp( cValue, "t" ) == 0 ) ? JSVAL_TRUE : JSVAL_FALSE;
-									break;
-								case 2278:    //  void
-									jValue = JSVAL_VOID;
-								case 20:
-								case 21:
-								case 23:
-								case 26:      //  int
-								case 700:
-								case 701:
-								case 1700:    //  digits
-									jValue = JS_NumberValue( ( double ) atof( cValue ) );
-									break;
-									//  case 702: case 703: case 704: case 1082: case 1083: case 1114: case 1184: case 1186: case 1266://time
-								case 1114: {
-									int year, month, day, hour, min, sec, f, found;
-									found = sscanf( cValue, "%4d-%2d-%2d %2d:%2d:%2d.%6d", &year, &month, &day, &hour, &min, &sec, &f );
-									if ( 7 == found ) {
-										JSObject * dateObj = JS_NewDateObject( cx, year, month, day, hour, min, sec );
-										jValue = OBJECT_TO_JSVAL( dateObj );
-										break;
-									}  //  else ft
-								}
-								case 17:
-								case 18:
-								case 19:
-								case 25:
-								case 142:
-								case 143:
-								case 194:
-								default:
-									cleanUp.good = ( ( jStr = JS_NewStringCopyZ( cx, cValue ) ) != NULL );
-									if ( cleanUp.good ) {
-										jValue = STRING_TO_JSVAL( jStr );
-									} else {
-										jValue = JSVAL_VOID;  //  not quite true
+						recordObj = NULL;
+						JS::RootedObject 		recordObjRoot( cx, recordObj );
+						JS::HandleObject 		recordObjHandle( recordObjRoot );
+						cleanUp.good = ( (recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+						if ( ! cleanUp.good ) {
+							currentVal = OBJECT_TO_JSVAL( recordObj );
+							JS::RootedValue 	currentValRoot( cx, currentVal );
+							JS::HandleValue 	currentValHandle( currentValRoot );
+							JS_SetElement( cx, resultArrayHandle, (uint32_t) rowId, currentValHandle );
+							for ( colId = 0; colId < colCount; colId++ ) {
+								cFieldName = PQfname( result, colId );  //  speedup might be possible by caching this
+								dataType = PQftype( result, colId );
+								if ( PQgetisnull( result, (int) rowId, colId ) == 1 ) {
+									jValue = JSVAL_NULL;
+								} else {
+									cValue = PQgetvalue( result, (int) rowId, colId );
+									switch ( dataType ) {
+										//  it is possible to make a even better mapping to postgresql data types to JSAPI DATA TYPES: this relies on the settings in /usr/include/postgresql/catalog/pg_type.h
+										case 16:      //  bool
+											jValue = ( strcmp( cValue, "t" ) == 0 ) ? JSVAL_TRUE : JSVAL_FALSE;
+											break;
+										case 2278:    //  void
+											jValue = JSVAL_VOID;
+										case 20:
+										case 21:
+										case 23:
+										case 26:      //  int
+										case 700:
+										case 701:
+										case 1700:    //  digits
+											jValue = JS_NumberValue( ( double ) atof( cValue ) );
+											break;
+											//  case 702: case 703: case 704: case 1082: case 1083: case 1114: case 1184: case 1186: case 1266://time
+										case 1114: {
+													   int year, month, day, hour, min, sec, f, found;
+													   found = sscanf( cValue, "%4d-%2d-%2d %2d:%2d:%2d.%6d", &year, &month, &day, &hour, &min, &sec, &f );
+													   if ( 7 == found ) {
+														   JSObject * dateObj = JS_NewDateObject( cx, year, month, day, hour, min, sec );
+														   jValue = OBJECT_TO_JSVAL( dateObj );
+														   break;
+													   }  //  else ft
+												   }
+										case 17:
+										case 18:
+										case 19:
+										case 25:
+										case 142:
+										case 143:
+										case 194:
+										default:
+												   cleanUp.good = ( ( jStr = JS_NewStringCopyZ( cx, cValue ) ) != NULL );
+												   if ( cleanUp.good ) {
+													   jValue = STRING_TO_JSVAL( jStr );
+												   } else {
+													   jValue = JSVAL_VOID;  //  not quite true
+												   }
+												   break;
 									}
-									break;
 								}
+								JS::RootedValue jValueRoot( cx, jValue );
+								JS::HandleValue jValueHandle( jValueRoot );
+								JS_SetProperty( cx, recordObjHandle, cFieldName, jValueHandle );  //  hmm, what if postgresql columns do not have ascii chars, ecma does not allow that...?
 							}
-							JS::RootedValue jValueRoot( cx, jValue );
-							JS::HandleValue jValueHandle( jValueRoot );
-							JS_SetProperty( cx, recordObjHandle, cFieldName, jValueHandle );  //  hmm, what if postgresql columns do not have ascii chars, ecma does not allow that...?
 						}
 					}
-				}
-				break;
+					break;
 			}
 			//  lastOid = ( unsigned long ) PQoidValue( res );
 			//  affected += atoi( PQcmdTuples( res ) );
@@ -733,35 +752,35 @@ static JSFunctionSpec jsmPostgresqlclient[ ] = {
 };
 
 /**
-* Connect to a postgresql server.
-*
-* @name	Hard.PostgresqlClient
-* @constructor
-* @public
-* @since	0.0.5b
-* @returns	{object}							The postgresql client javascript instance or null on failure
-* @param	{object}		params				The connection string.
-* @param	{string}		params.host			The host name for pg auth
-* @param	{string}		params.ip			The host ip
-* @param	{int}			params.port			The port number
-* @param	{string}		params.db			The database name
-* @param	{string}		params.user			The database user
-* @param	{string}		params.password		The database user password
-* @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' int the postgresql section of the configurationFile.</p>
-*
-* @example
-* var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
-* pg.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
-* 	if ( Array.isArray( res ) ) {
-* 		for ( var rowId = 0; rowId < res.length; rowId++) {
-* 				row = res[rowId];
-* 				console.log(rowId + ' ' + row.name + ' ' + row.sales );
-* 			}
-* 		}
-* 	});
-* @see	Hard.PostgresqlClient.query
-* @see	Hard.MysqlClient
-*/
+ * Connect to a postgresql server.
+ *
+ * @name	Hard.PostgresqlClient
+ * @constructor
+ * @public
+ * @since	0.0.5b
+ * @returns	{object}							The postgresql client javascript instance or null on failure
+ * @param	{object}		params				The connection string.
+ * @param	{string}		params.host			The host name for pg auth
+ * @param	{string}		params.ip			The host ip
+ * @param	{int}			params.port			The port number
+ * @param	{string}		params.db			The database name
+ * @param	{string}		params.user			The database user
+ * @param	{string}		params.password		The database user password
+ * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' int the postgresql section of the configurationFile.</p>
+ *
+ * @example
+ * var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
+ * pg.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
+ * 	if ( Array.isArray( res ) ) {
+ * 		for ( var rowId = 0; rowId < res.length; rowId++) {
+ * 				row = res[rowId];
+ * 				console.log(rowId + ' ' + row.name + ' ' + row.sales );
+ * 			}
+ * 		}
+ * 	});
+ * @see	Hard.PostgresqlClient.query
+ * @see	Hard.MysqlClient
+ */
 
 
 static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
@@ -777,10 +796,10 @@ static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresql
 	}
 }
 /*
- ===============================================================================
- Webserver OBJECT
- ===============================================================================
- */
+   ===============================================================================
+   Webserver OBJECT
+   ===============================================================================
+   */
 extern const char * MethodDefinitions[ ];
 /**
  * Webserver response object.
@@ -798,13 +817,13 @@ static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webcl
 	const char * ip, * url;
 	const unsigned int attrs = JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT;
 	struct {unsigned char ip:1;
-			unsigned char jip:1;
-			unsigned char url:1;
-			unsigned char jurl:1;
-			unsigned char method:1;
-			unsigned char cli:1;
-			unsigned char resp:1;
-			unsigned char good:1;} cleanUp;
+		unsigned char jip:1;
+		unsigned char url:1;
+		unsigned char jurl:1;
+		unsigned char method:1;
+		unsigned char cli:1;
+		unsigned char resp:1;
+		unsigned char good:1;} cleanUp;
 	//  @TODO call autocompartment, begin request etc.
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	clientObj = NULL;
@@ -935,14 +954,14 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
 static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
 	struct payload_t * payload;
-	JSObject * webserverObj, * globalObj;
+	JSObject * webserverObj;
 	JSString * jPattern;
 	JS::CallArgs args;
 	jsval fnVal;
 	char * cPattern;
 	struct {unsigned char payload:1;
-			unsigned char pattern:1;
-			unsigned char good:1;} cleanUp;
+		unsigned char pattern:1;
+		unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vpn );
@@ -950,8 +969,6 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	payload = NULL;
 	webserverObj = JS_THIS_OBJECT( cx, vpn );
 	webserver = (struct webserver_t *) JS_GetPrivate( webserverObj );
-	globalObj = JS_GetGlobalForObject( cx, webserverObj );
-	JS::RootedObject 		globalObjRoot( cx, globalObj );
 	JS::RootedValue 		fnValRoot( cx, fnVal );
 	JS::HandleValue 		fnValHandle( fnValRoot );
 	JS::MutableHandleValue 	fnValMut( &fnValRoot );
@@ -1016,8 +1033,8 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 	JSString * jDocumentRoot, * jLocation;
 	char * cDocumentRoot, * cLocation;
 	struct {	unsigned char location:1;
-				unsigned char documentRoot:1;
-				unsigned char good:1;} cleanUp;
+		unsigned char documentRoot:1;
+		unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webServerObj = JS_THIS_OBJECT( cx, vpn );
@@ -1198,43 +1215,45 @@ static bool JsnHard_Shutdown( JSContext * cx, unsigned argc, jsval * vpn ) {
 }
 
 static const JSClass jscHard = {
-	"Hard",
+	MAIN_OBJ_NAME,
 	JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
 };
 
 static const JSFunctionSpec jsmHard[ ] = {
 	JS_FS( "shutdown", 			JsnHard_Shutdown, 1, 0 ),
-	JS_FS( "onInit", 			JsnFunction_Stub, 0, 0),
+	JS_FS( "onLoad", 			JsnFunction_Stub, 0, 0),
+	JS_FS( "onReady", 			JsnFunction_Stub, 0, 0),
+	JS_FS( "onUnload", 			JsnFunction_Stub, 0, 0),
 	JS_FS_END
 };
 
 /**
-===============================================================================
-* Standard javascript object.
-* Log messages to the console and the logger
-*
-* @name console
-* @public
-* @namespace
-===============================================================================
-*/
+  ===============================================================================
+ * Standard javascript object.
+ * Log messages to the console and the logger
+ *
+ * @name console
+ * @public
+ * @namespace
+ ===============================================================================
+ */
 
 /**
-* Log a message.
-*
-* Messages will be logged to the console and the syslog in the back.
-*
-* @name	console.log
-* @function
-* @public
-* @since	0.0.5b
-* @returns	{undefined}
-* @param	{string}		message	Message to be logged.
-*
-* @example
-* console.log( 'hello world' );
-*/
+ * Log a message.
+ *
+ * Messages will be logged to the console and the syslog in the back.
+ *
+ * @name	console.log
+ * @function
+ * @public
+ * @since	0.0.5b
+ * @returns	{undefined}
+ * @param	{string}		message	Message to be logged.
+ *
+ * @example
+ * console.log( 'hello world' );
+ */
 static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct javascript_t * javascript;
 	JSObject * consoleObj;
@@ -1269,7 +1288,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 		fileName = __FILE__;
 		lineNo = __LINE__;
 #endif
-		LOG( javascript->core, LOG_INFO, "[%s:%d] : %s", fileName, lineNo, cString );
+		Core_Log( javascript->core, LOG_INFO, fileName, lineNo, cString );
 	}
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
@@ -1290,14 +1309,14 @@ static const JSFunctionSpec jsmConsole[ ] = {
 };
 
 /**
-===============================================================================
-* Standard javascript object.
-*
-* @name global
-* @public
-* @namespace
-===============================================================================
-*/
+  ===============================================================================
+ * Standard javascript object.
+ *
+ * @name global
+ * @public
+ * @namespace
+ ===============================================================================
+ */
 static void Payload_Delete( struct payload_t * payload ) {
 	JSAutoRequest ar( payload->cx );
 	payload->fnValRoot = NULL;
@@ -1308,8 +1327,8 @@ static void Payload_Delete( struct payload_t * payload ) {
 static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, const bool repeat ) {
 	struct payload_t * payload;
 	struct {unsigned char good:1;
-			unsigned char payload:1;
-			unsigned char args:1;} cleanUp;
+		unsigned char payload:1;
+		unsigned char args:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( payload = (struct payload_t *) JS_malloc( cx, sizeof( *payload ) ) ) != NULL );
@@ -1333,30 +1352,30 @@ static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::Ro
 }
 
 /**
-* Load an other javascript file.
-*
-* Files will be interpreted only upon loading. Once the file has been loaded, any changes to the file will be ignored. The files will be relative to the 'javascript/scripts_path' configuration settings.
-*
-* @name	include
-* @function
-* @public
-* @since	0.0.5b
-* @returns	{null}
-* @param	{string}		scriptname	File that will be interpreted upon loading.
-*
-* @example
-* try {
-* 	include( './framework/orm.js' );
-* 	include( './models/customers.js' );
-* 	include( './models/purchases.js' );
-* 	include( './bizlog/invoice.js' );
-* 	include( './tools/pdf.js' );
-* 	include( './layouts/invoice.js' );
-* 	include( './bizlog/archive.js' );
-* } catch ( e ) {
-* 	console.log( 'loading failed: ' + e.getMessage() );
-* }
-*/
+ * Load an other javascript file.
+ *
+ * Files will be interpreted only upon loading. Once the file has been loaded, any changes to the file will be ignored. The files will be relative to the 'javascript/scripts_path' configuration settings.
+ *
+ * @name	include
+ * @function
+ * @public
+ * @since	0.0.5b
+ * @returns	{null}
+ * @param	{string}		scriptname	File that will be interpreted upon loading.
+ *
+ * @example
+ * try {
+ * 	include( './framework/orm.js' );
+ * 	include( './models/customers.js' );
+ * 	include( './models/purchases.js' );
+ * 	include( './bizlog/invoice.js' );
+ * 	include( './tools/pdf.js' );
+ * 	include( './layouts/invoice.js' );
+ * 	include( './bizlog/archive.js' );
+ * } catch ( e ) {
+ * 	console.log( 'loading failed: ' + e.getMessage() );
+ * }
+ */
 static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct javascript_t * javascript;
 	JSString * jFile;
@@ -1421,153 +1440,153 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 }
 
 #define JAVASCRIPT_GLOBAL_SET_TIMER( repeat ) do { \
-		struct javascript_t * javascript; \
-		struct payload_t * payload; \
-		struct timing_t * timing; \
-		JSObject * globalObj; \
-		JS::CallArgs args; \
-		int ms; \
-		struct { 	unsigned char payload:1; \
-					unsigned char timer:1; \
-					unsigned char good:1;} cleanUp; \
-		memset( &cleanUp, 0, sizeof( cleanUp ) ); \
-		JS::RootedValue 		dummy( cx ); \
-		JS::HandleValue 		dummyHandle( dummy ); \
-		JS::RootedValue 		fnVal( cx ); \
-		JS::MutableHandleValue	fnValMut( &fnVal ); \
-		payload = NULL; \
-		timing = NULL; \
-		args = CallArgsFromVp( argc, vpn ); \
-		globalObj = JS_THIS_OBJECT( cx, vpn ); \
-		javascript = (struct javascript_t *) JS_GetPrivate( globalObj ); \
-		cleanUp.good = ( JS_ConvertArguments( cx, args, "fi", &dummy, &ms ) == true ); \
-		if ( cleanUp.good ) { \
-			cleanUp.good = ( JS_ConvertValue( cx, dummyHandle, JSTYPE_FUNCTION, fnValMut ) == true ); \
-		} \
-		if ( cleanUp.good ) { \
-			if (args.length() > 2 ) { \
-				JS::HandleValueArray argsAt2 = JS::HandleValueArray::fromMarkedLocation( argc - 2, vpn ); \
-				cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false ) ) != NULL ); \
-			} else { \
-				JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty(); \
-				cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false) ) != NULL ); \
-			} \
-		} \
-		if ( cleanUp.good ) { \
-			cleanUp.payload = 1; \
-			cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, repeat, Payload_Timing_ResultHandler_cb, (void * ) payload ) ) != NULL ); \
-		} \
-		if ( cleanUp.good ) { \
-			cleanUp.timer = 1; \
-			timing->clearFunc_cb = (timerHandler_cb_t) Payload_Delete; \
-			args.rval().setInt32( (int32_t) timing->identifier ); \
+	struct javascript_t * javascript; \
+	struct payload_t * payload; \
+	struct timing_t * timing; \
+	JSObject * globalObj; \
+	JS::CallArgs args; \
+	int ms; \
+	struct {	unsigned char payload:1; \
+				unsigned char timer:1; \
+				unsigned char good:1;} cleanUp; \
+	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
+	JS::RootedValue 		dummy( cx ); \
+	JS::HandleValue 		dummyHandle( dummy ); \
+	JS::RootedValue 		fnVal( cx ); \
+	JS::MutableHandleValue	fnValMut( &fnVal ); \
+	payload = NULL; \
+	timing = NULL; \
+	args = CallArgsFromVp( argc, vpn ); \
+	globalObj = JS_THIS_OBJECT( cx, vpn ); \
+	javascript = (struct javascript_t *) JS_GetPrivate( globalObj ); \
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "fi", &dummy, &ms ) == true ); \
+	if ( cleanUp.good ) { \
+		cleanUp.good = ( JS_ConvertValue( cx, dummyHandle, JSTYPE_FUNCTION, fnValMut ) == true ); \
+	} \
+	if ( cleanUp.good ) { \
+		if (args.length() > 2 ) { \
+			JS::HandleValueArray argsAt2 = JS::HandleValueArray::fromMarkedLocation( argc - 2, vpn ); \
+			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false ) ) != NULL ); \
 		} else { \
-			if ( cleanUp.timer ) { \
-				Core_DelTiming( javascript->core, timing ); \
-			} \
-			if ( cleanUp.payload ) { \
-				Payload_Delete( payload ); payload = NULL; \
-			} \
-			args.rval().setUndefined(); \
+			JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty(); \
+			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false) ) != NULL ); \
 		} \
-		return ( cleanUp.good ) ? true : false; \
-	} while ( 0 );
+	} \
+	if ( cleanUp.good ) { \
+		cleanUp.payload = 1; \
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, repeat, Payload_Timing_ResultHandler_cb, (void * ) payload ) ) != NULL ); \
+	} \
+	if ( cleanUp.good ) { \
+		cleanUp.timer = 1; \
+		timing->clearFunc_cb = (timerHandler_cb_t) Payload_Delete; \
+		args.rval().setInt32( (int32_t) timing->identifier ); \
+	} else { \
+		if ( cleanUp.timer ) { \
+			Core_DelTiming( javascript->core, timing ); \
+		} \
+		if ( cleanUp.payload ) { \
+			Payload_Delete( payload ); payload = NULL; \
+		} \
+		args.rval().setUndefined(); \
+	} \
+	return ( cleanUp.good ) ? true : false; \
+} while ( 0 );
 
 /**
-* Calls a function after a certain delay.
-*
-* @name	setTimeout
-* @function
-* @public
-* @since	0.0.5b
-* @returns	{integer}				An Id that eventually can be used to stop the timeout, or null on error.
-* @param	{function}	fn			A Javascript function that will be called after a delay.
-* @param	{integer}	delay		The delay in ms.
-* @param	{mixed}		[arguments]	Parameters arg1, arg2, ..
-*
-* @example
-* var timeoutId = setInterval(function(a, b) {
-*  	Hard.log('Foo : ' + a + ' Bar : ' + b);
-*  }, 3000, 'foo', 'bar');
-*  ClearTimeout(timeoutId);
-*
-* @see	setInterval
-* @see	clearTimeout
-* @see	clearInterval
-*/
+ * Calls a function after a certain delay.
+ *
+ * @name	setTimeout
+ * @function
+ * @public
+ * @since	0.0.5b
+ * @returns	{integer}				An Id that eventually can be used to stop the timeout, or null on error.
+ * @param	{function}	fn			A Javascript function that will be called after a delay.
+ * @param	{integer}	delay		The delay in ms.
+ * @param	{mixed}		[arguments]	Parameters arg1, arg2, ..
+ *
+ * @example
+ * var timeoutId = setInterval(function(a, b) {
+ *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ *  }, 3000, 'foo', 'bar');
+ *  ClearTimeout(timeoutId);
+ *
+ * @see	setInterval
+ * @see	clearTimeout
+ * @see	clearInterval
+ */
 
 static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
 	JAVASCRIPT_GLOBAL_SET_TIMER( 0 )
-	return false;
+		return false;
 }
 
 /**
-* Calls a function repeatedly, with a fixed time delay between each call to that function.
-*
-* @name	setInterval
-* @function
-* @public
-* @since	0.0.5b
-* @returns	{integer}				An Id that eventually can be used to stop the timeout, or null on error.
-* @param	{function}	fn			A Javascript function that will be called after a delay.
-* @param	{integer}	delay		The delay in ms.
-* @param	{mixed}		[arguments]	Parameters arg1, arg2, ..
-*
-* @example
-* var timeoutId = setInterval(function(a, b) {
-*  	Hard.log('Foo : ' + a + ' Bar : ' + b);
-*  }, 3000, 'foo', 'bar');
-*  clearInterval(timeoutId);
-*
-* @see	setTimeout
-* @see	clearTimeout
-* @see	clearInterval
-*/
+ * Calls a function repeatedly, with a fixed time delay between each call to that function.
+ *
+ * @name	setInterval
+ * @function
+ * @public
+ * @since	0.0.5b
+ * @returns	{integer}				An Id that eventually can be used to stop the timeout, or null on error.
+ * @param	{function}	fn			A Javascript function that will be called after a delay.
+ * @param	{integer}	delay		The delay in ms.
+ * @param	{mixed}		[arguments]	Parameters arg1, arg2, ..
+ *
+ * @example
+ * var timeoutId = setInterval(function(a, b) {
+ *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ *  }, 3000, 'foo', 'bar');
+ *  clearInterval(timeoutId);
+ *
+ * @see	setTimeout
+ * @see	clearTimeout
+ * @see	clearInterval
+ */
 
 static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) {
 	JAVASCRIPT_GLOBAL_SET_TIMER( 0 );
 	return false;
 }
 /**
-* Cancel a timeout created by setTimeout.
-*
-* @name	clearTimeout
-* @function
-* @public
-* @since	0.0.5b
-* @returns	{null}
-* @param	{integer}		timerId	Reference to a timer that needs to be stopped.
-*
-* @example
-* var timeoutId = setInterval(function(a, b) {
-*  	Hard.log('Foo : ' + a + ' Bar : ' + b);
-*  }, 3000, 'foo', 'bar');
-*  ClearTimeout(timeoutId);
-*
-* @see	setInterval
-* @see	setTimeout
-* @see	clearInterval
-*/
+ * Cancel a timeout created by setTimeout.
+ *
+ * @name	clearTimeout
+ * @function
+ * @public
+ * @since	0.0.5b
+ * @returns	{null}
+ * @param	{integer}		timerId	Reference to a timer that needs to be stopped.
+ *
+ * @example
+ * var timeoutId = setInterval(function(a, b) {
+ *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ *  }, 3000, 'foo', 'bar');
+ *  ClearTimeout(timeoutId);
+ *
+ * @see	setInterval
+ * @see	setTimeout
+ * @see	clearInterval
+ */
 /**
-* Cancel a timeout created by setInterval.
-*
-* @name	clearInterval
-* @function
-* @public
-* @since	0.0.5b
-* @returns	{null}
-* @param	{integer}		timerId	Reference to a timer that needs to be stopped.
-*
-* @example
-* var timeoutId = setInterval(function(a, b) {
-*  	Hard.log('Foo : ' + a + ' Bar : ' + b);
-*  }, 3000, 'foo', 'bar');
-*  clearInterval(timeoutId);
-*
-* @see	setInterval
-* @see	setTimeout
-* @see	clearTimeout
-*/
+ * Cancel a timeout created by setInterval.
+ *
+ * @name	clearInterval
+ * @function
+ * @public
+ * @since	0.0.5b
+ * @returns	{null}
+ * @param	{integer}		timerId	Reference to a timer that needs to be stopped.
+ *
+ * @example
+ * var timeoutId = setInterval(function(a, b) {
+ *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ *  }, 3000, 'foo', 'bar');
+ *  clearInterval(timeoutId);
+ *
+ * @see	setInterval
+ * @see	setTimeout
+ * @see	clearTimeout
+ */
 static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct javascript_t * javascript;
 	unsigned int identifier;
@@ -1604,36 +1623,50 @@ static const JSFunctionSpec jsmGlobal[ ] = {
 };
 
 /*
-===============================================================================
-BOILERPLATE
-===============================================================================
-*/
-static bool Javascript_IncludeScript( const struct javascript_t * javascript, const char * cfile ) {
-	char fileNameWithPath[512];
-	struct { unsigned char good:1;} cleanUp;
+   ===============================================================================
+   BOILERPLATE
+   ===============================================================================
+   */
+static bool Javascript_IncludeScript( const struct javascript_t * javascript, const char * cFile ) {
+	JSScript * script;
+	char * fileNameWithPath;
+	int len;
+	struct { unsigned char good:1;
+		unsigned char fn:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSAutoRequest ar( javascript->context );
-	memset( fileNameWithPath, '\0', sizeof( fileNameWithPath ) );
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	strncpy( fileNameWithPath, javascript->path, 255 );
-	strncat( fileNameWithPath, cfile, 255 );
-	LOG( javascript->core, LOG_INFO, "[%14s] Loading script %s", __FILE__, fileNameWithPath );
+	script = NULL;
+	len = strlen( cFile ) + strlen( javascript->path ) + 2;
+	cleanUp.good = ( ( fileNameWithPath = (char *) malloc( len ) ) != NULL );
 	if (cleanUp.good ) {
+		cleanUp.fn = 1;
+		snprintf( fileNameWithPath, len, "%s/%s", javascript->path, cFile );
+		JSAutoRequest ar( javascript->context );
+		JSAutoCompartment ac( javascript->context, javascript->globalObj );
 		JS::HandleObject 		globalObjHandle( javascript->globalObj );
-		JS::RootedScript 		script( javascript->context );
+		JS::RootedScript 		scriptRoot( javascript->context, script );
+		JS::HandleScript		scriptHandle( scriptRoot );
+		JS::MutableHandleScript	scriptMut( &scriptRoot );
 		JS::CompileOptions		options( javascript->context );
 		options.setIntroductionType( "js include" )
 			.setUTF8(true)
-			.setFileAndLine( cfile, 1)
+			.setFileAndLine( cFile, 1)
 			.setCompileAndGo( true )
 			.setNoScriptRval( true );
-		cleanUp.good = ( JS::Compile( javascript->context, globalObjHandle, options, fileNameWithPath, &script ) == true );
+		cleanUp.good = 0; //  to reuse the JS:: scope, we deviate now from the cleanUp.good style
+		if ( JS::Compile( javascript->context, globalObjHandle, options, fileNameWithPath, scriptMut ) == true ) {
+			if ( JS_ExecuteScript( javascript->context, globalObjHandle, scriptHandle ) == true ) {
+				cleanUp.good = 1;
+			}
+		}
 	}
 	if ( cleanUp.good ) {
-		LOG( javascript->core, LOG_INFO, "[%14s] Failed loading script %s", __FILE__, fileNameWithPath );
+		Core_Log( javascript->core, LOG_INFO, cFile, 0, "Script loaded" );
+	} else {
+		Core_Log( javascript->core, LOG_INFO, cFile, 0, "Script could not be loaded" );
 	}
-	if ( ! cleanUp.good ) {
+	if ( cleanUp.fn ) {
+		free( fileNameWithPath ); fileNameWithPath = NULL;
 	}
 	return ( cleanUp.good ) ? true : false;
 }
@@ -1648,28 +1681,42 @@ static bool Javascript_IncludeScript( const struct javascript_t * javascript, co
  * @returns	{null}
  */
 static int Javascript_Run( struct javascript_t * javascript ) {
+	struct {unsigned char good:1;}cleanUp;
 
-	JSAutoCompartment ac( javascript->context, javascript->globalObj );
-	JS::RootedValue rVal( javascript->context );
-	JS::MutableHandleValue rValMut( &rVal );
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	JSAutoRequest 				ar( javascript->context );
+	JSAutoCompartment 			ac( javascript->context, javascript->globalObj );
+	JS::RootedObject			globalObjRoot( javascript->context, javascript->globalObj );
+	JS::HandleObject			globalObjHandle( globalObjRoot );
 
-	JS::RootedObject consoleObj( javascript->context, JS_NewObject( javascript->context, &jscConsole, JS::NullPtr( ), JS::NullPtr( ) ) );
-	JS::HandleObject consoleObjHandle( consoleObj );
-	JS_SetPrivate( consoleObj, (void * ) javascript );
+	JSObject * consoleObj;
+	consoleObj = JS_NewObject( javascript->context, &jscConsole, JS::NullPtr( ), globalObjHandle );
+	JS::RootedObject 			consoleObjRoot( javascript->context, consoleObj );
+	JS::HandleObject 			consoleObjHandle( consoleObjRoot );
 	JS_DefineFunctions( javascript->context, consoleObjHandle, jsmConsole );
+	JS_SetPrivate( consoleObj, (void * ) javascript );
 
-	JS::RootedObject hardObj( javascript->context, JS_NewObject( javascript->context, &jscHard, JS::NullPtr( ), JS::NullPtr( ) ) );
-	JS::HandleObject hardObjHandle( consoleObj );
-	JS_SetPrivate( hardObj, (void * ) javascript );
+	JSObject * hardObj;
+	hardObj = JS_NewObject( javascript->context, &jscHard, JS::NullPtr( ), globalObjHandle );
+	JS::RootedObject 			hardObjRoot( javascript->context, hardObj );
+	JS::HandleObject 			hardObjHandle( hardObjRoot );
 	JS_DefineFunctions( javascript->context, hardObjHandle, jsmHard );
+	JS_SetPrivate( hardObj, (void * ) javascript );
 
-	JS::RootedObject WebserverObj( javascript->context, JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscWebserver, JsnWebserver_Constructor, 3, nullptr, nullptr, nullptr, nullptr ) );
+	JSObject * webserverObj;
+	webserverObj = 	JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscWebserver, JsnWebserver_Constructor, 3, nullptr, nullptr, nullptr, nullptr );
+	JS::RootedObject webserverObjRoot( javascript->context, webserverObj );
 #if HAVE_MYSQL == 1
-	JS::RootedObject MysqlclientObj( javascript->context, JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 5, nullptr, nullptr, nullptr, nullptr ) );
+	JSObject * mysqlclientObj = JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 2, nullptr, nullptr, nullptr, nullptr );
+	JS::RootedObject mysqlclientObjRoot( javascript->context, mysqlclienObj );
 #endif
-	JS::RootedObject PgsqlclientObj( javascript->context, JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 5, nullptr, nullptr, nullptr, nullptr ) );
-	JS_CallFunctionName( javascript->context, hardObjHandle, "onInit", JS::HandleValueArray::empty(), rValMut );
-	return 0;
+	JSObject * postgresqlObj;
+	postgresqlObj =  JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 2, nullptr, nullptr, nullptr, nullptr );
+	JS::RootedObject pgsqlclientObj( javascript->context, postgresqlObj );
+
+	cleanUp.good = ( Javascript_IncludeScript( javascript, javascript->fileName ) ) ? 1: 0 ;
+
+	return cleanUp.good;
 }
 
 static int Javascript_Init( struct javascript_t * javascript ) {
@@ -1697,18 +1744,21 @@ static int Javascript_Init( struct javascript_t * javascript ) {
 	}
 	if ( cleanUp.good ) {
 		JS_SetPrivate( javascript->globalObj, ( void * ) javascript );
-		cleanUp.good = ( Javascript_Run( javascript ) != 0 );
+		cleanUp.good = ( Javascript_Run( javascript ) ) ? 1: 0;
 	}
-
 	return cleanUp.good;
 }
 
 static void JsnReport_Error( JSContext * cx, const char * message, JSErrorReport * report ) {
 	struct javascript_t * javascript;
-	const char * fileName;
-	const char * state;
+	const char * fileName, * state;
+	char * messageFmt;
 	int level;
+	size_t len;
+	struct {unsigned char good:1;
+			unsigned char msg:1;} cleanUp;
 
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	javascript = (struct javascript_t *) JS_GetContextPrivate( cx );
 	//  http://egachine.berlios.de/embedding-sm-best-practice/ar01s02.html#id2464522
 	fileName = (report->filename != NULL)? report->filename : "<no filename>";
@@ -1743,15 +1793,23 @@ static void JsnReport_Error( JSContext * cx, const char * message, JSErrorReport
 		state = "Exception";
 		level = LOG_CRIT;
 	}
-	LOG( javascript->core, level, "[%s:%d] : %s/%d: %s", fileName, report->lineno, state, report->errorNumber, message );
+	len = 4 + 1 + 3 +strlen( state) + strlen( message );
+	cleanUp.good = ( ( messageFmt = (char *) malloc( len ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.msg = 1;
+		len = snprintf( messageFmt, len, "%s/%3d:\t%s", state, report->errorNumber, message );
+		Core_Log( javascript->core, level, fileName, report->lineno, messageFmt );
+	}
+	if ( cleanUp.msg ) {
+		free( messageFmt ); message = NULL;
+	}
 }
 
 struct javascript_t * Javascript_New( const struct core_t * core, const char * path, const char * fileName ) {
 	struct javascript_t * javascript;
-#define MAX_PATH_LENGTH 512
-	char fullPath[MAX_PATH_LENGTH];
 	struct {	unsigned char good:1;
 				unsigned char path:1;
+				unsigned char fileName:1;
 				unsigned char jsinit:1;
 				unsigned char runtime:1;
 				unsigned char context:1;
@@ -1763,10 +1821,13 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	if ( cleanUp.good ) {
 		cleanUp.javascript = 1;
 		javascript->core = ( struct core_t *) core;
-		cleanUp.good = ( ( javascript->path = strdup( path ) ) != NULL );
+		cleanUp.good = ( ( javascript->path = Xstrdup( path ) ) != NULL );
 	}
 	if 	( cleanUp.good ) {
 		cleanUp.path = 1;
+		cleanUp.good = ( ( javascript->fileName = Xstrdup( fileName ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
 		if ( jsInterpretersAlive == 0 ) {
 			cleanUp.good = ( JS_Init( ) == true );
 			jsInterpretersAlive++;
@@ -1801,10 +1862,6 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	}
 	if ( cleanUp.good ) {
 		cleanUp.init = 1;
-		FullPath( fullPath, MAX_PATH_LENGTH, path, fileName );
-		cleanUp.good = Javascript_IncludeScript( javascript, fullPath );
-	}
-	if ( cleanUp.good ) {
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.context ) {
@@ -1818,6 +1875,9 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 				JS_ShutDown( );
 				jsInterpretersAlive--;
 			}
+		}
+		if ( cleanUp.fileName ) {
+			free( (char *) javascript->fileName ); javascript->fileName = NULL;
 		}
 		if ( cleanUp.path ) {
 			free( (char *) javascript->path ); javascript->path = NULL;
@@ -1839,6 +1899,7 @@ void Javascript_Delete( struct javascript_t * javascript ) {
 	JS_DestroyRuntime( javascript->runtime );
 
 	free( (char *) javascript->path ); javascript->path = NULL;
+	free( (char *) javascript->fileName ); javascript->fileName = NULL;
 	javascript->core = NULL;
 	free( javascript ); javascript = NULL;
 

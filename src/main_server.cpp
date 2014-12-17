@@ -53,28 +53,35 @@ int main( int argc, const char ** argv ) {
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
 		cleanUp.good = ( ( webserverModule = Module_New( "webserver", NULL, NULL, NULL, NULL ) ) != NULL );
-		Core_AddModule( core, webserverModule );
-
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Core_AddModule( core, webserverModule ) ) ? 1 : 0;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.webserver = 1;
 		cleanUp.good = ( ( pgSqlclientModule = Module_New( "postgresql", NULL, NULL, NULL, NULL ) ) != NULL );
-		Core_AddModule( core, pgSqlclientModule );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Core_AddModule( core, pgSqlclientModule ) ) ? 1 : 0 ;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.pgSqlclient = 1;
 #if HAVE_MYSQL == 1
 		cleanUp.good = ( ( mySqlclientModule = Module_New( "mysqlclient", NULL, NULL, NULL, NULL ) ) != NULL );
-		Core_AddModule( core, mySqlclientModule );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Core_AddModule( core, mySqlclientModule ) ) ? 1 : 0;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.mySqlclient = 1;
 #endif
-		cleanUp.good = ( ( javascriptModule = Module_New( "javascript", NULL, NULL, NULL, NULL ) ) != NULL );
-		Core_AddModule( core, javascriptModule );
+		cleanUp.good = ( ( javascriptModule = Module_New( "javascript", JavascriptModule_Load, JavascriptModule_Ready, JavascriptModule_Unload, NULL ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-	cleanUp.javascript = 1;
+		cleanUp.good = ( Core_AddModule( core, javascriptModule ) ) ? 1 : 0 ;
+	}
+	if ( cleanUp.good ) {
+		cleanUp.javascript = 1;
 		cleanUp.good = ( Core_PrepareDaemon( core, SignalHandler ) == 1 );
 	}
 	if ( cleanUp.good ) {

@@ -10,6 +10,7 @@
 #include <sys/resource.h>
 
 #include "core.h"
+#include "utils.h"
 
 #include "configuration.h"
 /*****************************************************************************/
@@ -56,8 +57,9 @@ struct module_t * Module_New ( const char * name, const moduleHandler_cb_t onLoa
 		module->onReady = onReady;
 		module->onUnload = onUnload;
 		module->cbArgs = cbArgs;
+		module->instance = NULL;
 		PR_INIT_CLIST( &module->mLink );
-		cleanUp.name = ( ( module->name = strdup( name ) ) != NULL );
+		cleanUp.name = ( ( module->name =  Xstrdup( name ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.name = 1;
@@ -70,6 +72,7 @@ struct module_t * Module_New ( const char * name, const moduleHandler_cb_t onLoa
 		module->onLoad = NULL;
 		module->onReady = NULL;
 		module->onUnload = NULL;
+		module->instance = NULL;
 		PR_INIT_CLIST( &module->mLink );
 		if ( cleanUp.module ) {
 			free( module ); module = NULL;
@@ -84,6 +87,7 @@ void Module_Delete ( struct module_t * module ) {
 	module->onLoad = NULL;
 	module->onReady = NULL;
 	module->onUnload = NULL;
+	module->instance = NULL;
 	PR_INIT_CLIST( &module->mLink );
 	free( module ); module = NULL;
 }
@@ -207,16 +211,24 @@ struct core_t * Core_New( const cfg_t * config ) {
 
 	return core;
 }
-void Core_Log( const struct core_t * core, int logLevel, const char * fmt, ... ) {
-	char *message;
-	va_list val;
 
-	va_start( val, fmt );
-	vasprintf( &message, fmt, val );
-	va_end( val );
-	core->logger.logFun( logLevel, "%", message );
+void Core_Log( const struct core_t * core, const int logLevel, const char * fileName, const int lineNr, const char * message ) {
+	char * line;
+	size_t len;
+	struct {unsigned char good:1;
+			unsigned char line:1;} cleanUp;
 
-	free( message ); message = NULL;
+	len = strlen( fileName ) + strlen( message ) + 4 +5 + 1;
+	cleanUp.good = ( ( line = malloc( len ) ) != NULL );
+	printf( "[%s:%5d]\t%s\n", fileName, lineNr, message );
+	if ( cleanUp.good ) {
+		cleanUp.line = 1;
+		snprintf( line, len, "[%s:%5d]\t%s", fileName, lineNr, message );
+		core->logger.logFun( logLevel, "%", message );
+	}
+	if ( cleanUp.line ) {
+		free( line ); line = NULL;
+	}
 }
 
 int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t signalHandler ) {
@@ -285,28 +297,38 @@ static void Core_ProcessTick( struct core_t * core ) {
 	}
 }
 
-void Core_Loop( struct core_t * core ) {
+int Core_Loop( struct core_t * core ) {
 	struct module_t * module, * firstModule;
 	PRCList * next;
+	struct {unsigned char good:1;} cleanUp;
 
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = 1;
 	firstModule = module = core->modules;
 	if ( firstModule != NULL ) {
 		do {
 			next = PR_NEXT_LINK( &module->mLink );
 			if ( module->onReady != NULL )  {
-					module->onReady ( module->cbArgs );
+					cleanUp.good = ( module->onReady ( core, module, module->cbArgs ) ) ? 1 : 0 ;
 			}
 			module = FROM_NEXT_TO_ITEM( struct module_t );
-		} while ( module != firstModule );
+		} while ( cleanUp.good && module != firstModule );
 	}
-	core->keepOnRunning = 1;
-	while ( core->keepOnRunning == 1 )  {
-		Core_ProcessTick( core );
-		picoev_loop_once( core->loop, 0 );
+	if ( cleanUp.good ) {
+		core->keepOnRunning = 1;
+		while ( core->keepOnRunning == 1 )  {
+			Core_ProcessTick( core );
+			picoev_loop_once( core->loop, 0 );
+		}
 	}
+	return (cleanUp.good)? 1: 0;
 }
 
-void Core_AddModule( struct core_t * core, struct module_t * module ) {
+int Core_AddModule( struct core_t * core, struct module_t * module ) {
+	struct {unsigned char good:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = 1;
 	if ( module != NULL ) {
 		if ( core->modules == NULL ) {
 			core->modules = module;
@@ -314,15 +336,19 @@ void Core_AddModule( struct core_t * core, struct module_t * module ) {
 			PR_APPEND_LINK( &module->mLink, &core->modules->mLink );
 		}
 		if ( module->onLoad != NULL ) {
-			module->onLoad( module->cbArgs );
+			cleanUp.good = ( module->onLoad( core, module, module->cbArgs ) ) ? 1 : 0;
 		}
 	}
+	return ( cleanUp.good ) ? 1 : 0;
 }
 
-void Core_DelModule( struct core_t * core, struct module_t * module ) {
+int Core_DelModule( struct core_t * core, struct module_t * module ) {
 	struct module_t * moduleFirst, * moduleNext;
 	PRCList * next;
+	struct {unsigned char good:1;}cleanUp;
 
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = 1;
 	moduleFirst = core->modules;
 	if ( module == moduleFirst ){
 		next = PR_NEXT_LINK( &module->mLink );
@@ -335,9 +361,10 @@ void Core_DelModule( struct core_t * core, struct module_t * module ) {
 	}
 	PR_REMOVE_AND_INIT_LINK( &module->mLink );
 	if ( module->onUnload != NULL ) {
-		module->onUnload( module->cbArgs );
+		cleanUp.good = ( module->onUnload( core, module, module->cbArgs ) ) ? 1 : 0;
 	}
 	Module_Delete( module ); module = NULL;
+	return ( cleanUp.good ) ? 1 : 0;
 }
 
 struct timing_t * Core_AddTiming ( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs ) {

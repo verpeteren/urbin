@@ -36,7 +36,9 @@ H1. Project organisation
 
 H2. Codestyle
 
-Following ID software's code style guide: http://www.geeks3d.com/downloads/200811/idSoftware-Coding-Conventions-Geeks3D.com.pdf
+
+* Following ID software's code style guide: http://www.geeks3d.com/downloads/200811/idSoftware-Coding-Conventions-Geeks3D.com.pdf
+* Take track of memory alloctions and the appropiate cleanup with an anonymous struct see http://blog.staila.com/?p=114 for details
 
 H2. Dependencies
 

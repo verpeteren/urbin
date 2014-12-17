@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+char * 								Xstrdup							( const char* str );
 int									FullPath						( char target[], const size_t size, const char * path, const char * filename );
 char *								FileGetContents					( const char * fileName );
 

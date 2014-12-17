@@ -105,7 +105,7 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 	if ( cleanUp.good ) {
 		cleanUp.route = 1;
 		route->cbArgs = cbArgs;
-		cleanUp.good = ( ( route->orgPattern = strdup( pattern ) ) != NULL );
+		cleanUp.good = ( ( route->orgPattern = Xstrdup( pattern ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.orgPattern = 1;
@@ -118,7 +118,7 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 		PR_INIT_CLIST( &route->mLink );
 		switch ( route->routeType ) {
 			case ROUTETYPE_DOCUMENTROOT:
-				cleanUp.good = ( ( route->details.documentRoot = strdup( details ) ) != NULL );
+				cleanUp.good = ( ( route->details.documentRoot = Xstrdup( details ) ) != NULL );
 				if ( cleanUp.good ) {
 					cleanUp.documentRoot = 1;
 				}
@@ -255,7 +255,7 @@ static void Webclient_Render##name( struct webclient_t * webclient) { \
 	} \
 	webclient->response.contentType = CONTENTTYPE_BUFFER; \
 	webclient->response.mimeType = MIMETYPE_HTML; \
-	cleanUp.good = ( ( webclient->response.content = strdup( webpage ) ) != NULL ); \
+	cleanUp.good = ( ( webclient->response.content = Xstrdup( webpage ) ) != NULL ); \
 	if ( cleanUp.good ) { \
 		cleanUp.content = 1; \
 		webclient->response.contentLength = strlen( webclient->response.content ); \
@@ -584,7 +584,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 		picoev_set_timeout( loop, fd, webclient->webserver->timeoutSec );
 		if ( ! webclient->response.headersSent ) {
 			ssize_t headerLength, wroteHeader;
-			struct tm tm;
+			struct tm * tm_info;
 			char headerBuffer[HTTP_BUFF_LENGTH];
 			const char * contentTypeString;
 			const char * connectionString;
@@ -595,8 +595,9 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 			webclient->response.end = time( 0 );
 			contentTypeString = MimeTypeDefinitions[webclient->response.mimeType].applicationString;
 			connectionString = (webclient->connection == CONNECTION_CLOSE ) ? "Close" : "Keep-Alive";
-			gmtime_r( &webclient->response.end , &tm);
-			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", &tm );
+			time( &webclient->response.end );
+			tm_info = localtime( &webclient->response.end );
+			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", tm_info );
 			headerLength = HTTP_SERVER_TEMPLATE_SIZE;
 			headerLength = (ssize_t) snprintf( headerBuffer, headerLength, HTTP_SERVER_TEMPLATE, HTTP_SERVER_TEMPLATE_ARGS );
 			wroteHeader = write( fd, headerBuffer, headerLength /*  , flags | MSG_MORE  */ );
@@ -730,7 +731,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 		if ( listenBacklog == 0 ) {
 			listenBacklog = PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG;
 		}
-		cleanUp.good = ( ( webserver->ip = strdup( ip ) ) != NULL );
+		cleanUp.good = ( ( webserver->ip = Xstrdup( ip ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
