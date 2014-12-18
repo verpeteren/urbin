@@ -1,3 +1,5 @@
+var a  = Hard;
+
 /*
 try {
 	console.log( "hee" );

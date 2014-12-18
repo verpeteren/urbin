@@ -15,12 +15,16 @@ struct payload_t {
 	JS::HandleValueArray *			argsHVA;
 	bool							repeat;
 };
+struct script_t {
+	char *						fileNameWithPath;
+	JSScript *					bytecode;
+	PRCList						mLink;
+};
 
 static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, const bool repeat );
 static int 							Payload_Timing_ResultHandler_cb	( void * cbArgs );
 static void 						Payload_Delete					( struct payload_t * payload );
-static bool 						Javascript_IncludeScript		( const struct javascript_t * javascript, const char * cfile );
-
+static struct script_t * 			Javascript_AddScript			( struct javascript_t * javascript, const char * fileName );
 static int jsInterpretersAlive = 0;
 
 /*#  @TODO:  from inline back to macro   define JAVASCRIPT_MODULE_ACTION( action ) \*/
@@ -30,6 +34,7 @@ inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, co
 		jsval hardVal;
 
 		hardObj = NULL;
+		hardVal = JSVAL_NULL;
 		JSAutoRequest			ar( javascript->context );
 		JSAutoCompartment		ac( javascript->context, javascript->globalObj );
 		JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
@@ -219,6 +224,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 		JS::RootedObject connObjRoot( cx, connObj ); \
 		JS::HandleObject connObjHandle( connObjRoot ); \
 		jsval value; \
+		value = JSVAL_NULL; \
 		JS::RootedValue valueRoot( cx, value ); \
 		JS::MutableHandleValue valueMut( &valueRoot ); \
 		/*  Refer to http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS for more details. */ \
@@ -235,7 +241,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 	JS::RootedObject thisObjRoot( cx, thisObj ); \
 	if ( cleanUp.good ) { \
-		globalObj = JS_GetGlobalForObject( cx, thisObj ); \
+		globalObj = JS_GetGlobalForObject( cx, &args.callee( ) ); \
 		instance = (struct javascript_t * ) JS_GetPrivate( globalObj ); \
 		cleanUp.good = ( ( sqlclient = engine_new( instance->core, cHostName, cIp, (uint16_t) port, cUserName, cPassword, cDbName, (unsigned char) timeoutSec ) ) != NULL ); \
 	} \
@@ -271,6 +277,8 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	\
 	payload = ( struct payload_t * ) query->cbArgs; \
 	globalObj = NULL; \
+	retVal = JSVAL_NULL; \
+	paramValArray[0] = JSVAL_NULL; \
 	cx = payload->cx; \
 	JS_BeginRequest( cx ); \
 	oldCompartment = JS_EnterCompartment( cx, globalObj ); \
@@ -309,6 +317,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
 	fnVal = JSVAL_NULL; \
 	paramList = JSVAL_NULL; \
+	value = JSVAL_NULL; \
 	JS::RootedValue 		fnValRoot( cx, fnVal ); \
 	JS::HandleValue 		fnValHandle( fnValRoot ); \
 	JS::MutableHandleValue 	fnValMut( &fnValRoot ); \
@@ -446,6 +455,8 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 				colCount = mysac_field_count( result );
 				rowId = 0;
 				while ( cleanUp.good && ( row = mysac_fetch_row( result ) ) != NULL ) {
+					jValue = JSVAL_NULL;
+					currentValue = JSVAL_NULL;
 					JS::RootedObject 		recordObjRoot( cx, recordObj );
 					JS::HandleObject 		recordObjHandle( recordObjRoot );
 					cleanUp.good = ( (		recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
@@ -625,10 +636,11 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void 
 					colCount = PQnfields( result );
 					for ( rowId = 0; rowId < rowCount; rowId++ ) {
 						JSObject * recordObj;
-						jsval currentVal;
-						jsval jValue;
+						jsval currentVal, jValue;
 
 						recordObj = NULL;
+						jValue = JSVAL_NULL;
+						currentVal = JSVAL_NULL;
 						JS::RootedObject 		recordObjRoot( cx, recordObj );
 						JS::HandleObject 		recordObjHandle( recordObjRoot );
 						cleanUp.good = ( (recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
@@ -908,6 +920,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
 	JSCompartment * oldCompartment;
 
 	retVal = JSVAL_NULL;
+	clientObjVal = JSVAL_NULL;
 	clientObj = NULL;
 	payload = (struct payload_t *) webclient->route->cbArgs;
 	if ( payload != NULL ) {
@@ -967,6 +980,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	args = CallArgsFromVp( argc, vpn );
 	cPattern = NULL;
 	payload = NULL;
+	fnVal = JSVAL_NULL;
 	webserverObj = JS_THIS_OBJECT( cx, vpn );
 	webserver = (struct webserver_t *) JS_GetPrivate( webserverObj );
 	JS::RootedValue 		fnValRoot( cx, fnVal );
@@ -1396,11 +1410,11 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 		cleanUp.good = ( ( cFile = JS_EncodeString( cx, jFile ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		globalObj = JS_THIS_OBJECT( cx, vpn );
+		globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
 		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( globalObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( ( Javascript_IncludeScript( javascript, cFile ) ) == true );
+		cleanUp.good = ( Javascript_AddScript( javascript, cFile ) != NULL );
 		JS_free( cx, cFile ); cFile = NULL;
 	}
 
@@ -1457,7 +1471,7 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	payload = NULL; \
 	timing = NULL; \
 	args = CallArgsFromVp( argc, vpn ); \
-	globalObj = JS_THIS_OBJECT( cx, vpn ); \
+	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) ); \
 	javascript = (struct javascript_t *) JS_GetPrivate( globalObj ); \
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "fi", &dummy, &ms ) == true ); \
 	if ( cleanUp.good ) { \
@@ -1597,7 +1611,7 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn )
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vpn );
 	args.rval().setUndefined();
-	globalObj = JS_THIS_OBJECT( cx, vpn );
+	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "i", &identifier ) == true );
 	if ( cleanUp.good ) {
 		javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
@@ -1627,24 +1641,29 @@ static const JSFunctionSpec jsmGlobal[ ] = {
    BOILERPLATE
    ===============================================================================
    */
-static bool Javascript_IncludeScript( const struct javascript_t * javascript, const char * cFile ) {
-	JSScript * script;
-	char * fileNameWithPath;
+static struct script_t * Script_New( const struct javascript_t * javascript, const char * cFile ) {
+	struct script_t * script;
 	int len;
-	struct { unsigned char good:1;
-		unsigned char fn:1; } cleanUp;
+	struct {unsigned char good:1;
+			unsigned char script:1;
+			unsigned char bytecode:1;
+			unsigned char fn:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	script = NULL;
 	len = strlen( cFile ) + strlen( javascript->path ) + 2;
-	cleanUp.good = ( ( fileNameWithPath = (char *) malloc( len ) ) != NULL );
+	cleanUp.good = (( script = (struct script_t *) malloc( sizeof( *script ) ) ) != NULL);
+	if ( cleanUp.good ) {
+		cleanUp.script = 1;
+		script->bytecode = NULL;
+		cleanUp.good = ( ( script->fileNameWithPath = (char *) malloc( len ) ) != NULL );
+	}
 	if (cleanUp.good ) {
 		cleanUp.fn = 1;
-		snprintf( fileNameWithPath, len, "%s/%s", javascript->path, cFile );
-		JSAutoRequest ar( javascript->context );
-		JSAutoCompartment ac( javascript->context, javascript->globalObj );
-		JS::HandleObject 		globalObjHandle( javascript->globalObj );
-		JS::RootedScript 		scriptRoot( javascript->context, script );
+		snprintf( script->fileNameWithPath, len, "%s/%s", javascript->path, cFile );
+		JS::RootedObject		globalObjRoot ( javascript->context, javascript->globalObj );
+		JS::HandleObject 		globalObjHandle( globalObjRoot );
+		JS::RootedScript 		scriptRoot( javascript->context, script->bytecode );
+		JS::PersistentRootedScript scriptPer( javascript->context, script->bytecode );
 		JS::HandleScript		scriptHandle( scriptRoot );
 		JS::MutableHandleScript	scriptMut( &scriptRoot );
 		JS::CompileOptions		options( javascript->context );
@@ -1654,7 +1673,8 @@ static bool Javascript_IncludeScript( const struct javascript_t * javascript, co
 			.setCompileAndGo( true )
 			.setNoScriptRval( true );
 		cleanUp.good = 0; //  to reuse the JS:: scope, we deviate now from the cleanUp.good style
-		if ( JS::Compile( javascript->context, globalObjHandle, options, fileNameWithPath, scriptMut ) == true ) {
+		if ( JS::Compile( javascript->context, globalObjHandle, options, script->fileNameWithPath, scriptMut ) == true ) {
+			cleanUp.bytecode = 1;
 			if ( JS_ExecuteScript( javascript->context, globalObjHandle, scriptHandle ) == true ) {
 				cleanUp.good = 1;
 			}
@@ -1665,12 +1685,24 @@ static bool Javascript_IncludeScript( const struct javascript_t * javascript, co
 	} else {
 		Core_Log( javascript->core, LOG_INFO, cFile, 0, "Script could not be loaded" );
 	}
-	if ( cleanUp.fn ) {
-		free( fileNameWithPath ); fileNameWithPath = NULL;
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.bytecode ) {
+			script->bytecode = NULL;
+		}
+		if ( cleanUp.fn ) {
+			free( script->fileNameWithPath ); script->fileNameWithPath = NULL;
+		}
+		if ( cleanUp.script ) {
+			free( script ); script = NULL;
+		}
 	}
-	return ( cleanUp.good ) ? true : false;
+	return script;
 }
 
+static void Script_Delete( struct script_t * script ) {
+	free( script->fileNameWithPath ); script->fileNameWithPath = NULL;
+	free( script ); script = NULL;
+}
 /**
  * Function that is called when the first Javascript file is loaded correctly.
  *
@@ -1714,7 +1746,7 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	postgresqlObj =  JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 2, nullptr, nullptr, nullptr, nullptr );
 	JS::RootedObject pgsqlclientObj( javascript->context, postgresqlObj );
 
-	cleanUp.good = ( Javascript_IncludeScript( javascript, javascript->fileName ) ) ? 1: 0 ;
+	cleanUp.good = ( Javascript_AddScript( javascript, javascript->fileName ) != NULL ) ;
 
 	return cleanUp.good;
 }
@@ -1728,19 +1760,20 @@ static int Javascript_Init( struct javascript_t * javascript ) {
 	JSAutoRequest ar = JSAutoRequest( javascript->context );
 	JS::CompartmentOptions compartmentOptions;
 	compartmentOptions.setVersion( JSVERSION_LATEST );
-	JS::PersistentRootedObject globalObj( javascript->context, JS_NewGlobalObject( javascript->context, &jscGlobal, nullptr, JS::DontFireOnNewGlobalHook, compartmentOptions ) );
-	JS::HandleObject globalHandle( globalObj );
-	cleanUp.good = ( globalObj != NULL );
+	javascript->globalObj = JS_NewGlobalObject( javascript->context, &jscGlobal, nullptr, JS::DontFireOnNewGlobalHook, compartmentOptions );
+	JS::PersistentRootedObject globalObjPers( javascript->context, javascript->globalObj );
+	JS::RootedObject globalObjRoot( javascript->context, javascript->globalObj );
+	JS::HandleObject globalObjHandle( globalObjRoot );
+	cleanUp.good = ( javascript->globalObj != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.global = 1;
-		javascript->globalObj = globalObj;
 	}
 	JSAutoCompartment ac( javascript->context, javascript->globalObj );
-	cleanUp.good = ( ( JS_InitStandardClasses( javascript->context, globalHandle ) ) == true );
+	cleanUp.good = ( ( JS_InitStandardClasses( javascript->context, globalObjHandle ) ) == true );
 	if ( cleanUp.good ) {
 		cleanUp.standard = 1;
-		JS_FireOnNewGlobalObject( javascript->context, globalHandle );
-		cleanUp.good = ( JS_DefineFunctions( javascript->context, globalHandle, jsmGlobal ) == true );
+		JS_FireOnNewGlobalObject( javascript->context, globalObjHandle );
+		cleanUp.good = ( JS_DefineFunctions( javascript->context, globalObjHandle, jsmGlobal ) == true );
 	}
 	if ( cleanUp.good ) {
 		JS_SetPrivate( javascript->globalObj, ( void * ) javascript );
@@ -1820,6 +1853,7 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	cleanUp.good = ( ( javascript = (struct javascript_t *) malloc( sizeof( * javascript ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.javascript = 1;
+		javascript->scripts = NULL;
 		javascript->core = ( struct core_t *) core;
 		cleanUp.good = ( ( javascript->path = Xstrdup( path ) ) != NULL );
 	}
@@ -1883,6 +1917,7 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 			free( (char *) javascript->path ); javascript->path = NULL;
 		}
 		if ( cleanUp.javascript ) {
+			javascript->scripts = NULL;
 			javascript->core = NULL;
 			free( javascript ); javascript = NULL;
 		}
@@ -1891,8 +1926,56 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	return javascript;
 }
 
-void Javascript_Delete( struct javascript_t * javascript ) {
+static struct script_t * Javascript_AddScript( struct javascript_t * javascript, const char * fileName ) {
+	struct script_t * script;
+	struct {unsigned char good:1;
+			unsigned char script:1; } cleanUp;
 
+	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
+	cleanUp.good = ( (  script = Script_New( javascript, fileName ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.script = 1;
+		if ( javascript->scripts == NULL ) {
+			javascript->scripts = script;
+		} else {
+			PR_APPEND_LINK( &script->mLink, &javascript->scripts->mLink );
+		}
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.script ) {
+				Script_Delete( script ); script = NULL;
+		}
+	}
+
+	return script;
+}
+
+static void Javascript_DelScript( struct javascript_t * javascript, struct script_t * script ) {
+	struct script_t * scriptFirst;
+	PRCList * next;
+
+	scriptFirst = javascript->scripts;
+	if ( script == scriptFirst ){
+		next = PR_NEXT_LINK( &script->mLink );
+		if ( next  == &script->mLink ) {
+			javascript->scripts = NULL;
+		} else {
+			scriptFirst = FROM_NEXT_TO_ITEM( struct script_t );
+			javascript->scripts = scriptFirst;
+		}
+	}
+	PR_REMOVE_AND_INIT_LINK( &script->mLink );
+	Script_Delete( script ); script = NULL;
+}
+
+void Javascript_Delete( struct javascript_t * javascript ) {
+	struct script_t * firstScript;
+
+	firstScript = javascript->scripts;
+	while ( firstScript != NULL ) {
+		Javascript_DelScript( javascript, firstScript );
+		firstScript = javascript->scripts;
+	}
 	JSAutoRequest ar( javascript->context );
 	JSAutoCompartment ac( javascript->context, javascript->globalObj );
 	JS_DestroyContext( javascript->context );

@@ -7,6 +7,7 @@
 #define SIZE_MAX UINT32_MAX
 #endif
 #include <jsapi.h>
+#include <prclist.h>
 
 #include "../core/core.h"
 
@@ -14,13 +15,16 @@
 extern "C" {
 #endif
 
+struct script_t;
+
 struct javascript_t {
 	struct core_t *				core;
 	const char *				path;
 	const char *				fileName;
 	JSRuntime *					runtime;
 	JSContext *					context;
-	JS::PersistentRootedObject	globalObj;
+	struct script_t *			scripts;
+	JSObject * 					globalObj;
 };
 
 struct javascript_t *			Javascript_New						( const struct core_t * core, const char * path, const char * fileName );
