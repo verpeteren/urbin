@@ -284,10 +284,9 @@ $(LIB_MOZ_SHARED): $(LIB_NSPR_SHARED) $(LIB_Z_SHARED)
 		--without-ccache \
 		--with-system-zlib=$(ZLIB_PATH) \
 		--with-nspr-prefix=$(NSPR_PATH) --with-nspr-cflags="-I$(NSPR_PATH)/dist/include/nspr" --with-nspr-libs="-lrt -L$(NSPR_PATH)/dist/lib/ -lnspr4 -lplds4 -lplc4" \
-		$(DEBUG) 
-		
-	#&&make 
-	#@touch $@
+		$(DEBUG)  \
+	&&make 
+	@touch $@
 
 $(DIR_MOZ):
 	@echo $@

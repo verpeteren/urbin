@@ -218,12 +218,12 @@ void Core_Log( const struct core_t * core, const int logLevel, const char * file
 	struct {unsigned char good:1;
 			unsigned char line:1;} cleanUp;
 
-	len = strlen( fileName ) + strlen( message ) + 4 +5 + 1;
+	len = strlen( fileName ) + strlen( message ) + 4 +5 + 2;
 	cleanUp.good = ( ( line = malloc( len ) ) != NULL );
 	printf( "[%s:%5d]\t%s\n", fileName, lineNr, message );
 	if ( cleanUp.good ) {
 		cleanUp.line = 1;
-		snprintf( line, len, "[%s:%5d]\t%s", fileName, lineNr, message );
+		snprintf( line, len, "[%s:%5d]\t%s\n", fileName, lineNr, message );
 		core->logger.logFun( logLevel, "%", message );
 	}
 	if ( cleanUp.line ) {
@@ -442,7 +442,6 @@ void Core_Delete( struct core_t * core ) {
 		Core_DelTiming( core, firstTiming );
 		firstTiming = core->timings;
 	}
-	core->timings = NULL;
 	//  cleanup the rest
 	core->processTicksMs = 0;
 	picoev_destroy_loop( core->loop );

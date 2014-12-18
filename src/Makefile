@@ -98,7 +98,7 @@ $(OBJ_DIR)/main_server.o:			./main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADE
 ###############################################################################
 # LINKING
 ###############################################################################
-$(THE_EXECUTABLE): 					$(CODE_OBJECTS) $(DEPS) docs tags
+$(THE_EXECUTABLE): 					$(DEPS) $(CODE_OBJECTS) docs tags
 ifeq ($(MAKE_STATIC_LIBS),yes)
 	@echo "\tLD.a :\t"$@
 else

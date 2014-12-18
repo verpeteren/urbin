@@ -1701,6 +1701,7 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 
 static void Script_Delete( struct script_t * script ) {
 	free( script->fileNameWithPath ); script->fileNameWithPath = NULL;
+	script->bytecode = NULL;
 	free( script ); script = NULL;
 }
 /**
