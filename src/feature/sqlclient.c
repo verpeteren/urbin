@@ -43,7 +43,11 @@ void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, cons
 		query->cbArgs = args;
 		PR_INIT_CLIST( &query->mLink );
 		query->sqlclient = sqlclient;
-		query->statementId = 0;
+#if HAVE_MYSQL == 1
+		query->result.my.statementId = 0;
+		query->result.my.vars = NULL;
+		query->result.my.resBuf = NULL;
+#endif
 		cleanUp.good = ( ( query->statement = Xstrdup( sqlStatement ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -108,14 +112,16 @@ void Query_Delete ( struct query_t * query ) {
 	query->paramCount = 0;
 	switch ( query->sqlclient->adapter ) {
 	case SQLADAPTER_POSTGRESQL:
-		if ( query->result.pg != NULL ) {
-			PQclear( query->result.pg ); query->result.pg = NULL;
+		if ( query->result.pg.res != NULL ) {
+			PQclear( query->result.pg.res ); query->result.pg.res = NULL;
 		}
 		break;
 #if HAVE_MYSQL == 1
 	case SQLADAPTER_MYSQL:
-		if ( query->result.my != NULL ) {
-			mysac_free_res( query->result.my ); query->result.my = NULL;
+		free( query->result.my.resBuf ); query->result.my.resBuf = NULL;
+		free( query->result.my.vars ); query->result.my.vars = NULL;
+		if ( query->result.my.res != NULL ) {
+			mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
 		}
 		break;
 #endif
@@ -143,22 +149,22 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		cleanUp.good = ( PQstatus( sqlclient->connection.pg ) == CONNECTION_OK );
+		cleanUp.good = ( PQstatus( sqlclient->connection.pg.conn ) == CONNECTION_OK );
 		if ( cleanUp.good ) {
-			cleanUp.good = ( PQconsumeInput( sqlclient->connection.pg ) == 1 );
+			cleanUp.good = ( PQconsumeInput( sqlclient->connection.pg.conn ) == 1 );
 		}
 		if ( cleanUp.good ) {
-			if ( PQisBusy( sqlclient->connection.pg ) != 1 ) {
+			if ( PQisBusy( sqlclient->connection.pg.conn ) != 1 ) {
 				do {
-					query->result.pg = PQgetResult( sqlclient->connection.pg );
+					query->result.pg.res = PQgetResult( sqlclient->connection.pg.conn );
 					if ( query->cbHandler != NULL ) {
-						if ( query->result.pg != NULL ) {
+						if ( query->result.pg.res != NULL ) {
 							//  Most of the time all the results are returend in the first loop, but just in case we have to call it again.
 							query->cbHandler( query );
 						}
-						PQclear( query->result.pg ); query->result.pg = NULL;
+						PQclear( query->result.pg.res ); query->result.pg.res = NULL;
 					}
-				} while ( query->result.pg != NULL );
+				} while ( query->result.pg.res != NULL );
 			}
 		}
 		//  We're done with this query, go back to start and collect 20k
@@ -183,16 +189,16 @@ static void Postgresql_HandleWrite_cb( picoev_loop * loop, const int fd, const i
 		query = Sqlclient_PopQuery( sqlclient );
 		if ( query != NULL ) {
 			if ( query->paramCount == 0 ) {
-				cleanUp.good = ( PQsendQuery( sqlclient->connection.pg, query->statement ) == 1 );
+				cleanUp.good = ( PQsendQuery( sqlclient->connection.pg.conn, query->statement ) == 1 );
 			} else {
 				//  Send out the query and the parameters to the datebase engine
 				picoev_del( loop, fd ) ;
 				picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleRead_cb, cbArgs );
 				//  only Version 2 protocoll, and only one command per statement
-				cleanUp.good = ( PQsendQueryParams( sqlclient->connection.pg, query->statement, (int) query->paramCount, NULL, query->paramValues, (const int *) query->paramLengths, NULL, 0 ) == 1 );
+				cleanUp.good = ( PQsendQueryParams( sqlclient->connection.pg.conn, query->statement, (int) query->paramCount, NULL, query->paramValues, (const int *) query->paramLengths, NULL, 0 ) == 1 );
 			}
 			if ( cleanUp.good ) {
-				cleanUp.good = ( PQflush( sqlclient->connection.pg ) == 0 );
+				cleanUp.good = ( PQflush( sqlclient->connection.pg.conn ) == 0 );
 			} else {
 				Sqlclient_CloseConn( sqlclient );
 			}
@@ -211,12 +217,12 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 		PostgresPollingStatusType status;
 		ConnStatusType statusType;
 
-		if ( ( statusType = PQstatus( sqlclient->connection.pg ) ) == CONNECTION_BAD ) {
+		if ( ( statusType = PQstatus( sqlclient->connection.pg.conn ) ) == CONNECTION_BAD ) {
 			Sqlclient_CloseConn( sqlclient );
 		} else {
-			status = PQconnectPoll( sqlclient->connection.pg );
+			status = PQconnectPoll( sqlclient->connection.pg.conn );
 			if ( status != PGRES_POLLING_FAILED && status != PGRES_POLLING_OK ) {
-				if ( PQstatus( sqlclient->connection.pg ) != CONNECTION_OK ) {
+				if ( PQstatus( sqlclient->connection.pg.conn ) != CONNECTION_OK ) {
 					Sqlclient_CloseConn( sqlclient );
 				} else {
 					//  We are connected ( and have the database ), we are good to go.
@@ -294,12 +300,12 @@ static void	Mysql_HandleRead_cb	( picoev_loop * loop, const int fd, const int ev
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		retCode = mysac_io( sqlclient->connection.my );
+		retCode = mysac_io( sqlclient->connection.my.conn );
 		cleanUp.good = ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ );
 		if ( cleanUp.good ) {
 			if ( query->cbHandler != NULL ) {
 				query->cbHandler( query );
-				mysac_free_res( query->result.my ); query->result.my = NULL;
+				mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
 			}
 		}
 		//  We're done with this query, go back to start and collect 20k
@@ -314,11 +320,11 @@ static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const in
 	struct query_t * query;
 	int retCode;
 	size_t i;
-	  //  @TODO:  check memory handling of resBUf and vars
-	MYSAC_BIND * vars;
-	char resBuf[MYSQL_BUFS];
 	struct { unsigned char good:1;
 			unsigned char vars:1;
+			unsigned char id:1;
+			unsigned char my:1;
+			unsigned char resBuf:1;
 			unsigned char ev:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -328,33 +334,53 @@ static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const in
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_WRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		cleanUp.good = ( ( vars = (MYSAC_BIND *) calloc( sizeof( MYSAC_BIND ), query->paramCount ) ) != NULL );
+		cleanUp.good = ( ( query->result.my.vars = (MYSAC_BIND *) calloc( sizeof( MYSAC_BIND ), query->paramCount ) ) != NULL );
 		if ( cleanUp.good ) {
 			cleanUp.vars = 1;
+			cleanUp.good = (( query->result.my.resBuf = malloc( MYSQL_BUFS ) ) != NULL);
+		}
+		if ( cleanUp.good ) {
+			cleanUp.resBuf = 1;
 			for ( i = 0; i < query->paramCount; i++ ) {
-				vars[i].type = MYSQL_TYPE_VAR_STRING;
-				vars[i].value = ( void * ) query->paramValues[i];
-				vars[i].value_len = (int) query->paramLengths[i];
-				vars[i].is_null = 0;
+				query->result.my.vars[i].type = MYSQL_TYPE_VAR_STRING;
+				query->result.my.vars[i].value = ( void * ) query->paramValues[i];
+				query->result.my.vars[i].value_len = (int) query->paramLengths[i];
+				query->result.my.vars[i].is_null = 0;
 			}
 		}
 		if ( cleanUp.good ) {
-			cleanUp.good = ( ( query->result.my = ( void * ) mysac_init_res( resBuf, MYSQL_BUFS ) ) != NULL );
+			cleanUp.good = ( ( query->result.my.res = ( void * ) mysac_init_res( query->result.my.resBuf, MYSQL_BUFS ) ) != NULL );
 		}
 		if ( cleanUp.good ) {
-			cleanUp.good = ( mysac_set_stmt_execute( sqlclient->connection.my, ( MYSAC_RES * ) query->result.my, query->statementId, vars, (int) query->paramCount ) == 0 );
+			cleanUp.my = 1;
+			cleanUp.good = ( mysac_set_stmt_execute( sqlclient->connection.my.conn, ( MYSAC_RES * ) query->result.my.res, query->result.my.statementId, query->result.my.vars, (int) query->paramCount ) == 0 );
 		}
 		if ( cleanUp.good ) {
+			cleanUp.id = 1;
 			//  Send out the query and the parameters to the datebase engine
 			picoev_del( loop, fd );
 			picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Mysql_HandleRead_cb, cbArgs );
 			cleanUp.ev = 1;
-			retCode = mysac_io( sqlclient->connection.my );
+		}
+		if ( cleanUp.good ) {
+			retCode = mysac_io( sqlclient->connection.my.conn );
 			cleanUp.good = ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ );
 		}
 		if ( ! cleanUp.good ) {
+			if ( cleanUp.my ) {
+				mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
+			}
+			if ( cleanUp.id ) {
+				query->result.my.statementId = 0;
+			}
+			if ( cleanUp.ev) {
+				picoev_del( loop, fd );
+			}
+			if ( cleanUp.resBuf ) {
+				free( query->result.my.resBuf ); query->result.my.resBuf = NULL;
+			}
 			if ( cleanUp.vars ) {
-				free( vars ); vars = NULL;  //  @TODO:  further cleanup
+				free( query->result.my.vars ); query->result.my.vars = NULL;
 			}
 		}
 	}
@@ -380,9 +406,9 @@ static void	Mysql_HandleWrite_cb( picoev_loop * loop, const int fd, const int ev
 			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleSetParams_cb, cbArgs );
 			cleanUp.ev = 1;
 			//  Mysac needs to perpare the statement
-			cleanUp.good = ( mysac_b_set_stmt_prepare( sqlclient->connection.my, &query->statementId, query->statement, (int) strlen( query->statement ) ) == 0 );
+			cleanUp.good = ( mysac_b_set_stmt_prepare( sqlclient->connection.my.conn, &query->result.my.statementId, query->statement, (int) strlen( query->statement ) ) == 0 );
 			if ( cleanUp.good ) {
-				retCode = mysac_io( sqlclient->connection.my );
+				retCode = mysac_io( sqlclient->connection.my.conn );
 				cleanUp.good = ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ );
 			}
 		}
@@ -403,7 +429,7 @@ static void Mysql_HandleSetDb_cb( picoev_loop * loop, const int fd, const int ev
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		retCode = mysac_io( sqlclient->connection.my );
+		retCode = mysac_io( sqlclient->connection.my.conn );
 		if ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ ) {
 			//  yes, we are connected and have a database, we are good to go
 			picoev_del( loop, fd );
@@ -423,13 +449,13 @@ static void Mysql_HandleConnect_cb( picoev_loop * loop, const int fd, const int 
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		retCode = mysac_io( sqlclient->connection.my );
+		retCode = mysac_io( sqlclient->connection.my.conn );
 		if ( retCode != MYERR_WANT_WRITE && retCode != MYERR_WANT_READ ) {
 			picoev_del( loop, fd );
 			picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleSetDb_cb, cbArgs );
 			//  Yes, we are connected, now set the database, as mysac needs that first
-			mysac_set_database( sqlclient->connection.my, sqlclient->dbName );
-			if ( mysac_send_database( sqlclient->connection.my ) == MYERR_BAD_STATE ) {
+			mysac_set_database( sqlclient->connection.my.conn, sqlclient->dbName );
+			if ( mysac_send_database( sqlclient->connection.my.conn ) == MYERR_BAD_STATE ) {
 				Sqlclient_CloseConn( sqlclient );
 			}
 		} else {
@@ -468,12 +494,16 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 		sqlclient->port = port;
 		sqlclient->adapter = adapter;
 		switch ( sqlclient->adapter ) {
-			case SQLADAPTER_POSTGRESQL: //  ft
 #if HAVE_MYSQL == 1
-			case SQLADAPTER_MYSQL:		//  ft
+			case SQLADAPTER_MYSQL:
+				sqlclient->connection.my.conn = NULL;
+				sqlclient->connection.my.statementId = 0;
 #endif
+			case SQLADAPTER_POSTGRESQL:
+				sqlclient->connection.pg.conn = NULL;
+				break;
 			default:
-				sqlclient->connection.pg = NULL;
+				break;
 			break;
 		}
 		sqlclient->hostName = sqlclient->ip = sqlclient->loginName = sqlclient->password = sqlclient->dbName = NULL;
@@ -519,7 +549,9 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 	if ( cleanUp.good ) {
 		sqlclient->timeoutSec = timeoutSec;
 		sqlclient->socketFd = 0;
-		sqlclient->statementId = 0;
+#if HAVE_MYSQL == 1
+		sqlclient->connection.my.statementId = 0;
+#endif
 		sqlclient->currentQuery = NULL;
 		Sqlclient_Connect( sqlclient );
 	}
@@ -560,7 +592,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 	connString = NULL;
 	switch ( sqlclient->adapter ) {
 		case SQLADAPTER_POSTGRESQL:
-			if ( sqlclient->connection.pg == NULL ) {
+			if ( sqlclient->connection.pg.conn == NULL ) {
 #define CONNSTRING_TEMPLATE "host=%s port=%d dbname=%s user=%s password=%s hostaddr=%s"
 				len = 1 + strlen( CONNSTRING_TEMPLATE ) + strlen( sqlclient->hostName ) + 5 + strlen( sqlclient->dbName ) + strlen( sqlclient->loginName ) + strlen( sqlclient->password ) + strlen( sqlclient->ip ) - 12 ;
 				cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
@@ -568,27 +600,27 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 					cleanUp.connString = 1;
 				snprintf( connString, len, CONNSTRING_TEMPLATE, sqlclient->hostName, sqlclient->port, sqlclient->dbName, sqlclient->loginName, sqlclient->password, sqlclient->ip );
 #undef CONNSTRING_TEMPLATE
-					cleanUp.good = ( ( sqlclient->connection.pg = PQconnectStart( connString ) ) != NULL );
+					cleanUp.good = ( ( sqlclient->connection.pg.conn = PQconnectStart( connString ) ) != NULL );
 				}
 				if ( cleanUp.good ) {
 					cleanUp.conn = 1;
-					cleanUp.good = ( ( sqlclient->socketFd = PQsocket( sqlclient->connection.pg ) ) > 0 );
+					cleanUp.good = ( ( sqlclient->socketFd = PQsocket( sqlclient->connection.pg.conn ) ) > 0 );
 				}
 				if ( cleanUp.good ) {
 					cleanUp.conn = 1;
 					picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleConnect_cb, (void * ) sqlclient );
-					PQsetnonblocking( sqlclient->connection.pg, 1 );
+					PQsetnonblocking( sqlclient->connection.pg.conn, 1 );
 				}
 				if ( ! cleanUp.good ) {
 					if ( cleanUp.conn ) {
-						PQfinish( sqlclient->connection.pg ); sqlclient->connection.pg= NULL;
+						PQfinish( sqlclient->connection.pg.conn ); sqlclient->connection.pg.conn= NULL;
 					}
 				}
 			}
 			break;
 #if HAVE_MYSQL == 1
 		case SQLADAPTER_MYSQL:
-			if ( sqlclient->connection.my == NULL ) {
+			if ( sqlclient->connection.my.conn == NULL ) {
 #define CONNSTRING_TEMPLATE "%s:%d"
 				len = 1 + strlen( CONNSTRING_TEMPLATE ) + 5 + strlen( sqlclient->hostName ) - 4;
 				cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
@@ -597,20 +629,20 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 					snprintf( connString, len, CONNSTRING_TEMPLATE, sqlclient->hostName, sqlclient->port);
 #undef CONNSTRING_TEMPLATE
 					if ( cleanUp.good ) {
-						cleanUp.good = ( ( sqlclient->connection.my = mysac_new( MYSQL_BUFS ) ) != NULL );
+						cleanUp.good = ( ( sqlclient->connection.my.conn = mysac_new( MYSQL_BUFS ) ) != NULL );
 					}
 					if ( cleanUp.good ) {
 						cleanUp.conn = 1;
-						cleanUp.good = ( ( sqlclient->socketFd = mysac_get_fd( sqlclient->connection.my ) ) > 0 );
+						cleanUp.good = ( ( sqlclient->socketFd = mysac_get_fd( sqlclient->connection.my.conn ) ) > 0 );
 					}
 					if ( cleanUp.good ) {
 						picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READ, sqlclient->timeoutSec, Mysql_HandleConnect_cb, (void * ) sqlclient );
 						SetupSocket( sqlclient->socketFd );
-						mysac_setup( sqlclient->connection.my, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0);
+						mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0);
 					}
 					if ( ! cleanUp.good ) {
 						if ( cleanUp.conn ) {
-							mysac_close( sqlclient->connection.my ); sqlclient->connection.my = NULL;
+							mysac_close( sqlclient->connection.my.conn ); sqlclient->connection.my.conn = NULL;
 						}
 					}
 				}
@@ -632,15 +664,15 @@ static void Sqlclient_CloseConn ( struct sqlclient_t * sqlclient ) {
 	picoev_del( sqlclient->core->loop, sqlclient->socketFd );
 	switch ( sqlclient->adapter ) {
 	case SQLADAPTER_POSTGRESQL:
-		if ( sqlclient->connection.pg != NULL ) {
-			PQfinish( sqlclient->connection.pg ); sqlclient->connection.pg = NULL;
+		if ( sqlclient->connection.pg.conn != NULL ) {
+			PQfinish( sqlclient->connection.pg.conn ); sqlclient->connection.pg.conn = NULL;
 		}
 		break;
 #if HAVE_MYSQL == 1
 	case SQLADAPTER_MYSQL:
-		if ( sqlclient->connection.my != NULL ) {
-			free( sqlclient->connection.my->buf ); sqlclient->connection.my->buf = NULL;
-			mysac_close( sqlclient->connection.my ); sqlclient->connection.my = NULL;
+		if ( sqlclient->connection.my.conn != NULL ) {
+			free( sqlclient->connection.my.conn->buf ); sqlclient->connection.my.conn->buf = NULL;
+			mysac_close( sqlclient->connection.my.conn ); sqlclient->connection.my.conn = NULL;
 		}
 		break;
 #endif
@@ -693,7 +725,9 @@ void Sqlclient_Delete ( struct sqlclient_t * sqlclient ) {
 	//  cleanup the rest
 	Sqlclient_CloseConn( sqlclient );
 	sqlclient->timeoutSec = 0;
-	sqlclient->statementId = 0;
+#if HAVE_MYSQL == 1
+	sqlclient->connection.my.statementId = 0;
+#endif
 	memset( (char *) sqlclient->password, '\0', strlen( sqlclient->password ) );
 	free( (char *) sqlclient->hostName ); 		sqlclient->hostName = NULL;
 	free( (char *) sqlclient->ip ); 			sqlclient->ip = NULL;

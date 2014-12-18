@@ -10,7 +10,6 @@
 #include <prclist.h>
 #include <prinrval.h>
 
-#include "../common.h"
 #include "configuration.h"
 
 #ifdef __cplusplus

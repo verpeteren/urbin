@@ -27,30 +27,27 @@ static void 						Payload_Delete					( struct payload_t * payload );
 static struct script_t * 			Javascript_AddScript			( struct javascript_t * javascript, const char * fileName );
 static int jsInterpretersAlive = 0;
 
-/*#  @TODO:  from inline back to macro   define JAVASCRIPT_MODULE_ACTION( action ) \*/
 inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, const char * action ) {
-	do { \
-		JSObject * hardObj;
-		jsval hardVal;
+	JSObject * hardObj;
+	jsval hardVal;
 
-		hardObj = NULL;
-		hardVal = JSVAL_NULL;
-		JSAutoRequest			ar( javascript->context );
-		JSAutoCompartment		ac( javascript->context, javascript->globalObj );
-		JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
-		JS::HandleObject		globalObjHandle( globalObjRoot );
-		JS::RootedValue			rValRoot( javascript->context );
-		JS::MutableHandleValue	rValMut( &rValRoot );
-		JS::RootedValue			hardValRoot( javascript->context, hardVal );
-		JS::HandleValue			hardValHandle( hardValRoot );
-		JS::MutableHandleValue	hardValMut( &hardValRoot );
-		JS::RootedObject		hardObjRoot( javascript->context, hardObj );
-		JS::HandleObject		hardObjHandle( hardObjRoot );
-		JS::MutableHandleObject	hardObjMut( &hardObjRoot );
-		JS_GetProperty( javascript->context, globalObjHandle, MAIN_OBJ_NAME, hardValMut );
-		JS_ValueToObject( javascript->context, hardValHandle, hardObjMut );
-		JS_CallFunctionName( javascript->context, hardObjHandle, action, JS::HandleValueArray::empty(), rValMut );
-	} while ( 0 );
+	hardObj = NULL;
+	hardVal = JSVAL_NULL;
+	JSAutoRequest			ar( javascript->context );
+	JSAutoCompartment		ac( javascript->context, javascript->globalObj );
+	JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
+	JS::HandleObject		globalObjHandle( globalObjRoot );
+	JS::RootedValue			rValRoot( javascript->context );
+	JS::MutableHandleValue	rValMut( &rValRoot );
+	JS::RootedValue			hardValRoot( javascript->context, hardVal );
+	JS::HandleValue			hardValHandle( hardValRoot );
+	JS::MutableHandleValue	hardValMut( &hardValRoot );
+	JS::RootedObject		hardObjRoot( javascript->context, hardObj );
+	JS::HandleObject		hardObjHandle( hardObjRoot );
+	JS::MutableHandleObject	hardObjMut( &hardObjRoot );
+	JS_GetProperty( javascript->context, globalObjHandle, MAIN_OBJ_NAME, hardValMut );
+	JS_ValueToObject( javascript->context, hardValHandle, hardObjMut );
+	JS_CallFunctionName( javascript->context, hardObjHandle, action, JS::HandleValueArray::empty(), rValMut );
 }
 
 /**
@@ -284,7 +281,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	oldCompartment = JS_EnterCompartment( cx, globalObj ); \
 	globalObj = JS_GetGlobalForObject( cx, payload->objRoot ); \
 	JS::RootedValue paramValArrayRoot( cx, paramValArray[0] ); \
-	resultObj = formatter( cx, query->result.sub ); \
+	resultObj = formatter( cx, query->result.sub.res ); \
 	paramValArray[0] = OBJECT_TO_JSVAL( resultObj ); \
 	JS::HandleValueArray 	paramValArrayHandle( paramValArrayRoot ); \
 	JS::HandleValue 		fnValHandle( *payload->fnValRoot ); \
@@ -456,7 +453,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 				rowId = 0;
 				while ( cleanUp.good && ( row = mysac_fetch_row( result ) ) != NULL ) {
 					jValue = JSVAL_NULL;
-					currentValue = JSVAL_NULL;
+					currentVal = JSVAL_NULL;
 					JS::RootedObject 		recordObjRoot( cx, recordObj );
 					JS::HandleObject 		recordObjHandle( recordObjRoot );
 					cleanUp.good = ( (		recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
@@ -815,15 +812,16 @@ static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresql
 extern const char * MethodDefinitions[ ];
 /**
  * Webserver response object.
- *SET_PROPERTY_ON
+ *
  * @name Hard.Webserver.req
  * @private:
  * @object
  */
 static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
 
-static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webclient_t * webclient );
-static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webclient_t * webclient ) {
+static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webclient_t * webclient );
+static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webclient_t * webclient ) {
+	JSContext * cx;
 	JSObject * clientObj, * responseObj;
 	JSString * jIp, * jUrl, * jMethod;
 	const char * ip, * url;
@@ -836,11 +834,14 @@ static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webcl
 		unsigned char cli:1;
 		unsigned char resp:1;
 		unsigned char good:1;} cleanUp;
-	//  @TODO call autocompartment, begin request etc.
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+
 	clientObj = NULL;
 	jIp = jUrl = jMethod = NULL;
 	ip = url = NULL;
+	cx = payload->cx;
+	JSAutoRequest ar( cx );
+	JSAutoCompartment ac( cx, globalObj );
 	cleanUp.good = ( ( ip = Webclient_GetIp( webclient ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
@@ -914,7 +915,7 @@ static JSObject * Webserver_Route_ResultToJS( JSContext * cx, const struct webcl
 }
 
 static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclient ) {
-	JSObject * clientObj;
+	JSObject * clientObj, * globalObj;
 	jsval clientObjVal, retVal;
 	struct payload_t * payload;
 	JSCompartment * oldCompartment;
@@ -926,8 +927,9 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
 	if ( payload != NULL ) {
 		JS_BeginRequest( payload->cx );
 		oldCompartment = JS_EnterCompartment( payload->cx, payload->objRoot );
+		globalObj = JS_GetGlobalForCompartmentOrNull( payload->cx, oldCompartment );
 		JS::RootedObject 		clientObjRoot( payload->cx, clientObj );
-		clientObj = Webserver_Route_ResultToJS( payload->cx, webclient );
+		clientObj = Webserver_Route_ResultToJS( payload, globalObj, webclient );
 		JS::RootedValue 		clientValRoot( payload->cx, clientObjVal );
 		JS::RootedValue 		retValRoot( payload->cx, retVal );
 		JS::MutableHandleValue 	retValMut( &retValRoot );
@@ -1295,7 +1297,6 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	if ( cleanUp.good ) {
 #if DEBUG && 0
 		JSScript * script;
-		//  @FIXME:  act on this depending on the compiled javascript debug build
 		JS_DescribeScriptedCaller( cx, &script, &lineNo );
 		fileName = JS_GetScriptFilename( cx, script );
 #else
@@ -1520,9 +1521,9 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
  *
  * @example
  * var timeoutId = setInterval(function(a, b) {
- *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
- *  }, 3000, 'foo', 'bar');
- *  ClearTimeout(timeoutId);
+ * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ * }, 3000, 'foo', 'bar');
+ * ClearTimeout(timeoutId);
  *
  * @see	setInterval
  * @see	clearTimeout
@@ -1548,9 +1549,9 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
  *
  * @example
  * var timeoutId = setInterval(function(a, b) {
- *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
- *  }, 3000, 'foo', 'bar');
- *  clearInterval(timeoutId);
+ * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ * }, 3000, 'foo', 'bar');
+ * clearInterval(timeoutId);
  *
  * @see	setTimeout
  * @see	clearTimeout
@@ -1573,9 +1574,9 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
  *
  * @example
  * var timeoutId = setInterval(function(a, b) {
- *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
- *  }, 3000, 'foo', 'bar');
- *  ClearTimeout(timeoutId);
+ * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ * }, 3000, 'foo', 'bar');
+ * ClearTimeout(timeoutId);
  *
  * @see	setInterval
  * @see	setTimeout
@@ -1593,9 +1594,9 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
  *
  * @example
  * var timeoutId = setInterval(function(a, b) {
- *  	Hard.log('Foo : ' + a + ' Bar : ' + b);
- *  }, 3000, 'foo', 'bar');
- *  clearInterval(timeoutId);
+ * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
+ * }, 3000, 'foo', 'bar');
+ * clearInterval(timeoutId);
  *
  * @see	setInterval
  * @see	setTimeout
@@ -1741,7 +1742,7 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	JS::RootedObject webserverObjRoot( javascript->context, webserverObj );
 #if HAVE_MYSQL == 1
 	JSObject * mysqlclientObj = JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 2, nullptr, nullptr, nullptr, nullptr );
-	JS::RootedObject mysqlclientObjRoot( javascript->context, mysqlclienObj );
+	JS::RootedObject mysqlclientObjRoot( javascript->context, mysqlclientObj );
 #endif
 	JSObject * postgresqlObj;
 	postgresqlObj =  JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 2, nullptr, nullptr, nullptr, nullptr );

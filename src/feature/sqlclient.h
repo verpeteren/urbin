@@ -36,9 +36,14 @@ struct sqlclient_t {
 	struct query_t *			currentQuery;
 	enum sqlAdapter_t			adapter;
 	union {
-		PGconn *					pg;
+		struct{
+			PGconn *						conn;
+						} 			pg;
 #if HAVE_MYSQL == 1
-		MYSAC *						my;
+		struct {
+			MYSAC *							conn;
+			unsigned int					statementId;
+						}			my;
 #endif
 							}	connection;
 	const char *				hostName;
@@ -49,7 +54,6 @@ struct sqlclient_t {
 	const char *				dbName;
 	int							socketFd;
 	unsigned char				timeoutSec;
-	unsigned int				statementId; //  only needed for mysac
 	struct query_t *			queries;
 	uint16_t					port;
 };
@@ -60,11 +64,17 @@ struct query_t{
 	const char **				paramValues;
 	size_t *					paramLengths;
 	size_t						paramCount;
-	unsigned int				statementId;
 	union {
-		PGresult * 					pg;
+		struct {
+			PGresult * 					res;
+		}							pg;
 #if HAVE_MYSQL == 1
-		MYSAC_RES * 				my;
+			struct {
+				MYSAC_RES * 				res;
+				unsigned int				statementId;
+				MYSAC_BIND * 				vars;
+				char *						resBuf;
+			}						my;
 #endif
 						} 		result;
 	void *						cbArgs;

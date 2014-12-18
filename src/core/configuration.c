@@ -4,7 +4,6 @@
 #include <libgen.h>
 
 #include "configuration.h"
-#include "../common.h"
 
 void Usage( const char * prog_name, const int code ) {
 	printf( "\nUsage: %s [options] [configurationFilename]\n"
