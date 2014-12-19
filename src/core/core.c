@@ -331,10 +331,15 @@ static void Core_ProcessTick( struct core_t * core ) {
 
 int Core_Loop( struct core_t * core ) {
 	struct module_t * module, * firstModule;
+	cfg_t * mainSection;
 	PRCList * next;
+	int maxWait;
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	maxWait = PR_CFG_LOOP_MAX_FDS;
+	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
+	maxWait = cfg_getint( mainSection, "loop_max_wait" );
 	cleanUp.good = 1;
 	firstModule = module = core->modules;
 	if ( firstModule != NULL ) {
@@ -350,7 +355,7 @@ int Core_Loop( struct core_t * core ) {
 		core->keepOnRunning = 1;
 		while ( core->keepOnRunning == 1 )  {
 			Core_ProcessTick( core );
-			picoev_loop_once( core->loop, 10 );
+			picoev_loop_once( core->loop, maxWait );
 		}
 	}
 	return (cleanUp.good)? 1: 0;

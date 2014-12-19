@@ -19,6 +19,7 @@ static const cfg_opt_t mainCfgOpts[] = {
 	CFG_INT( (char * ) "loop_max_fds",					PR_CFG_LOOP_MAX_FDS, CFGF_NONE ),
 	CFG_INT( (char * ) "loop_timeout_sec", 				PR_CFG_LOOP_TIMEOUT_SEC, CFGF_NONE ),
 	CFG_INT( (char * ) "loop_ticks_ms", 				PR_CFG_LOOP_TICKS_MS, CFGF_NONE ),
+	CFG_INT( (char * ) "loop_max_wait", 				PR_CFG_LOOP_MAX_WAIT, CFGF_NONE ),
 	CFG_BOOL( (char * ) "loop_daemon",					PR_CFG_LOOP_DAEMON, CFGF_NONE ),
 	CFG_STR( (char * ) "loop_log_level",	(char *)	PR_CFG_LOOP_LOG_LEVEL_TEXT, CFGF_NONE ),
 	CFG_END()

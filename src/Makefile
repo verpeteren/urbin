@@ -154,7 +154,7 @@ tags:	$(shell ls *.[ch])
 
 clean:
 	@echo cleaning
-	@rm -f $(CODE_OBJECTS) $(THE_EXECUTABLE) $(DOC_OBJECTS)
+	@rm -rf $(CODE_OBJECTS) $(THE_EXECUTABLE) $(DOC_OBJECTS) $(BIN_DIR)/*.a $(BIN_DIR)/*.so
 	
 propperclean: clean
 	@echo propper cleaning 

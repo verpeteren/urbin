@@ -1,4 +1,4 @@
 ronja
 lib*.a
-lib*.so
+lib*.so*
 
