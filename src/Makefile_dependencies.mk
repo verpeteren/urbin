@@ -131,14 +131,13 @@ $(LIB_TADL_SHARED): $(DIR_TADL)
 	@cd $(DIR_TADL) && \
 	$(CC) $(CC_DEBUG_FLAGS) $(CC_RELEASE_FLAGS) -c -o tadns.o tadns.c && \
 	$(CC) $(LD_DEBUG_FLAGS) $(LD_RELEASE_FLAGS) -fPIC -c -o tadns_shared.o tadns.c && \
-	$(CC) -shared -Wl,-soname,libtadns.so -o libtadns.so tadns_shared.o
-	@touch $@
 
 $(DIR_TADL):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q http://sourceforge.net/projects/adns/files/tadns/$(VER_TADL)/tadns-$(VER_TADL).tar.gz/download -O tadns-$(VER_TADL).tar.gz && \
 	tar -xaf tadns-$(VER_TADL).tar.gz 
+	@touch $@
 
 ###############################################################################
 # oniguruma: an regular expression engine
@@ -189,7 +188,7 @@ $(DIR_MYS):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q http://www.arpalert.org/src/mysac-$(VER_MYS).tar.gz && \
-	tar -xaf mysac-$(VER_MYS).tar.gz && \
+	tar -xaf mysac-$(VER_MYS).tJSDOC-Toolkit template based on bootstrap, and it realy looks slik! ar.gz && \
 	cd ./mysac-$(VER_MYS) && \
 	cp Makefile Makefile.org && \
 	sed -e"s/\/ITRIEDTOREPAIRusr\/include\/mysql/\.\.\/mysql-connector-c-$(VER_MY)-src -I\.\.\/mysql-connector-c-$(VER_MY)-src\/include/" \
@@ -210,7 +209,7 @@ $(LIB_MY_STATIC): $(DIR_MY) $(LIB_Z_STATIC)
 $(LIB_MY_SHARED): $(DIR_MY) $(LIB_Z_SHARED)
 	@echo $@
 	@cd $(DIR_MY)/ && \
-	cmake . -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 -DENABLED_PROFILING=0 -DWITHOUT_SERVER=1 -DWITH_VALGRIND=0 -DWITH_UNIT_TESTS=0 -DENABLE_GCOV=0 -DENABLE_GPROF=0 -DWITH_ZLIB=system&& \
+	cmake . -DCMAKE_INSTALL_PREFIX=/usr/locJSDOC-Toolkit template based on bootstrap, and it realy looks slik! al/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 -DENABLED_PROFILING=0 -DWITHOUT_SERVER=1 -DWITH_VALGRIND=0 -DWITH_UNIT_TESTS=0 -DENABLE_GCOV=0 -DENABLE_GPROF=0 -DWITH_ZLIB=system&& \
 	make
 	@touch $@
 
@@ -313,6 +312,16 @@ $(DIR_CONF):
 	tar -xaf confuse-$(VER_CONF).tar.gz
 
 ###############################################################################
+# Docstrape: JSDOC-Toolkit template based on bootstrap, and it realy looks slik!
+###############################################################################
+$(DIR_DST):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q https://github.com/verpeteren/Docstrape/archive/master.zip -O Docstrape.zip && \
+	unzip -qq Docstrape.zip && \
+	mv Docstrape-master Docstrape 
+
+###############################################################################
 # Boilerplate
 ###############################################################################
 .PHONY: depclean deppropperclean
@@ -323,5 +332,5 @@ depclean:
 
 deppropperclean: depclean
 	@echo cleaning all dependencies
-	@rm -rf $(shell find $(DEP_DIR)/* -type d)
+	@rm -rf $(DIRS) $(DEP_DIR)/*.zip $(DEP_DIR)/*.tar.gz $(DEP_DIR)/*.tar.bz2 $(DEP_DIR)/*.tar
 

@@ -2,8 +2,11 @@ include ./Makefile_platform.mk
 ###############################################################################
 # For the tweaker
 ###############################################################################
-#HAS_MYSQL = yes
-HAS_MYSQL = no
+CC = gcc
+#CC = clang
+
+HAS_MYSQL = yes
+#HAS_MYSQL = no
 
 #MAKE_STATIC_LIBS =yes
 MAKE_STATIC_LIBS = no
@@ -28,15 +31,13 @@ AR = ar
 RANLIB = ranlib
 CTAGS = ctags
 STRIP = strip
-CC = gcc
-#CC = clang
 
-#sharedLibFileToParam = $(shell echo $1 )
 sharedLibFileToParam = -L$(shell dirname $1) -l$(shell basename $1 .so|cut -b 4-)
 
 OBJ_DIR = .objects
 DEP_DIR = ../deps
 
+DIR_DST = $(DEP_DIR)/Docstrape
 VER_Z = 1.2.8
 DIR_Z = $(DEP_DIR)/zlib-$(VER_Z)
 INC_Z = -isystem$(DIR_Z)
@@ -101,7 +102,7 @@ else
 HAVE_MYSQL = -DHAVE_MYSQL=0
 endif
 
-DIRS = $(DIR_PICOEV) $(DIR_H3) $(DIR_CLOG) $(DIR_TADL) $(DIR_ONIG) $(DIR_PG) $(DIR_MOZ) $(DIR_NSPR) $(DIR_CONF) $(DIR_Z)
+DIRS = $(DIR_PICOEV) $(DIR_H3) $(DIR_CLOG) $(DIR_TADL) $(DIR_ONIG) $(DIR_PG) $(DIR_MOZ) $(DIR_NSPR) $(DIR_CONF) $(DIR_Z) $(DIR_DST)
 INCS = $(INC_PICOEV) $(INC_H3) $(INC_CLOG) $(INC_TADL) $(INC_ONIG) $(INC_PG) $(INC_MOZ) $(INC_NSPR) $(INC_CONF) $(INC_Z)
 ifeq ($(MAKE_STATIC_LIBS),yes)
 DEPS = $(LIB_PICOEV_STATIC) $(LIB_H3_STATIC) $(LIB_CLOG_STATIC) $(LIB_TADL_STATIC) $(LIB_ONIG_STATIC) $(LIB_PG_STATIC) $(LIB_MOZ_STATIC) $(LIB_NSPR_STATIC) $(LIB_CONF_STATIC) $(LIB_Z_STATIC)

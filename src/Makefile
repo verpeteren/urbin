@@ -35,7 +35,7 @@ CORE_DIR = ./core
 FEAT_DIR = ./feature
 GLOT_DIR = ./glot
 BIN_DIR = ../bin
-DOC_DIR = ../docs
+DOC_DIR = ../doc
 
 COMMON_HEADERS = common.h platform.h $(DIRS) 
 FEATURE_HEADERS = $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h
@@ -45,16 +45,17 @@ CORE_OBJECTS = $(OBJ_DIR)/utils.o $(OBJ_DIR)/configuration.o $(OBJ_DIR)/core.o
 FEAT_OBJECTS = $(OBJ_DIR)/webserver.o $(OBJ_DIR)/sqlclient.o
 GLOT_OBJECTS = $(OBJ_DIR)/javascript.o
 MAIN_OBJECTS = $(OBJ_DIR)/main_server.o
-DOC_API_OBJECT =  $(DOC_DIR)/Api.txt
+DOC_API_OBJECT = $(DOC_DIR)/Api.txt
+HTMLDOC_DIR = $(DOC_DIR)/html
 
-DOC_OBJECTS = $(DOC_API_OBJECT)
+DOC_OBJECTS = $(DOC_API_OBJECT) $(HTMLDOC_DIR)
 CODE_OBJECTS = $(CORE_OBJECTS) $(FEAT_OBJECTS) $(GLOT_OBJECTS) $(MAIN_OBJECTS)
 
 THE_EXECUTABLE = $(BIN_DIR)/ronja
 
 all: 	$(THE_EXECUTABLE) 
 deps:	$(DEPS)
-docs:   $(DOC_OBJECT)
+docs:   $(DOC_OBJECTS)
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION = 
@@ -132,6 +133,8 @@ $(DOC_API_OBJECT): tags
 	@echo $@
 	@echo 'PUBLIC\n' */* > $@ && \
 	grep "^RONJA_" tags|cut -f1|sort >> $@ 
+
+include ./Makefile_documentation.mk
 
 ###############################################################################
 # Boilerplate

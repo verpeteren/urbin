@@ -55,8 +55,8 @@ inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, co
  *
  * @name	Hard.onLoad
  * @event
- * @public:
- * @since	0.0.5b
+ * @public
+ * @since	0.0.8a
  * @returns	{null}
  *
  * @example
@@ -102,7 +102,7 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
  * @name	Hard.onReady
  * @event
  * @public
- * @since	0.0.5b
+ * @since	0.0.8a
  * @returns	{null}
  *
  * @example
@@ -129,9 +129,9 @@ unsigned char JavascriptModule_Ready( const struct core_t * core, struct module_
  * The javascript module is stopping.
  *
  * @name	Hard.onUnload
- * @event:
+ * @event
  * @public
- * @since	0.0.5b
+ * @since	0.0.8a
  * @returns	{null}
  *
  * @example
@@ -156,12 +156,14 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	}
 	return 1;
 }
-/*
-   ===============================================================================
-   Sqlclient OBJECT
-   ===============================================================================
-   */
 
+/**
+ * Sql client connection object.
+ *
+ * @name Hard.Sqlclient
+ * @private
+ * @object
+ */
 #define SET_PROPERTY_ON( handle, key, value ) do {\
 	JS::RootedValue valRoot( cx, value ); \
 	JS::HandleValue valHandle( valRoot ); \
@@ -257,13 +259,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	JS_free( cx, cPassword ); cPassword = NULL; \
 	return ( cleanUp.good ) ? true : false; \
 } while ( 0 );
-/**
- * Sql client connection object.
- *
- * @name Hard.Sqlclient
- * @private:
- * @object
- */
+
 
 #define SQL_CLIENT_QUERY_RESULT_HANDLER_CB( formatter, sub) do { \
 	struct payload_t * payload; \
@@ -424,7 +420,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
    ===============================================================================
    Mysql OBJECT
    ===============================================================================
-   */
+*/
 
 static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * myqlObj );
 
@@ -588,7 +584,7 @@ static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * mysqlObj ) {
    ===============================================================================
    Postgresql OBJECT
    ===============================================================================
-   */
+*/
 
 static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresqlObj );
 
@@ -808,13 +804,13 @@ static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresql
    ===============================================================================
    Webserver OBJECT
    ===============================================================================
-   */
+*/
 extern const char * MethodDefinitions[ ];
 /**
  * Webserver response object.
  *
  * @name Hard.Webserver.req
- * @private:
+ * @private
  * @object
  */
 static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
@@ -948,7 +944,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
  *
  * A javascript function will handle the request.
  *
- * @name	Hard.WebServer.addRoute
+ * @name	Hard.Webserver.addRoute
  * @function
  * @public
  * @since	0.0.5b
@@ -1103,7 +1099,7 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  *
  * @name	Hard.Webserver
  * @constructor
- * @public:
+ * @public
  * @since	0.0.5b
  * @returns	{object}					The web server javascript javascript
  * @param	{string}		serverIp	The Ip address that the server will listen to.<p>default: The value for 'server_address' int the http section of the configurationFile.</p>
@@ -1179,13 +1175,12 @@ static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj ) {
 		Webserver_Delete( webserver ); webserver = NULL;
 	}
 }
-/*===============================================================================
+/**
  * Hard javascript object.
  *
  * @name Hard
  * @public
  * @namespace
- ===============================================================================
  */
 static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn );
 static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn ) {
@@ -1245,14 +1240,12 @@ static const JSFunctionSpec jsmHard[ ] = {
 };
 
 /**
-  ===============================================================================
  * Standard javascript object.
  * Log messages to the console and the logger
  *
  * @name console
  * @public
  * @namespace
- ===============================================================================
  */
 
 /**
@@ -1318,13 +1311,11 @@ static const JSFunctionSpec jsmConsole[ ] = {
 };
 
 /**
-  ===============================================================================
  * Standard javascript object.
  *
  * @name global
  * @public
  * @namespace
- ===============================================================================
  */
 static void Payload_Delete( struct payload_t * payload ) {
 	JSAutoRequest ar( payload->cx );
@@ -1635,7 +1626,7 @@ static const JSFunctionSpec jsmGlobal[ ] = {
    ===============================================================================
    BOILERPLATE
    ===============================================================================
-   */
+*/
 static struct script_t * Script_New( const struct javascript_t * javascript, const char * cFile ) {
 	struct script_t * script;
 	int len;
@@ -1699,15 +1690,7 @@ static void Script_Delete( struct script_t * script ) {
 	script->bytecode = NULL;
 	free( script ); script = NULL;
 }
-/**
- * Function that is called when the first Javascript file is loaded correctly.
- *
- * @name	Hard.onInit
- * @event
- * @public
- *
- * @returns	{null}
- */
+
 static int Javascript_Run( struct javascript_t * javascript ) {
 	struct {unsigned char good:1;}cleanUp;
 

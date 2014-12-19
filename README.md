@@ -44,9 +44,9 @@ H2. Dependencies
 
 H3. Tools needed
 
-These tools are needed to complie the dependencies to build, but after that, they are not needed anymore
+These tools are needed to complie the dependencies to build, but after that, they are not needed anymore. 
 
-sudo apt-get install autoconf2.13 wget git sed unzip build-essential g++ make cmake python2.7 head tail cat tac ar ranlib tr echo cut basename dirname echo strip
+sudo apt-get install autoconf2.13 wget git sed unzip build-essential g++ make cmake python2.7 head tail cat tac ar ranlib tr echo cut basename dirname echo strip jsdoc-toolkit
 
 H3. Integrated libraries
 
@@ -65,6 +65,9 @@ H3. Optional libraries
 Topic		Project			License			SLOC		Link
 Mysql		mysac			GPL3			18593		http://cv.arpalert.org/page.sh?mysac
 
+H3. Disc space
+
+I just found out that after downloading and compiling the dependecies the directory is a little bit over 3.5 Gb!
 
 TBD, probably MIT
 MySql can be excluded from the linking
@@ -73,6 +76,9 @@ H2. FAQ
 
 Q:	What is your thing with Makefiles?
 A:	I think they are quite handy
+
+Q:	Why do you download and compile all the dependencies yourself. You could use the system libraries.
+A:	As this is cutting edge, the dependencies have not landed in your distro yet, or are ancient.
 
 
 
