@@ -350,7 +350,7 @@ int Core_Loop( struct core_t * core ) {
 		core->keepOnRunning = 1;
 		while ( core->keepOnRunning == 1 )  {
 			Core_ProcessTick( core );
-			picoev_loop_once( core->loop, 0 );
+			picoev_loop_once( core->loop, 10 );
 		}
 	}
 	return (cleanUp.good)? 1: 0;
