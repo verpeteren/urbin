@@ -1295,14 +1295,8 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( consoleObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-#if DEBUG && 0
-		JSScript * script;
-		JS_DescribeScriptedCaller( cx, &script, &lineNo );
-		fileName = JS_GetScriptFilename( cx, script );
-#else
 		fileName = __FILE__;
 		lineNo = __LINE__;
-#endif
 		Core_Log( javascript->core, LOG_INFO, fileName, lineNo, cString );
 	}
 	if ( cleanUp.cstring ) {

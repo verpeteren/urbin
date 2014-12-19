@@ -41,7 +41,7 @@ $(DIR_Z):
 $(LIB_PICOEV_STATIC): $(DIR_PICOEV)
 	@echo $@
 	@cd $(DIR_PICOEV) && \
-	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o picoev_static.o $(PICOEV_SOURCE) && \
+	$(CC) $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS) -c -o picoev_static.o $(PICOEV_SOURCE) && \
 	$(AR) cr libpicoev.a picoev_static.o && \
 	$(RANLIB) libpicoev.a
 	@touch $@
@@ -49,8 +49,8 @@ $(LIB_PICOEV_STATIC): $(DIR_PICOEV)
 $(LIB_PICOEV_SHARED): $(DIR_PICOEV)
 	@echo $@
 	@cd $(DIR_PICOEV) && \
-	$(CC) $(SPEEDFLAGS) $(DEVFLAGS) -fPIC -c -o picoev_shared.o $(PICOEV_SOURCE) && \
-	$(CC) -shared -Wl,-soname,libpicoev.so -o libpicoev.so picoev_shared.o
+	$(CC) $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS) -fPIC -c -o picoev_shared.o $(PICOEV_SOURCE) && \
+	$(CC) $(LD_DEBUG_FLAGS) $(LD_RELEASE_FLAGS) -shared -Wl,-soname,libpicoev.so -o libpicoev.so picoev_shared.o
 	@touch $@
 
 $(DIR_PICOEV):
@@ -69,7 +69,7 @@ $(DIR_PICOEV):
 $(LIB_CLOG_STATIC): $(DIR_CLOG)
 	@echo $@
 	@cd $(DIR_CLOG) && \
-	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o logging_static.o logging.c && \
+	$(CC) $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS) -c -o logging_static.o logging.c && \
 	$(AR) cr libclog.a logging_static.o && \
 	$(RANLIB) libclog.a
 	@touch $@
@@ -77,8 +77,8 @@ $(LIB_CLOG_STATIC): $(DIR_CLOG)
 $(LIB_CLOG_SHARED): $(DIR_CLOG)
 	@echo $@
 	@cd $(DIR_CLOG) && \
-	$(CC) $(SPEEDFLAGS) $(DEVFLAGS) -fPIC -c -o logging_shared.o logging.c && \
-	$(CC) -shared -Wl,-soname,libclog.so -o libclog.so logging_shared.o
+	$(CC) $(CC_DEBUG_FLAGS) $(CC_RELEASE_FLAGS) -fPIC -c -o logging_shared.o logging.c && \
+	$(CC) $(LD_DEBUG_FLAGS) $(LD_RELEASE_FLAGS) -shared -Wl,-soname,libclog.so -o libclog.so logging_shared.o
 	@touch $@
 
 $(DIR_CLOG):
@@ -121,7 +121,7 @@ $(DIR_H3):
 $(LIB_TADL_STATIC): $(DIR_TADL)
 	@echo $@
 	@cd $(DIR_TADL) && \
-	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o tadns_static.o tadns.c && \
+	$(CC) $(CC_DEBUG_FLAGS) $(CC_RELEASE_FLAGS) -c -o tadns_static.o tadns.c && \
 	$(AR) cr libtadns.a tadns_static.o && \
 	$(RANLIB) libtadns.a
 	@touch $@
@@ -129,8 +129,8 @@ $(LIB_TADL_STATIC): $(DIR_TADL)
 $(LIB_TADL_SHARED): $(DIR_TADL)
 	@echo $@
 	@cd $(DIR_TADL) && \
-	gcc $(SPEEDFLAGS) $(DEVFLAGS) -c -o tadns.o tadns.c && \
-	$(CC) $(SPEEDFLAGS) $(DEVFLAGS) -fPIC -c -o tadns_shared.o tadns.c && \
+	$(CC) $(CC_DEBUG_FLAGS) $(CC_RELEASE_FLAGS) -c -o tadns.o tadns.c && \
+	$(CC) $(LD_DEBUG_FLAGS) $(LD_RELEASE_FLAGS) -fPIC -c -o tadns_shared.o tadns.c && \
 	$(CC) -shared -Wl,-soname,libtadns.so -o libtadns.so tadns_shared.o
 	@touch $@
 

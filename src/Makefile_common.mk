@@ -11,6 +11,16 @@ MAKE_STATIC_LIBS = no
 CC_FLAGS =
 LD_FLAGS = 
 
+ifdef STAGING_RELEASE
+OPTMIZATIONLEVEL = -O2
+CC_RELEASE_FLAGS = 
+LD_RELEASE_FLAGS = 
+else
+OPTMIZATIONLEVEL = -O0
+CC_DEBUG_FLAGS = 
+LD_DEBUG_FLAGS = 
+endif
+
 ###############################################################################
 # For the master of the Makefiles
 ###############################################################################
