@@ -13,6 +13,27 @@
 #include "utils.h"
 
 #include "configuration.h"
+
+#ifdef SYSLOG_NAMES
+extern CODE prioritynames[];
+#else
+typedef struct _code {
+	const char *			c_name;
+	const int				c_val;
+} CODE;
+
+CODE prioritynames[] = {
+	{ "emerg", LOG_EMERG },
+	{ "alert", LOG_ALERT },
+	{ "crit", LOG_CRIT },
+	{ "err", LOG_ERR },
+	{ "warning", LOG_WARNING },
+	{ "notice", LOG_NOTICE },
+	{ "info", LOG_INFO },
+	{ "debug", LOG_DEBUG },
+	{ NULL, -1 }
+};
+#endif
 /*****************************************************************************/
 /* Global things                                                             */
 /*****************************************************************************/
@@ -39,6 +60,21 @@ void SetupSocket( const int fd ) {
 	assert( r == 0 );
 }
 
+static int GetPriorityFromName( const char * name ) {
+	int logLevel = PR_LOG_LEVEL_VALUE;
+	CODE * priority;
+
+	priority = &prioritynames[0];
+	while( priority->c_name != NULL ) {
+		if ( strcmp( priority->c_name, name) == 0 ) {
+			logLevel = priority->c_val;
+			break;
+		}
+		priority++;
+	}
+
+	return logLevel;
+}
 
 /*****************************************************************************/
 /* Modules                                                                   */
@@ -168,6 +204,7 @@ struct core_t * Core_New( const cfg_t * config ) {
 		core->config =  config;
 		core->timings = NULL;
 		core->modules = NULL;
+		core->logger.logLevel = PR_LOG_LEVEL_VALUE;
 		mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
 		timeoutSec = cfg_getint( mainSection, "loop_timeout_sec" );
 		if ( timeoutSec == 0 ) {
@@ -178,17 +215,13 @@ struct core_t * Core_New( const cfg_t * config ) {
 			core->processTicksMs = PR_CFG_LOOP_TICKS_MS;
 		}
 		//  Set up the logging
-#if DEBUG
-		core->logger.logLevel = LOG_DEBUG;
-#else
-		core->logger.logLevel = PR_LOG_LOG_LEVEL;
-#endif
 		if ( cfg_getbool( mainSection, "loop_daemon" ) == cfg_true ) {
 			 get_syslog_logger( & core->logger.logFun, 0, &core->logger.logMask);
 		} else {
 			//  we log to the stderr in interactive mode
 			get_stderr_logger( &core->logger.logFun, 0, &core->logger.logMask );
 		}
+		core->logger.logLevel = GetPriorityFromName( cfg_getstr( mainSection, "loop_log_level" ) );
 		core->logger.logMask( LOG_UPTO( core->logger.logLevel ) );
 		cleanUp.good = ( ( core->loop = picoev_create_loop( timeoutSec ) ) != NULL );
 	}
@@ -218,13 +251,12 @@ void Core_Log( const struct core_t * core, const int logLevel, const char * file
 	struct {unsigned char good:1;
 			unsigned char line:1;} cleanUp;
 
-	len = strlen( fileName ) + strlen( message ) + 4 +5 + 2;
+	len = strlen( fileName ) + strlen( message ) + 4 +5 + 1;
 	cleanUp.good = ( ( line = malloc( len ) ) != NULL );
-	printf( "[%s:%5d]\t%s\n", fileName, lineNr, message );
 	if ( cleanUp.good ) {
 		cleanUp.line = 1;
-		snprintf( line, len, "[%s:%5d]\t%s\n", fileName, lineNr, message );
-		core->logger.logFun( logLevel, "%", message );
+		snprintf( line, len, "[%s:%5d] %s", fileName, lineNr, message );
+		core->logger.logFun( logLevel, "%s", line );
 	}
 	if ( cleanUp.line ) {
 		free( line ); line = NULL;
