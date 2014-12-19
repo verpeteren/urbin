@@ -20,8 +20,8 @@ endif
 endif
 
 ifdef STAGING_RELEASE
-CC_RELEASE_FLAGS = $(OPTMIZATIONLEVEL)
-LD_RELEASE_FLAGS = $(OPTMIZATIONLEVEL)
+CC_RELEASE_FLAGS += $(OPTMIZATIONLEVEL)
+LD_RELEASE_FLAGS += $(OPTMIZATIONLEVEL)
 ifeq ($(CC),gcc)
 else 
 endif
@@ -35,6 +35,7 @@ CORE_DIR = ./core
 FEAT_DIR = ./feature
 GLOT_DIR = ./glot
 BIN_DIR = ../bin
+DOC_DIR = ../docs
 
 COMMON_HEADERS = common.h platform.h $(DIRS) 
 FEATURE_HEADERS = $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h
@@ -44,15 +45,16 @@ CORE_OBJECTS = $(OBJ_DIR)/utils.o $(OBJ_DIR)/configuration.o $(OBJ_DIR)/core.o
 FEAT_OBJECTS = $(OBJ_DIR)/webserver.o $(OBJ_DIR)/sqlclient.o
 GLOT_OBJECTS = $(OBJ_DIR)/javascript.o
 MAIN_OBJECTS = $(OBJ_DIR)/main_server.o
+DOC_API_OBJECT =  $(DOC_DIR)/Api.txt
 
+DOC_OBJECTS = $(DOC_API_OBJECT)
 CODE_OBJECTS = $(CORE_OBJECTS) $(FEAT_OBJECTS) $(GLOT_OBJECTS) $(MAIN_OBJECTS)
 
 THE_EXECUTABLE = $(BIN_DIR)/ronja
 
 all: 	$(THE_EXECUTABLE) 
-tests:	$(TST_EXECUTABLE) 
 deps:	$(DEPS)
-docs:   ../doc/Api.txt
+docs:   $(DOC_OBJECT)
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION = 
@@ -85,7 +87,7 @@ $(OBJ_DIR)/main_server.o:			./main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADE
 ###############################################################################
 # LINKING
 ###############################################################################
-$(THE_EXECUTABLE): 					$(DEPS) $(CODE_OBJECTS) docs tags
+$(THE_EXECUTABLE): 					$(DEPS) $(CODE_OBJECTS) $(DOC_OBJECT)
 ifeq ($(MAKE_STATIC_LIBS),yes)
 	@echo "\tLD.a :\t"$@
 else
@@ -99,24 +101,25 @@ endif
 ifdef STAGING_RELEASE
 	@$(STRIP) $@ $(DEPS)
 endif
+	@touch $@
 ###############################################################################
 # OBJECTS
 ###############################################################################
 $(OBJ_DIR)/main_%.o:				./main_%.cpp
 	@echo "\tCC\t"$@:
-	@$(CC) -std=$(STDCPP) $(INC) $(CC_FLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDCPP) $(CC_FLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 $(OBJ_DIR)/%.o:						$(FEAT_DIR)/%.c
 	@echo "\tCC\t"$@
-	@$(CC) -std=$(STDC) $(INC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 $(OBJ_DIR)/%.o:						$(CORE_DIR)/%.c
 	@echo "\tCC\t"$@
-	@$(CC) -std=$(STDC) $(INC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 $(OBJ_DIR)/%.o:						$(GLOT_DIR)/%.cpp
 	@echo "\tCC\t"$@
-	@$(CC) -std=$(STDCPP) $(INC) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
+	@$(CC) -std=$(STDCPP) $(CC_FLAGS) -c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 
 ###############################################################################
 # DEPENDENCIES
@@ -125,7 +128,7 @@ $(OBJ_DIR)/%.o:						$(GLOT_DIR)/%.cpp
 ###############################################################################
 # Documentation
 ###############################################################################
-../doc/Api.txt: tags
+$(DOC_API_OBJECT): tags
 	@echo $@
 	@echo 'PUBLIC\n' */* > $@ && \
 	grep "^RONJA_" tags|cut -f1|sort >> $@ 
@@ -144,11 +147,11 @@ check:
 tags:	$(shell ls *.[ch]) 
 	@$(CTAGS) --if0=no --languages=c,c++ -f $@ --fields=+Snf --extra=+q --exclude=$(DEP_DIR) -R . 2>/dev/null
 
-.PHONY: clean propperclean check
+.PHONY: clean propperclean check 
 
 clean:
 	@echo cleaning
-	@rm -f $(CODE_OBJECTS) $(THE_EXECUTABLE)
+	@rm -f $(CODE_OBJECTS) $(THE_EXECUTABLE) $(DOC_OBJECTS)
 	
 propperclean: clean
 	@echo propper cleaning 
