@@ -1,6 +1,7 @@
 var a  = Hard;
 
-/*
+console.log( "hee" );
+
 try {
 	console.log( "hee" );
 } catch ( e ) {
@@ -15,4 +16,3 @@ Hard.onReady = function( ) {
 Hard.onUnload = function( ) {
 	console.log( "unload" );
 }
-*/

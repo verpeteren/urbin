@@ -199,7 +199,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 } while ( 0 );
 
-#define SQL_CLASS_CONSTRUCTOR( engine_new, jsnClass, jsnMethods ) do { \
+#define SQL_CLASS_CONSTRUCTOR( engine_new, jsnClass ) do { \
 	struct sqlclient_t * sqlclient; \
 	struct javascript_t * instance; \
 	JSObject * globalObj, * sqlclientObj, * connObj, * thisObj; \
@@ -246,9 +246,6 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 	if ( cleanUp.good ) { \
 		sqlclientObj = JS_NewObjectForConstructor( cx, jsnClass, args ); \
-		JS::RootedObject 	sqlclientObjRoot( cx, sqlclientObj ); \
-		JS::HandleObject 	sqlclientObjHandle( sqlclientObjRoot ); \
-		JS_DefineFunctions( cx, sqlclientObjHandle, jsnMethods ); \
 		JS_SetPrivate( sqlclientObj, ( void * ) sqlclient ); \
 		args.rval().setObject( *sqlclientObj ); \
 	} else { \
@@ -568,7 +565,7 @@ static JSFunctionSpec jsmMysqlclient[ ] = {
  * @see	Hard.PostgreslClient
  */
 static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
-	SQL_CLASS_CONSTRUCTOR ( Postgresql_New, &jscMysqlclient, jsmMysqlclient);
+	SQL_CLASS_CONSTRUCTOR ( Postgresql_New, &jscMysqlclient );
 	return false;
 }
 
@@ -789,7 +786,7 @@ static JSFunctionSpec jsmPostgresqlclient[ ] = {
 
 
 static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
-	SQL_CLASS_CONSTRUCTOR ( Postgresql_New, &jscPostgresqlclient, jsmPostgresqlclient);
+	SQL_CLASS_CONSTRUCTOR ( Postgresql_New, &jscPostgresqlclient );
 	return false;
 }
 
@@ -1154,9 +1151,6 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 	}
 	if ( cleanUp.good ) {
 		JSObject * webserverObj = 	JS_NewObject( cx, &jscWebserver, JS::NullPtr( ), JS::NullPtr( ) );
-		JS::RootedObject 			webserverObjRoot( cx, webserverObj );
-		JS::HandleObject 			webserverObjHandle( webserverObjRoot );
-		JS_DefineFunctions( cx, webserverObjHandle, jsmWebserver );
 		JS_SetPrivate( webserverObj, ( void * ) webserver );
 		Webserver_JoinCore( webserver );
 		args.rval().setObject( *webserverObj );
@@ -1272,6 +1266,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	unsigned int lineNo;
 	char * cString;
 	struct {unsigned char good:1;
+			unsigned char fileName:1;
 			unsigned char cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -1288,9 +1283,23 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( consoleObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		fileName = __FILE__;
-		lineNo = __LINE__;
-		Core_Log( javascript->core, LOG_INFO, fileName, lineNo, cString );
+		JS::AutoFilename fileDesc;
+		if ( JS::DescribeScriptedCaller( cx, &fileDesc, &lineNo ) == true ) {
+			 cleanUp.good = ( ( fileName = Xstrdup( fileDesc.get( ) ) ) != NULL );
+			if ( cleanUp.good ) {
+				cleanUp.fileName = 1;
+			}
+		} else {
+			fileName = __FILE__;
+			lineNo = __LINE__;
+		}
+	}
+	if ( cleanUp.good ) {
+			Core_Log( javascript->core, LOG_INFO, fileName, lineNo, cString );
+	}
+	//  always cleanUp
+	if ( cleanUp.fileName ) {
+		free( (char*) fileName ); fileName = NULL;
 	}
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
@@ -1701,28 +1710,26 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	JS::HandleObject			globalObjHandle( globalObjRoot );
 
 	JSObject * consoleObj;
-	consoleObj = JS_NewObject( javascript->context, &jscConsole, JS::NullPtr( ), globalObjHandle );
+	consoleObj = 	JS_InitClass( javascript->context, globalObjHandle, JS::NullPtr( ), &jscConsole, nullptr, 0, nullptr, jsmConsole, nullptr, nullptr );
 	JS::RootedObject 			consoleObjRoot( javascript->context, consoleObj );
-	JS::HandleObject 			consoleObjHandle( consoleObjRoot );
-	JS_DefineFunctions( javascript->context, consoleObjHandle, jsmConsole );
 	JS_SetPrivate( consoleObj, (void * ) javascript );
 
 	JSObject * hardObj;
-	hardObj = JS_NewObject( javascript->context, &jscHard, JS::NullPtr( ), globalObjHandle );
-	JS::RootedObject 			hardObjRoot( javascript->context, hardObj );
-	JS::HandleObject 			hardObjHandle( hardObjRoot );
-	JS_DefineFunctions( javascript->context, hardObjHandle, jsmHard );
+	hardObj = 	JS_InitClass( javascript->context, globalObjHandle, JS::NullPtr( ), &jscHard, nullptr, 0, nullptr, jsmHard, nullptr, nullptr );
+	JS::RootedObject			hardObjRoot( javascript->context, hardObj );
+	JS::HandleObject			hardObjHandle( hardObjRoot );
 	JS_SetPrivate( hardObj, (void * ) javascript );
 
 	JSObject * webserverObj;
-	webserverObj = 	JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscWebserver, JsnWebserver_Constructor, 3, nullptr, nullptr, nullptr, nullptr );
+	webserverObj = 	JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscWebserver, JsnWebserver_Constructor, 3, nullptr, jsmWebserver, nullptr, nullptr );
 	JS::RootedObject webserverObjRoot( javascript->context, webserverObj );
 #if HAVE_MYSQL == 1
-	JSObject * mysqlclientObj = JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 2, nullptr, nullptr, nullptr, nullptr );
-	JS::RootedObject mysqlclientObjRoot( javascript->context, mysqlclientObj );
+	JSObject * mysqlObj;
+	mysqlObj = JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 2, nullptr, jsmMysqlclient, nullptr, nullptr );
+	JS::RootedObject mysqlObjRoot( javascript->context, mysqlObj );
 #endif
 	JSObject * postgresqlObj;
-	postgresqlObj =  JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 2, nullptr, nullptr, nullptr, nullptr );
+	postgresqlObj =  JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 2, nullptr, jsmPostgresqlclient, nullptr, nullptr );
 	JS::RootedObject pgsqlclientObj( javascript->context, postgresqlObj );
 
 	cleanUp.good = ( Javascript_AddScript( javascript, javascript->fileName ) != NULL ) ;
