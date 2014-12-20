@@ -637,7 +637,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 					}
 					if ( cleanUp.good ) {
 						picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READ, sqlclient->timeoutSec, Mysql_HandleConnect_cb, (void * ) sqlclient );
-						SetupSocket( sqlclient->socketFd );
+						SetupSocket( sqlclient->socketFd, 0 );
 						mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0);
 					}
 					if ( ! cleanUp.good ) {

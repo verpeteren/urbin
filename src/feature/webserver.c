@@ -530,7 +530,7 @@ static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, v
 	newFd = accept( fd, NULL, NULL );
 	if (newFd != -1) {
 
-		SetupSocket( newFd );
+		SetupSocket( newFd, 1 );
 		webclient = Webclient_New( webserver, newFd );
 		picoev_add( loop, newFd, PICOEV_READ, webserver->timeoutSec , Webserver_HandleRead_cb, (void *) webclient );
 	}
@@ -753,7 +753,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 		cleanUp.good = ( listen( webserver->socketFd, listenBacklog ) == 0 );
 	}
 	if ( cleanUp.good ) {
-		SetupSocket( webserver->socketFd );
+		SetupSocket( webserver->socketFd, 1 );
 		cleanUp.good = ( ( webserver->region = onig_region_new( ) ) != NULL );
 	}
 	if ( cleanUp.good ) {

@@ -50,13 +50,16 @@ void Shutdown( ) {
 	picoev_deinit( );
 }
 
-void SetupSocket( const int fd ) {
+void SetupSocket( const int fd, const unsigned char tcp ) {
 	int on, r;
 
 	on = 1;
-	r = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof( on ) );
-	assert( r == 0 );
-	r = fcntl( fd, F_SETFL, O_NONBLOCK );
+	if ( tcp ) {
+		r = setsockopt( fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof( on ) );
+		assert( r == 0 );
+	}
+	on = fcntl( fd, F_GETFL, 0 );
+	r = fcntl( fd, F_SETFL, on | O_NONBLOCK );
 	assert( r == 0 );
 }
 
@@ -232,7 +235,7 @@ struct core_t * Core_New( const cfg_t * config ) {
 	}
 	if ( cleanUp.good ) {
 		cleanUp.dns = 1;
-		SetupSocket( dns_get_fd( core->dns ) );
+		SetupSocket( dns_get_fd( core->dns ), 0 );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.dns ) {
