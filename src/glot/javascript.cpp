@@ -1826,6 +1826,7 @@ static void JsnReport_Error( JSContext * cx, const char * message, JSErrorReport
 
 struct javascript_t * Javascript_New( const struct core_t * core, const char * path, const char * fileName ) {
 	struct javascript_t * javascript;
+	char * lastChar;
 	struct {	unsigned char good:1;
 				unsigned char path:1;
 				unsigned char fileName:1;
@@ -1845,6 +1846,10 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	}
 	if 	( cleanUp.good ) {
 		cleanUp.path = 1;
+		lastChar = (char*) &javascript->path[strlen( javascript->path ) - 1];
+		if ( '/' == *lastChar ) {
+			*lastChar = '\0';
+		}
 		cleanUp.good = ( ( javascript->fileName = Xstrdup( fileName ) ) != NULL );
 	}
 	if ( cleanUp.good ) {

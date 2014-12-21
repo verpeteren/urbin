@@ -93,6 +93,7 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 	struct route_t * route;
 	OnigErrorInfo einfo;
 	UChar * pat;
+	char * lastChar;
 	struct { unsigned char good:1;
 			unsigned char route:1;
 			unsigned char onig:1;
@@ -118,9 +119,13 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 		PR_INIT_CLIST( &route->mLink );
 		switch ( route->routeType ) {
 			case ROUTETYPE_DOCUMENTROOT:
-				cleanUp.good = ( ( route->details.documentRoot = Xstrdup( details ) ) != NULL );
+				cleanUp.good = ( ( route->details.documentRoot = Xstrdup( (char*) details ) ) != NULL );
 				if ( cleanUp.good ) {
 					cleanUp.documentRoot = 1;
+					lastChar = (char *) &route->details.documentRoot[ strlen( route->details.documentRoot ) - 1];
+					if ( '/' == *lastChar ) {
+						*lastChar = '\0';
+					}
 				}
 				break;
 			case ROUTETYPE_DYNAMIC:
