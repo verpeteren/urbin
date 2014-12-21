@@ -1,84 +1,126 @@
-H1. RONJA
+# RONJA
 
-H1. Introduction
 
-H2. Why
+## Introduction
 
-I want to have a webserver, that is fast, scriptable with javascript, that can talk with postgresql.
+### Why
 
-H2. How
+Let's face it. Web-apps are here to stay for the next decade, and we all want to be super-productive.
+
+The browser side is javascript, using another language on the server causes too much thinking. So the serverside should be javascript as well.
+
+I always felt that Node.js and vert.x were too magic and I do not want to land in mediocracy, so I do not want to follow the mainstream.
+
+I want to have a special server, that is :
+
+	* fast webserver
+	* scriptable with javascript
+	* that can talk with postgresql
+	* works asyncronously
+	* is blazing fast 
+	* is super stabile
+	* extendable with modules other then webserver, a sqlclient 
+
+### How
 
 Building upon the good ideas from others, glue it together.
 
-H2. What
+	stability:	compile with full warnings / valgrind all the way
+	Fast:		non blocking, async, zero copy
+	Meme:		KEYMAKER: But like all systems, it has a weakness. The system is based on the rules of a building, one system built on another.
+
+
+
+### What
 
 Something cool
 
-H2. Who
+### Who
 
 Peter Reijnders <peter.reijnders@verpeteren.nl>
 
-H1. Manual
-
-H2. Install
+## Install
 
 
-./build.sh						# will create some platform specific settings, gets the dependencies and compiles
+>	./build.sh						# will create some platform specific settings, gets the dependencies and compiles
+>	
+>	cd ./src						#
+>	
+>	make -f Makefile.dependencies	# this may take some time
+>	
+>	make							# compiles
+>	
+>	../bin/ronja					# demo
 
-#
-#cd ./src						#
-#make -f Makefile.dependencies	# this may take some time
-#make							# compiles
-#../bin/ronja					# demo
 
+## Project organisation
 
-H1. Project organisation
-
-H2. Codestyle
+### Codestyle
 
 
 * Following ID software's code style guide: http://www.geeks3d.com/downloads/200811/idSoftware-Coding-Conventions-Geeks3D.com.pdf
 * Take track of memory alloctions and the appropiate cleanup with an anonymous struct see http://blog.staila.com/?p=114 for details
 
-H2. Dependencies
+### Dependencies
 
-H3. Tools needed
+#### Tools needed
 
-These tools are needed to complie the dependencies to build, but after that, they are not needed anymore. 
+These tools are needed to compile the dependencies to build, but after that, they are not needed anymore. 
 
-sudo apt-get install autoconf2.13 wget git sed unzip build-essential g++ make cmake python2.7 head tail cat tac ar ranlib tr echo cut basename dirname echo strip jsdoc-toolkit
+`sudo apt-get install autoconf2.13 wget git sed unzip build-essential g++ make cmake python2.7 head tail cat tac ar ranlib tr echo cut basename dirname echo strip jsdoc-toolkit`
 
-H3. Integrated libraries
+#### Integrated libraries
 
-Topic		Project			License			SLOC		Link
-Eventloop	picoev			BSD				 1140		http://developer.cybozu.co.jp/archives/kazuho/2009/08/picoev-a-tiny-e.html
-Http Parser	H3				MIT				  481		https://github.com/c9s/h3
-Logging		c-logging		Public Domain	  230		https://github.com/dhess/c-logging
-Dns			TADNS			Beer-ware		  570		http://adns.sourceforge.net/
-Regex		oniguruma		BSD				19458		http://www.geocities.jp/kosako3/oniguruma/
-Postgresql	pq				Postgresql		53205		http://www.postgresql.org/docs/9.4/static/libpq.html
-Portabilty	nspr			MPL2.0		   112077		https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSPR
-Javascritp	spidermonkey	MPL2.0		   439718		https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey
+|	Topic		|	Project			|	License			|	SLOC	|	Link	|
+|---------------|-------------------|-------------------|-----------|-----------|
+|	Eventloop	|	picoev			|	BSD				|	  1140	|	http://developer.cybozu.co.jp/archives/kazuho/2009/08/picoev-a-tiny-e.html	|
+|	Http Parser	|	H3				|	MIT				|	   481	|	https://github.com/c9s/h3	|
+|	Logging		|	c-logging		|	Public Domain	|	   230	|	https://github.com/dhess/c-logging	|
+|	Dns			|	TADNS			|	Beer-ware		|	   570	|	http://adns.sourceforge.net/	|
+|	Regex		|	oniguruma		|	BSD				|	 19458	|	http://www.geocities.jp/kosako3/oniguruma/	|
+|	Postgresql	|	pq				|	Postgresql		|	 53205	|	http://www.postgresql.org/docs/9.4/static/libpq.html	|
+|	Portabilty	|	nspr			|	MPL2.0			|	112077	|	https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSPR	|
+|	Javascritp	|	spidermonkey	|	MPL2.0			|	439718	|	https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey	|
 
-H3. Optional libraries
+#### Optional libraries
 
-Topic		Project			License			SLOC		Link
-Mysql		mysac			GPL3			18593		http://cv.arpalert.org/page.sh?mysac
+>	Topic		Project			License			SLOC		Link
+>	Mysql		mysac			GPL3			18593		http://cv.arpalert.org/page.sh?mysac
 
-H3. Disc space
+#### Disc space
 
-I just found out that after downloading and compiling the dependecies the directory is a little bit over 3.5 Gb!
+To download and compile the dependecies the *deps* directory is a little bit over 3.5 Gb! Amazing..
+
+### Licence
 
 TBD, probably MIT
+
 MySql can be excluded from the linking
 
-H2. FAQ
+## FAQ
 
-Q:	What is your thing with Makefiles?
-A:	I think they are quite handy
+Q:	**What is your thing with Makefiles?**
 
-Q:	Why do you download and compile all the dependencies yourself. You could use the system libraries.
+A:	They help with 'once-and-only-once' definitions
+
+Q:	**Why do you download and compile all the dependencies yourself? You could use the system libraries.**
+
 A:	As this is cutting edge, the dependencies have not landed in your distro yet, or are ancient.
 
+Q:	**What is with the name?**
 
+A:	That is just a placeholder, It is likeley to change before version 0.10.0
 
+Q:	**What is the relationship with APE-Project?**
+
+A:	Ajax-Push-Engine and libapenetwork are focussed on async sockets; This project strives to be less advanced (KISS) then APE. However some ideas appear to be simular.
+
+## Common errors
+
+E:	**`error while loading shared libraries: libXXX.so: cannot open shared object file: No such file or directory`**
+
+S: `export LD_LIBRARY_PATH=`pwd``
+
+E: **`./etc/ronja.conf:2:` "`no such option`" or "`missing title for section`" or "`invalid integer value for option`"**
+
+S: check that config file, in line 2: there is a typo
