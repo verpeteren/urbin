@@ -32,6 +32,7 @@ HAVES = $(HAVE_MYSQL)
 CORE_DIR = ./core
 FEAT_DIR = ./feature
 GLOT_DIR = ./glot
+MAIN_DIR = ./main
 BIN_DIR = ../bin
 DOC_DIR = ../doc
 
@@ -83,7 +84,7 @@ $(OBJ_DIR)/core.o:					$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(CORE_DIR)/configu
 $(OBJ_DIR)/sqlclient.o:				$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(COMMON_HEADERS) 
 $(OBJ_DIR)/webserver.o:				$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(COMMON_HEADERS)
 $(OBJ_DIR)/javascript.o:			$(GLOT_DIR)/javascript.cpp $(GLOT_DIR)/javascript.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS) 
-$(OBJ_DIR)/main_server.o:			./main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADERS) $(GLOT_HEADERS) $(COMMON_HEADERS)
+$(OBJ_DIR)/main_server.o:			$(MAIN_DIR)/main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADERS) $(GLOT_HEADERS) $(COMMON_HEADERS)
 
 ###############################################################################
 # LINKING
@@ -109,7 +110,7 @@ endif
 ###############################################################################
 # OBJECTS
 ###############################################################################
-$(OBJ_DIR)/main_%.o:				./main_%.cpp
+$(OBJ_DIR)/main_%.o:				$(MAIN_DIR)/main_%.cpp
 	@echo "\tCC\t"$@:
 	@$(CC) -std=$(STDCPP) $(CC_FLAGS) 	-c $< -o $@ $(EXCEPTION) -I$(CORE_DIR) $(HAVES) $(INCS)
 

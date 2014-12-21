@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "./core/core.h"
-#include "./feature/webserver.h"
-#include "./feature/sqlclient.h"
-#include "./glot/javascript.h"
+#include "../core/core.h"
+#include "../feature/webserver.h"
+#include "../feature/sqlclient.h"
+#include "../glot/javascript.h"
 
 
 static struct core_t * core;
