@@ -204,7 +204,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	struct sqlclient_t * sqlclient; \
 	struct javascript_t * instance; \
 	JSObject * globalObj, * sqlclientObj, * connObj, * thisObj; \
-	char * cHostName, * cIp, * cUserName, *cPassword, * cDbName; \
+	char * cHostName, * cIp, * cUserName, * cPassword, * cDbName; \
 	int port, timeoutSec; \
 	JS::CallArgs args; \
 	struct {unsigned char good:1;} cleanUp; \
@@ -221,10 +221,11 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	port = 0; \
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "o/i", &connObj, &timeoutSec ) == true ); \
 	if ( cleanUp.good ) { \
+		jsval value; \
+		\
+		value = JSVAL_NULL; \
 		JS::RootedObject connObjRoot( cx, connObj ); \
 		JS::HandleObject connObjHandle( connObjRoot ); \
-		jsval value; \
-		value = JSVAL_NULL; \
 		JS::RootedValue valueRoot( cx, value ); \
 		JS::MutableHandleValue valueMut( &valueRoot ); \
 		/*  Refer to http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS for more details. */ \
@@ -254,6 +255,9 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 	\
 	memset( cPassword, '\0', strlen( cPassword ) ); /*  @TODO:  clean jPassword */ \
+	JS_free( cx, cHostName ); cHostName = NULL; \
+	JS_free( cx, cIp ); cIp = NULL; \
+	JS_free( cx, cUserName ); cUserName = NULL; \
 	JS_free( cx, cPassword ); cPassword = NULL; \
 	return ( cleanUp.good ) ? true : false; \
 } while ( 0 );
@@ -505,7 +509,7 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * @param	{function}	fn				The callback function ({response} query, int returnCode SuccessCode (..)
  *
  * @example
- * var pg = this.Hard.PostgresqlClient('hostaddr=10.0.0.25 dbname=apedevdb user=apedev password=vedepa port=5432;', 60);
+ * var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
  * pg.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
  * 	if ( returnCode == 0) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++) {
@@ -549,7 +553,7 @@ static JSFunctionSpec jsmMysqlclient[ ] = {
  * @param	{string}		params.db			The database name
  * @param	{string}		params.user			The database user
  * @param	{string}		params.password		The database user password
- * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' int the postgresql section of the configurationFile.</p>
+ * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
  * var my = this.Hard.MysqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
@@ -724,7 +728,7 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * @param	{function}	fn				The callback function ({response} query, int returnCode SuccessCode (..)
  *
  * @example
- * var pg = this.Hard.PostgresqlClient('hostaddr=10.0.0.25 dbname=apedevdb user=apedev password=vedepa port=5432;', 60);
+ * var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
  * pg.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
  * 	if ( returnCode == 0) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++) {
@@ -768,7 +772,7 @@ static JSFunctionSpec jsmPostgresqlclient[ ] = {
  * @param	{string}		params.db			The database name
  * @param	{string}		params.user			The database user
  * @param	{string}		params.password		The database user password
- * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' int the postgresql section of the configurationFile.</p>
+ * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
  * var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
@@ -950,7 +954,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
  * @param	{function}		fn		The callback function ({response} client, int returnCode SuccessCode (..).
  *
  * @example
- * var ws = this.Hard.Websserver( '10.0.0.25', 8888, 60 );
+ * var ws = this.Hard.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
  * ws.addRoute('^/a$', function(client, returnCode) {
  * 	console.log('got ' + client.url);
  * 	client.response.content='<html><h1>response </h1><html>';
@@ -1025,10 +1029,10 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
  * @since	0.0.5b
  * @returns	{boolean}						If the route could be registered successfully it returns true; else false is returned
  * @param	{string}		pattern			The regular expression that triggers a lookup in the filesystem. Please not that this is a string and not a RegExp object. The expression must have exactly 1 group. This will act as the placeholder for the requested file.
- * @param	{string}		documentRoot	The folder name that acts as the document root for this webserver.<p>default: The value for 'document_root' int the http section of the configurationFile</p>
+ * @param	{string}		documentRoot	The folder name that acts as the document root for this webserver.<p>default: The value for 'document_root' in the http section of the configurationFile</p>
  *
  * @example
- * var ws = this.Hard.Webserver( '10.0.0.25', 8888, 60 );
+ * var ws = this.Hard.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
  * ws.addDocumentRoot('^/static/(.*)', '/var/www/static/');
  *
  * @see	Hard.Webserver
@@ -1098,13 +1102,14 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * @constructor
  * @public
  * @since	0.0.5b
- * @returns	{object}					The web server javascript javascript
- * @param	{string}		serverIp	The Ip address that the server will listen to.<p>default: The value for 'server_address' int the http section of the configurationFile.</p>
- * @param	{integer}		[port]		The port that the server should bind to.<p>default: The value for 'port' int the http section of the configurationFile.</p>
- * @param	{integer}		[timeout]	The timeout for valid connections<p>default: The value for 'timeout' int the http section of the configurationFile.</p>
+ * @returns	{object}							The web server javascript javascript
+ * @param	{object}		params				The connection string.
+ * @param	{string}		params.ip			The Ip address that the server will listen to.<p>default: The value for 'ip' in the webserver  section of the configurationFile.</p>
+ * @param	{int}			params.port			The port that the server should bind to.<p>default: The value for 'port' in the webserver section of the configurationFile.</p>
+ * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the webserver section of the configurationFile.</p>
  *
  * @example
- * var ws = this.Hard.Webserver( '10.0.0.25', 8888, 60 );
+ * var ws = this.Hard.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
  * ws.addRoute('^/a$', function(client, returnCode) {
  * 	console.log('got ' + client.url);
  * 	client.response.content='<html><h1>response </h1><html>';
@@ -1117,7 +1122,7 @@ static const JSFunctionSpec jsmWebserver[ ] = {
 static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
 	struct javascript_t * javascript;
-	JSString * jServerIp;
+	JSObject * connObj;
 	JS::CallArgs args;
 	const char * cDocumentRoot, * cPath;
 	char * cServerIp;
@@ -1131,9 +1136,17 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 	cPath = NULL;
 	port = 0;
 	cServerIp = NULL;
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "S/ii", &jServerIp, &port, &timeoutSec ) == true );
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "o/i", &connObj, &port, &timeoutSec ) == true );
 	if ( cleanUp.good ) {
-		cleanUp.good = ( ( cServerIp = JS_EncodeString( cx, jServerIp ) ) != NULL );
+		jsval value;
+
+		value = JSVAL_NULL;
+		JS::RootedObject connObjRoot( cx, connObj );
+		JS::HandleObject connObjHandle( connObjRoot );
+		JS::RootedValue valueRoot( cx, value );
+		JS::MutableHandleValue valueMut( &valueRoot );
+		CONNOBJ_GET_PROP_STRING( "ip", cServerIp );
+		CONNOBJ_GET_PROP_NR( "port", port );
 	}
 	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vpn ) );
 	if ( cleanUp.good ) {
