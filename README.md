@@ -42,16 +42,32 @@ Peter Reijnders <peter.reijnders@verpeteren.nl>
 ## Install
 
 
->	./build.sh						# will create some platform specific settings, gets the dependencies and compiles
->	
->	cd ./src						#
->	
->	make -f Makefile.dependencies	# this may take some time
->	
->	make							# compiles
->	
->	../bin/ronja					# demo
+>	#Create some platform specific settings, gets the dependencies and compiles
+>	`./build.sh
 
+>	#Get and compile the dependencies (may take some time)
+
+>	`cd ./src
+
+>	`make deps`
+
+>	#Then compile
+
+>	`make all`
+
+>	#Then configure
+
+>	`cd ../bin`
+
+>	`vi ./etc/ronja.conf`
+
+>	#then hack
+
+>	`vi ../var/scripts/javascript/main.hard.js`
+
+>	#Then run
+
+>	`./ronja`
 
 ## Project organisation
 
