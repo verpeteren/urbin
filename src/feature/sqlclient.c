@@ -21,7 +21,7 @@ static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient
 /*****************************************************************************/
 /* Query     .                                                               */
 /*****************************************************************************/
-void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args ) {
+void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args ) {
 	struct query_t * query;
 	size_t i, j;
 	struct {unsigned char good:1;
@@ -59,7 +59,7 @@ void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, cons
 	}
 	if ( cleanUp.good ) {
 		cleanUp.length = 1;
-		cleanUp.good = ( ( query->paramValues = malloc( sizeof( *query->paramValues) * query->paramCount ) ) != NULL );
+		cleanUp.good = ( ( query->paramValues = malloc( sizeof( *query->paramValues ) * query->paramCount ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.values = 1;
@@ -85,20 +85,20 @@ void Query_New ( struct sqlclient_t * sqlclient, const char * sqlStatement, cons
 			free( ( char * ) query->statement );	query->statement = NULL;
 		}
 		if ( cleanUp.length ) {
-			free( query->paramLengths ) ; query->paramLengths = NULL;
+			free( query->paramLengths ); query->paramLengths = NULL;
 		}
 		if ( cleanUp.values ) {
 			free( query->paramValues ); query->paramValues = NULL;
 		}
 		if ( cleanUp.params ) {
-			for ( j = 0; j < i ; j++ ) {
+			for ( j = 0; j < i; j++ ) {
 				free( (char *) query->paramValues[j] ); query->paramValues[j] = NULL;
 			}
 		}
 	}
 }
 
-void Query_Delete ( struct query_t * query ) {
+void Query_Delete( struct query_t * query ) {
 	size_t i;
 
 	for ( i = 0; i < query->paramCount; i++ ) {
@@ -169,7 +169,7 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 		}
 		//  We're done with this query, go back to start and collect 20k
 		sqlclient->currentQuery = NULL;
-		picoev_del( loop, fd ) ;
+		picoev_del( loop, fd );
 		picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
 	}
 }
@@ -192,7 +192,7 @@ static void Postgresql_HandleWrite_cb( picoev_loop * loop, const int fd, const i
 				cleanUp.good = ( PQsendQuery( sqlclient->connection.pg.conn, query->statement ) == 1 );
 			} else {
 				//  Send out the query and the parameters to the datebase engine
-				picoev_del( loop, fd ) ;
+				picoev_del( loop, fd );
 				picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleRead_cb, cbArgs );
 				//  only Version 2 protocoll, and only one command per statement
 				cleanUp.good = ( PQsendQueryParams( sqlclient->connection.pg.conn, query->statement, (int) query->paramCount, NULL, query->paramValues, (const int *) query->paramLengths, NULL, 0 ) == 1 );
@@ -210,7 +210,7 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 	struct sqlclient_t * sqlclient;
 
 	sqlclient = (struct sqlclient_t *) cbArgs;
-	if ( ( events & PICOEV_TIMEOUT) != 0 ) {
+	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
@@ -225,8 +225,8 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 				if ( PQstatus( sqlclient->connection.pg.conn ) != CONNECTION_OK ) {
 					Sqlclient_CloseConn( sqlclient );
 				} else {
-					//  We are connected ( and have the database ), we are good to go.
-					picoev_del( loop, fd ) ;
+					//  We are connected, and have the database, we are good to go.
+					picoev_del( loop, fd );
 					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
 				}
 			} else {
@@ -293,7 +293,7 @@ static void	Mysql_HandleRead_cb	( picoev_loop * loop, const int fd, const int ev
 	int retCode;
 	struct {unsigned char good:1; } cleanUp;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	sqlclient = (struct sqlclient_t *) cbArgs;
 	query = sqlclient->currentQuery;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
@@ -310,7 +310,7 @@ static void	Mysql_HandleRead_cb	( picoev_loop * loop, const int fd, const int ev
 		}
 		//  We're done with this query, go back to start and collect 20k
 		sqlclient->currentQuery = NULL;
-		picoev_del( loop, fd ) ;
+		picoev_del( loop, fd );
 		picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArgs );
 	}
 }
@@ -337,7 +337,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const in
 		cleanUp.good = ( ( query->result.my.vars = (MYSAC_BIND *) calloc( sizeof( MYSAC_BIND ), query->paramCount ) ) != NULL );
 		if ( cleanUp.good ) {
 			cleanUp.vars = 1;
-			cleanUp.good = (( query->result.my.resBuf = malloc( MYSQL_BUFS ) ) != NULL);
+			cleanUp.good = ( ( query->result.my.resBuf = malloc( MYSQL_BUFS ) ) != NULL );
 		}
 		if ( cleanUp.good ) {
 			cleanUp.resBuf = 1;
@@ -373,7 +373,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const in
 			if ( cleanUp.id ) {
 				query->result.my.statementId = 0;
 			}
-			if ( cleanUp.ev) {
+			if ( cleanUp.ev ) {
 				picoev_del( loop, fd );
 			}
 			if ( cleanUp.resBuf ) {
@@ -402,7 +402,7 @@ static void	Mysql_HandleWrite_cb( picoev_loop * loop, const int fd, const int ev
 		//  Let's get some work
 		query = Sqlclient_PopQuery( sqlclient );
 		if ( query != NULL ) {
-			picoev_del( loop, fd ) ;
+			picoev_del( loop, fd );
 			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleSetParams_cb, cbArgs );
 			cleanUp.ev = 1;
 			//  Mysac needs to perpare the statement
@@ -425,7 +425,7 @@ static void Mysql_HandleSetDb_cb( picoev_loop * loop, const int fd, const int ev
 	int retCode;
 
 	sqlclient = (struct sqlclient_t *) cbArgs;
-	if ( ( events & PICOEV_TIMEOUT) != 0 ) {
+	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
@@ -445,7 +445,7 @@ static void Mysql_HandleConnect_cb( picoev_loop * loop, const int fd, const int 
 	int retCode;
 
 	sqlclient = (struct sqlclient_t *) cbArgs;
-	if ( ( events & PICOEV_TIMEOUT) != 0 ) {
+	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
@@ -489,7 +489,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 	sqlclient = NULL;
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( ( sqlclient = malloc( sizeof( *sqlclient ) ) ) != NULL ) );
-	if ( cleanUp.good) {
+	if ( cleanUp.good ) {
 		sqlclient->core = core;
 		sqlclient->port = port;
 		sqlclient->adapter = adapter;
@@ -508,7 +508,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 		}
 		sqlclient->hostName = sqlclient->ip = sqlclient->loginName = sqlclient->password = sqlclient->dbName = NULL;
 	}
-	  //  @TODO:  drop parameter ip and do a hostname lookup (well actually at 'connect' as the ip address could change)
+	  //  @TODO:  drop parameter ip and do a hostname lookup. Well actually at 'connect' as the ip address could change
 	if ( hostName == NULL && ip == NULL ) {
 		return NULL;
 	} else if ( hostName == NULL && ip != NULL ) {
@@ -540,7 +540,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 	}
 	if ( cleanUp.good ) {
 		cleanUp.password = 1;
-		cleanUp.good = ( ( sqlclient->dbName = Xstrdup( dbName) ) != NULL );
+		cleanUp.good = ( ( sqlclient->dbName = Xstrdup( dbName ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.dbName = 1;
@@ -555,12 +555,12 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 		sqlclient->currentQuery = NULL;
 		Sqlclient_Connect( sqlclient );
 	}
-	if ( ! cleanUp.good) {
+	if ( ! cleanUp.good ) {
 		if ( cleanUp.hostName ) {
 			free( (char *) sqlclient->hostName ); sqlclient->hostName = NULL;
 		}
-		if ( cleanUp.ip) {
-			free( (char *) sqlclient->ip); 	sqlclient->ip= NULL;
+		if ( cleanUp.ip ) {
+			free( (char *) sqlclient->ip); 	sqlclient->ip = NULL;
 		}
 		if ( cleanUp.loginName ) {
 			free( (char *) sqlclient->loginName ); 	sqlclient->loginName = NULL;
@@ -580,7 +580,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 	return sqlclient;
 }
 
-static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
+static void Sqlclient_Connect( struct sqlclient_t * sqlclient ) {
 	char * connString;
 	size_t len;
 	struct {unsigned char conn:1;
@@ -594,7 +594,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 		case SQLADAPTER_POSTGRESQL:
 			if ( sqlclient->connection.pg.conn == NULL ) {
 #define CONNSTRING_TEMPLATE "host=%s port=%d dbname=%s user=%s password=%s hostaddr=%s"
-				len = 1 + strlen( CONNSTRING_TEMPLATE ) + strlen( sqlclient->hostName ) + 5 + strlen( sqlclient->dbName ) + strlen( sqlclient->loginName ) + strlen( sqlclient->password ) + strlen( sqlclient->ip ) - 12 ;
+				len = 1 + strlen( CONNSTRING_TEMPLATE ) + strlen( sqlclient->hostName ) + 5 + strlen( sqlclient->dbName ) + strlen( sqlclient->loginName ) + strlen( sqlclient->password ) + strlen( sqlclient->ip ) - 12;
 				cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
 				if ( cleanUp.good ) {
 					cleanUp.connString = 1;
@@ -613,7 +613,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 				}
 				if ( ! cleanUp.good ) {
 					if ( cleanUp.conn ) {
-						PQfinish( sqlclient->connection.pg.conn ); sqlclient->connection.pg.conn= NULL;
+						PQfinish( sqlclient->connection.pg.conn ); sqlclient->connection.pg.conn = NULL;
 					}
 				}
 			}
@@ -638,7 +638,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 					if ( cleanUp.good ) {
 						picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READ, sqlclient->timeoutSec, Mysql_HandleConnect_cb, (void * ) sqlclient );
 						SetupSocket( sqlclient->socketFd, 0 );
-						mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0);
+						mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0 );
 					}
 					if ( ! cleanUp.good ) {
 						if ( cleanUp.conn ) {
@@ -660,7 +660,7 @@ static void Sqlclient_Connect ( struct sqlclient_t * sqlclient ) {
 	}
 }
 
-static void Sqlclient_CloseConn ( struct sqlclient_t * sqlclient ) {
+static void Sqlclient_CloseConn( struct sqlclient_t * sqlclient ) {
 	picoev_del( sqlclient->core->loop, sqlclient->socketFd );
 	switch ( sqlclient->adapter ) {
 	case SQLADAPTER_POSTGRESQL:
@@ -682,7 +682,7 @@ static void Sqlclient_CloseConn ( struct sqlclient_t * sqlclient ) {
 	sqlclient->socketFd = 0;
 }
 
-static void Sqlclient_PushQuery ( struct sqlclient_t * sqlclient, struct query_t * query ) {
+static void Sqlclient_PushQuery( struct sqlclient_t * sqlclient, struct query_t * query ) {
 	if ( query != NULL ) {
 		if ( sqlclient->queries == NULL ) {
 			sqlclient->queries = query;
@@ -692,7 +692,7 @@ static void Sqlclient_PushQuery ( struct sqlclient_t * sqlclient, struct query_t
 	}
 }
 
-static struct query_t * Sqlclient_PopQuery ( struct sqlclient_t * sqlclient ) {
+static struct query_t * Sqlclient_PopQuery( struct sqlclient_t * sqlclient ) {
 	PRCList * next;
 
 	if ( sqlclient->currentQuery == NULL ) {
@@ -711,17 +711,17 @@ static struct query_t * Sqlclient_PopQuery ( struct sqlclient_t * sqlclient ) {
 	return sqlclient->currentQuery;
 }
 
-void Sqlclient_Delete ( struct sqlclient_t * sqlclient ) {
+void Sqlclient_Delete( struct sqlclient_t * sqlclient ) {
 	struct query_t * query;
 
 	//  cleanup the queries
 	if ( sqlclient->currentQuery != NULL ) {
-		Query_Delete( sqlclient->currentQuery); sqlclient->currentQuery = NULL;
+		Query_Delete( sqlclient->currentQuery ); sqlclient->currentQuery = NULL;
 	}
 	do {
 		query = Sqlclient_PopQuery( sqlclient );
 		Query_Delete( query ); sqlclient->currentQuery = NULL;  //  pop sets also current query
-	} while (query != NULL );
+	} while ( query != NULL );
 	//  cleanup the rest
 	Sqlclient_CloseConn( sqlclient );
 	sqlclient->timeoutSec = 0;

@@ -189,7 +189,7 @@ $(DIR_MYS):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q http://www.arpalert.org/src/mysac-$(VER_MYS).tar.gz && \
-	tar -xaf mysac-$(VER_MYS).tJSDOC-Toolkit template based on bootstrap, and it realy looks slik! ar.gz && \
+	tar -xaf mysac-$(VER_MYS).tar.gz && \
 	cd ./mysac-$(VER_MYS) && \
 	cp Makefile Makefile.org && \
 	sed -e"s/\/ITRIEDTOREPAIRusr\/include\/mysql/\.\.\/mysql-connector-c-$(VER_MY)-src -I\.\.\/mysql-connector-c-$(VER_MY)-src\/include/" \
@@ -210,7 +210,7 @@ $(LIB_MY_STATIC): $(DIR_MY) $(LIB_Z_STATIC)
 $(LIB_MY_SHARED): $(DIR_MY) $(LIB_Z_SHARED)
 	@echo $@
 	@cd $(DIR_MY)/ && \
-	cmake . -DCMAKE_INSTALL_PREFIX=/usr/locJSDOC-Toolkit template based on bootstrap, and it realy looks slik! al/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 -DENABLED_PROFILING=0 -DWITHOUT_SERVER=1 -DWITH_VALGRIND=0 -DWITH_UNIT_TESTS=0 -DENABLE_GCOV=0 -DENABLE_GPROF=0 -DWITH_ZLIB=system&& \
+	cmake . -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DWITH_EMBEDDED_SERVER=0 -DWITH_LIBEDIT=0 -DISABLE_SHARED=1 -DENABLED_PROFILING=0 -DWITHOUT_SERVER=1 -DWITH_VALGRIND=0 -DWITH_UNIT_TESTS=0 -DENABLE_GCOV=0 -DENABLE_GPROF=0 -DWITH_ZLIB=system&& \
 	make
 	@touch $@
 

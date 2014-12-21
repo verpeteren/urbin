@@ -71,7 +71,7 @@ struct core_t {
 void							Boot					( const int maxFds );
 void							Shutdown				( );
 void							SetupSocket				( const int fd,  const unsigned char tcp );
-struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data ) ;
+struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data );
 void 							Module_Delete			( struct module_t * module );
 struct core_t *					Core_New				( const cfg_t * config );
 void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message );

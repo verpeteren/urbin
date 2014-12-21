@@ -17,7 +17,7 @@ char * Xstrdup( const char* str ) {
 	//  http://stackoverflow.com/questions/482375/strdup-function
 	return strdup( str );
 #else
-	return strcpy( malloc( strlen( str ) + 1), str );
+	return strcpy( malloc( strlen( str ) + 1 ), str );
 #endif
 }
 
@@ -30,7 +30,7 @@ char * FileGetContents( const char * fileName ) {
 	fp = fopen( fileName, "rb" );
 	if ( fp != NULL ) {
 		fseek( fp, 0, SEEK_END );
-		size = (size_t) ftell( fp );
+		size = (size_t) ftell(fp );
 		if ( ( contents = malloc( size + 1 ) ) != NULL ) {
 			contents[size] = '\0';
 			rewind( fp );

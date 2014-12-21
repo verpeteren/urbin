@@ -68,8 +68,8 @@ static int GetPriorityFromName( const char * name ) {
 	CODE * priority;
 
 	priority = &prioritynames[0];
-	while( priority->c_name != NULL ) {
-		if ( strcmp( priority->c_name, name) == 0 ) {
+	while ( priority->c_name != NULL ) {
+		if ( strcmp( priority->c_name, name ) == 0 ) {
 			logLevel = priority->c_val;
 			break;
 		}
@@ -81,7 +81,7 @@ static int GetPriorityFromName( const char * name ) {
 /*****************************************************************************/
 /* Modules                                                                   */
 /*****************************************************************************/
-struct module_t * Module_New ( const char * name, const moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * cbArgs ) {
+struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * cbArgs ) {
 	struct module_t * module;
 	struct {unsigned char good:1;
 			unsigned char name:1;
@@ -119,7 +119,7 @@ struct module_t * Module_New ( const char * name, const moduleHandler_cb_t onLoa
 	return module;
 }
 
-void Module_Delete ( struct module_t * module ) {
+void Module_Delete( struct module_t * module ) {
 	free( (char * ) module->name ); module->name = NULL;
 	module->cbArgs = NULL,
 	module->onLoad = NULL;
@@ -144,8 +144,8 @@ static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t iden
 	struct {unsigned char good:1;
 			unsigned char timing:1; } cleanUp;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
-	cleanUp.good = ( ( timing = malloc( sizeof(* timing ) ) ) != NULL );
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( timing = malloc( sizeof( *timing ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.timing = 1;
 		timing->ms = ms;
@@ -166,19 +166,19 @@ static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t iden
 	}
 	return timing;
 }
-static void Timer_CalculateDue ( struct timing_t * timing, const PRUint32 nowOrHorizon ) {
-	timing->due = ( nowOrHorizon + timing->ms );  //  @FIXME, this might overflow if ms is in the far future (+6 hours)
+static void Timer_CalculateDue( struct timing_t * timing, const PRUint32 nowOrHorizon ) {
+	timing->due = ( nowOrHorizon + timing->ms );  //  @FIXME, this might overflow if ms is in the far future ( +6 hours )
 }
 
 static void Timing_Delete( struct timing_t * timing ) {
 	if ( timing->clearFunc_cb != NULL ) {
-		timing->clearFunc_cb( timing->cbArgs);
+		timing->clearFunc_cb( timing->cbArgs );
 	}
 	timing->ms = 0;
 	timing->repeat = 0;
 	timing->identifier = 0;
 	timing->timerHandler_cb = NULL;
-	timing->clearFunc_cb= NULL;
+	timing->clearFunc_cb = NULL;
 	timing->cbArgs = NULL;
 	free( timing ); timing = NULL;
 }
@@ -220,7 +220,7 @@ struct core_t * Core_New( const cfg_t * config ) {
 		}
 		//  Set up the logging
 		if ( cfg_getbool( mainSection, "loop_daemon" ) == cfg_true ) {
-			 get_syslog_logger( & core->logger.logFun, 0, &core->logger.logMask);
+			 get_syslog_logger( &core->logger.logFun, 0, &core->logger.logMask );
 		} else {
 			//  we log to the stderr in interactive mode
 			get_stderr_logger( &core->logger.logFun, 0, &core->logger.logMask );
@@ -299,7 +299,7 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 		signal( SIGUSR2, signalHandler );
 		daemonize = cfg_getbool( mainSection, "loop_daemon" );
 		if ( daemonize == cfg_true )  {
-			if (0 != fork( ) ) {
+			if ( 0 != fork( ) ) {
 				exit( 0 );
 			}
 			if ( -1 == setsid( ) ) {
@@ -365,7 +365,7 @@ static void Dns_ReadWrite_cb( picoev_loop * loop, int fd, int events, void * cbA
 	}
 }
 
-void Core_GetHostByName ( const struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb ) {
+void Core_GetHostByName( const struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb ) {
 	struct {unsigned char good:1; } cleanUp;
 	enum dns_query_type queryType;
 	int dnsSocketFd;
@@ -413,7 +413,7 @@ int Core_Loop( struct core_t * core ) {
 		do {
 			next = PR_NEXT_LINK( &module->mLink );
 			if ( module->onReady != NULL )  {
-					cleanUp.good = ( module->onReady ( core, module, module->cbArgs ) ) ? 1 : 0 ;
+					cleanUp.good = ( module->onReady( core, module, module->cbArgs ) ) ? 1 : 0;
 			}
 			module = FROM_NEXT_TO_ITEM( struct module_t );
 		} while ( cleanUp.good && module != firstModule );
@@ -428,7 +428,7 @@ int Core_Loop( struct core_t * core ) {
 	if ( picoev_is_active( core->loop, dnsSocketFd ) ) {
 		picoev_del( core->loop, dnsSocketFd );
 	}
-	return (cleanUp.good)? 1: 0;
+	return ( cleanUp.good ) ? 1 : 0;
 }
 
 int Core_AddModule( struct core_t * core, struct module_t * module ) {
@@ -457,7 +457,7 @@ int Core_DelModule( struct core_t * core, struct module_t * module ) {
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = 1;
 	moduleFirst = core->modules;
-	if ( module == moduleFirst ){
+	if ( module == moduleFirst ) {
 		next = PR_NEXT_LINK( &module->mLink );
 		if ( next  == &module->mLink ) {
 			core->modules = NULL;
@@ -474,12 +474,12 @@ int Core_DelModule( struct core_t * core, struct module_t * module ) {
 	return ( cleanUp.good ) ? 1 : 0;
 }
 
-struct timing_t * Core_AddTiming ( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs ) {
+struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs ) {
 	struct timing_t * timing;
 	struct {unsigned char good:1;
 			unsigned char timing:1; } cleanUp;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	core->maxIdentifier++;
 	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArgs ) ) != NULL );
 	if ( cleanUp.good ) {
@@ -504,7 +504,7 @@ void Core_DelTiming( struct core_t * core, struct timing_t * timing ) {
 	PRCList * next;
 
 	timingFirst = core->timings;
-	if ( timing == timingFirst ){
+	if ( timing == timingFirst ) {
 		next = PR_NEXT_LINK( &timing->mLink );
 		if ( next  == &timing->mLink ) {
 			core->timings = NULL;
@@ -517,7 +517,7 @@ void Core_DelTiming( struct core_t * core, struct timing_t * timing ) {
 	Timing_Delete( timing ); timing = NULL;
 }
 
-void Core_DelTimingId ( struct core_t * core , uint32_t id ) {
+void Core_DelTimingId( struct core_t * core , uint32_t id ) {
 	struct timing_t * timing, *firstTiming;
 	PRCList * next;
 
@@ -541,8 +541,8 @@ void Core_Delete( struct core_t * core ) {
 
 	//  cleanup the modules
 	firstModule = core->modules;
-	while ( firstModule != NULL) {
-		Core_DelModule( core, firstModule);
+	while ( firstModule != NULL ) {
+		Core_DelModule( core, firstModule );
 		firstModule = core->modules;
 	}
 	firstTiming = core->timings;
@@ -552,7 +552,7 @@ void Core_Delete( struct core_t * core ) {
 	}
 	//  cleanup dns
 	dnsSocketFd = dns_get_fd( core->dns );
-	if (picoev_is_active( core->loop, dnsSocketFd ) ) {
+	if ( picoev_is_active( core->loop, dnsSocketFd ) ) {
 		picoev_del( core->loop, dnsSocketFd );
 	}
 	dns_fini( core->dns ); core->dns = NULL;

@@ -62,7 +62,7 @@ int main( int argc, const char ** argv ) {
 		cleanUp.good = ( ( pgSqlclientModule = Module_New( "postgresql", NULL, NULL, NULL, NULL ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Core_AddModule( core, pgSqlclientModule ) ) ? 1 : 0 ;
+		cleanUp.good = ( Core_AddModule( core, pgSqlclientModule ) ) ? 1 : 0;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.pgSqlclient = 1;
@@ -78,7 +78,7 @@ int main( int argc, const char ** argv ) {
 		cleanUp.good = ( ( javascriptModule = Module_New( "javascript", JavascriptModule_Load, JavascriptModule_Ready, JavascriptModule_Unload, NULL ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Core_AddModule( core, javascriptModule ) ) ? 1 : 0 ;
+		cleanUp.good = ( Core_AddModule( core, javascriptModule ) ) ? 1 : 0;
 	}
 	if ( cleanUp.good ) {
 		cleanUp.javascript = 1;
@@ -86,10 +86,10 @@ int main( int argc, const char ** argv ) {
 	}
 	if ( cleanUp.good ) {
 		Core_Loop( core );
-		Core_Delete( core ) ;
+		Core_Delete( core );
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.webserver) {
+		if ( cleanUp.webserver ) {
 			Core_DelModule( core, webserverModule );
 		}
 		if ( cleanUp.pgSqlclient) {
@@ -104,7 +104,7 @@ int main( int argc, const char ** argv ) {
 			Core_DelModule( core, javascriptModule );
 		}
 		if ( cleanUp.core ) {
-			Core_Delete( core ) ;
+			Core_Delete( core );
 		}
 	}
 

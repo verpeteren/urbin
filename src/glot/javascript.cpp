@@ -47,7 +47,7 @@ inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, co
 	JS::MutableHandleObject	hardObjMut( &hardObjRoot );
 	JS_GetProperty( javascript->context, globalObjHandle, MAIN_OBJ_NAME, hardValMut );
 	JS_ValueToObject( javascript->context, hardValHandle, hardObjMut );
-	JS_CallFunctionName( javascript->context, hardObjHandle, action, JS::HandleValueArray::empty(), rValMut );
+	JS_CallFunctionName( javascript->context, hardObjHandle, action, JS::HandleValueArray::empty( ), rValMut );
 }
 
 /**
@@ -89,7 +89,7 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
 		module->instance = ( void * ) javascript;
 		JAVASCRIPT_MODULE_ACTION( javascript, "onLoad" );
 	}
-	if (! cleanUp.good ) {
+	if ( ! cleanUp.good ) {
 		if ( cleanUp.javascript ) {
 			Javascript_Delete( javascript ); javascript = NULL;
 		}
@@ -108,7 +108,7 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
  *
  * @example
  * this.Hard.onReady = function( ) {
- * 	console.log("loaded and ready" );
+ * 	console.log( "loaded and ready" );
  * };
  *
  * @see	Hard.onLoad
@@ -171,10 +171,10 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	cleanUp.good = ( JS_DefineProperty( cx, handle, key, valHandle, attrs, JS_PropertyStub, JS_StrictPropertyStub ) == true ); \
 } while ( 0 );
 
-#define CONNOBJ_GET_PROP_STRING( property, var) do { \
-	if ( JS_GetProperty(cx, connObjHandle, property, valueMut ) ) { \
+#define CONNOBJ_GET_PROP_STRING( property, var ) do { \
+	if ( JS_GetProperty( cx, connObjHandle, property, valueMut ) ) { \
 		if ( value.isString( ) ) { \
-			cleanUp.good = ( ( var = JS_EncodeString(cx, value.toString( ) ) ) != NULL ); \
+			cleanUp.good = ( ( var = JS_EncodeString( cx, value.toString( ) ) ) != NULL ); \
 		} else { \
 			cleanUp.good = 0; \
 		} \
@@ -183,13 +183,13 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 } while ( 0 );
 
-#define CONNOBJ_GET_PROP_NR( property, var) do { \
-	if ( JS_GetProperty(cx, connObjHandle, property, valueMut ) ) { \
+#define CONNOBJ_GET_PROP_NR( property, var ) do { \
+	if ( JS_GetProperty( cx, connObjHandle, property, valueMut ) ) { \
 		if ( value.isNumber( ) ) { \
 			var = ( int ) value.toNumber( ); \
 		} else if ( value.isString( ) ) { \
 			char * dummy; \
-			cleanUp.good = ( ( dummy = JS_EncodeString(cx, value.toString( ) ) ) != NULL ); \
+			cleanUp.good = ( ( dummy = JS_EncodeString( cx, value.toString( ) ) ) != NULL ); \
 			var = atoi( dummy );\
 			JS_free( cx, dummy ); dummy = NULL; \
 		} else { \
@@ -249,9 +249,9 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	if ( cleanUp.good ) { \
 		sqlclientObj = JS_NewObjectForConstructor( cx, jsnClass, args ); \
 		JS_SetPrivate( sqlclientObj, ( void * ) sqlclient ); \
-		args.rval().setObject( *sqlclientObj ); \
+		args.rval( ).setObject( *sqlclientObj ); \
 	} else { \
-		args.rval().setNull( ); \
+		args.rval( ).setNull( ); \
 	} \
 	\
 	memset( cPassword, '\0', strlen( cPassword ) ); /*  @TODO:  clean jPassword */ \
@@ -263,7 +263,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 } while ( 0 );
 
 
-#define SQL_CLIENT_QUERY_RESULT_HANDLER_CB( formatter, sub) do { \
+#define SQL_CLIENT_QUERY_RESULT_HANDLER_CB( formatter, sub ) do { \
 	struct payload_t * payload; \
 	JSContext * cx; \
 	JSCompartment * oldCompartment; \
@@ -291,7 +291,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	delete payload; 		payload = NULL; \
 	JS_LeaveCompartment( cx, oldCompartment ); \
 	JS_EndRequest( cx ); \
-} while ( 0);
+} while ( 0 );
 
 #define SQL_CLIENT_QUERY( handler ) do { \
 	struct payload_t * payload; \
@@ -358,7 +358,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 			indexId = JSID_VOID; \
 			paramObj = &paramList.toObject( ); \
 			JS::RootedObject 		paramObjRoot( cx, paramObj ); \
-			JS::HandleObject 		paramObjHandle ( paramObjRoot ); \
+			JS::HandleObject 		paramObjHandle( paramObjRoot ); \
 			JS_GetArrayLength( cx, paramObjHandle, &nParams ); \
 			if ( nParams > 0 ) { \
 				cleanUp.good = ( ( cParamValues = ( const char ** ) new char*[nParams] ) != NULL ); \
@@ -384,8 +384,8 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 		} \
 	} \
 	if ( cleanUp.good ) { \
-		JS::HandleValueArray dummy = JS::HandleValueArray::empty(); \
-		cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, &fnValRoot, &dummy, false) ) != NULL ); \
+		JS::HandleValueArray dummy = JS::HandleValueArray::empty( ); \
+		cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, &fnValRoot, &dummy, false ) ) != NULL ); \
 	} \
 	if ( cleanUp.good ) { \
 		cleanUp.payload = 1; \
@@ -407,12 +407,12 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 	/*  get ready to return */ \
 	if ( cleanUp.good ) { \
-		args.rval().setBoolean( true ); \
+		args.rval( ).setBoolean( true ); \
 	} else { \
 		if ( cleanUp.payload ) { \
 			delete payload; payload = NULL; \
 		} \
-		args.rval().setBoolean( false ); \
+		args.rval( ).setBoolean( false ); \
 	} \
 	return ( cleanUp.good ) ? true : false; \
 } while ( 0 );
@@ -438,7 +438,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 	struct { unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	result = (MYSAC_RES *)rawRes;
+	result = (MYSAC_RES *) rawRes;
 	cleanUp.good = ( ( resultArray = JS_NewArrayObject( cx, 0 ) ) != NULL );
 	if ( cleanUp.good ) {
 		JS::RootedObject resultArrayRoot( cx, resultArray );
@@ -459,8 +459,8 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 						JS::RootedValue 	currentValRoot( cx, currentVal );
 						JS::HandleValue 	currentValHandle( currentValRoot );
 						JS_SetElement( cx, resultArrayHandle, rowId, currentValHandle );
-						for (colId = 0; colId < colCount; colId++) {
-							cFieldName = ( ( MYSAC_RES * )result)->cols[colId].name;
+						for ( colId = 0; colId < colCount; colId++ ) {
+							cFieldName = ( ( MYSAC_RES * ) result )->cols[colId].name;
 							cValue = row[colId].blob;
 							if ( cValue == NULL ) {
 								jValue = JSVAL_NULL;
@@ -483,8 +483,8 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 					rowId++;
 				}
 			}
-			//  lastOid = mysac_insert_id( MYSAC *  	m );
-			//  affected += int mysac_affected_rows ( MYSAC *  	mysac );
+			//  lastOid = mysac_insert_id( MYSAC * mysac );
+			//  affected += int mysac_affected_rows( MYSAC * mysac );
 		}
 	}
 
@@ -506,18 +506,18 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * @returns	{boolean}					If the query could be registered successfully it returns true; else false is returned
  * @param	{string}	statement		A sql command or query.
  * @param	{array}		[parameters]	A list of parameters that can be used in a query.<p>default: []</p>
- * @param	{function}	fn				The callback function ({response} query, int returnCode SuccessCode (..)
+ * @param	{function}	fn				The callback function {response}
  *
  * @example
- * var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
- * pg.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
- * 	if ( returnCode == 0) {
- * 		for ( var rowId = 0; rowId < res.length; rowId++) {
+ * var pg = this.Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432}, 60 );
+ * pg.query( 'SELECT name, sales FROM sales WHERE customer = '$1' );' , ['foobar' ], function( res ) {
+ * 	if ( typeof query == array ) {
+ * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];
- * 				console.log(rowId + ' ' + row.name + ' ' + row.sales );
+ * 				console.log( rowId + ' ' + row.name + ' ' + row.sales );
  * 			}
  * 		}
- * 	});
+ * 	} );
  *
  * @see	Hard.MysqlClient
  * @see	Hard.PostgresqlClient.query
@@ -556,20 +556,20 @@ static JSFunctionSpec jsmMysqlclient[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
- * var my = this.Hard.MysqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
- * my.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
+ * var my = this.Hard.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * my.query( 'SELECT name, sales FROM sales WHERE customer = '$1' );' , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
- * 		for ( var rowId = 0; rowId < res.length; rowId++) {
+ * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];
- * 				console.log(rowId + ' ' + row.name + ' ' + row.sales );
+ * 				console.log( rowId + ' ' + row.name + ' ' + row.sales );
  * 			}
  * 		}
- * 	});
+ * 	} );
  * @see	Hard.MysqlClient.query
  * @see	Hard.PostgreslClient
  */
 static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
-	SQL_CLASS_CONSTRUCTOR ( Postgresql_New, &jscMysqlclient );
+	SQL_CLASS_CONSTRUCTOR( Postgresql_New, &jscMysqlclient );
 	return false;
 }
 
@@ -637,7 +637,7 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void 
 						currentVal = JSVAL_NULL;
 						JS::RootedObject 		recordObjRoot( cx, recordObj );
 						JS::HandleObject 		recordObjHandle( recordObjRoot );
-						cleanUp.good = ( (recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+						cleanUp.good = ( ( recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
 						if ( ! cleanUp.good ) {
 							currentVal = OBJECT_TO_JSVAL( recordObj );
 							JS::RootedValue 	currentValRoot( cx, currentVal );
@@ -725,18 +725,18 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * @returns	{boolean}					If the query could be registered successfully it returns true; else false is returned
  * @param	{string}	statement		A sql command or query.
  * @param	{array}		[parameters]	A list of parameters that can be used in a query.<p>default: []</p>
- * @param	{function}	fn				The callback function ({response} query, int returnCode SuccessCode (..)
+ * @param	{function}	fn				The callback function {response}
  *
  * @example
- * var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
- * pg.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
- * 	if ( returnCode == 0) {
- * 		for ( var rowId = 0; rowId < res.length; rowId++) {
+ * var pg = this.Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * pg.query( 'SELECT name, sales FROM sales WHERE customer = '$1' );' , ['foobar' ], function( res ) {
+ * 	if ( Array.isArray( res ) ) {
+ * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];
- * 				console.log(rowId + ' ' + row.name + ' ' + row.sales );
+ * 				console.log( rowId + ' ' + row.name + ' ' + row.sales );
  * 			}
  * 		}
- * 	});
+ * 	} );
  *
  * @see	Hard.PostgresqlClient
  * @see	Hard.MysqlClient.query
@@ -775,22 +775,22 @@ static JSFunctionSpec jsmPostgresqlclient[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
- * var pg = this.Hard.PostgresqlClient( {host: '10.0.0.25', db:'apedevdb', user:'apedev', password: 'vedepa', port: 5432}, 60);
- * pg.query('SELECT name, sales FROM sales WHERE customer ='$1' );' , ['foobar' ], function( res, returnCode) {
+ * var pg = this.Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * pg.query( 'SELECT name, sales FROM sales WHERE customer = '$1' );' , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
- * 		for ( var rowId = 0; rowId < res.length; rowId++) {
+ * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];
- * 				console.log(rowId + ' ' + row.name + ' ' + row.sales );
+ * 				console.log( rowId + ' ' + row.name + ' ' + row.sales );
  * 			}
  * 		}
- * 	});
+ * 	} );
  * @see	Hard.PostgresqlClient.query
  * @see	Hard.MysqlClient
  */
 
 
 static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
-	SQL_CLASS_CONSTRUCTOR ( Postgresql_New, &jscPostgresqlclient );
+	SQL_CLASS_CONSTRUCTOR( Postgresql_New, &jscPostgresqlclient );
 	return false;
 }
 
@@ -904,7 +904,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 		if ( cleanUp.resp ) {
 			// resoponseObj
 		}
-		if ( cleanUp.cli) {
+		if ( cleanUp.cli ) {
 			// clientObj
 		}
 	}
@@ -951,14 +951,14 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
  * @since	0.0.5b
  * @returns	{boolean}				If the route could be registered successfully it returns true; else false is returned
  * @param	{string}		pattern	The regular expression that triggers a callback if there is a match.
- * @param	{function}		fn		The callback function ({response} client, int returnCode SuccessCode (..).
+ * @param	{function}		fn		The callback function {response}
  *
  * @example
- * var ws = this.Hard.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
- * ws.addRoute('^/a$', function(client, returnCode) {
- * 	console.log('got ' + client.url);
- * 	client.response.content='<html><h1>response </h1><html>';
- * 	});
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	console.log( 'got ' + client.url );
+ * 	client.response.content = '<html><h1>response</h1><html>';
+ * 	} );
  * @see	Hard.Webserver
  * @see	Hard.Webserver.addDocumentRoot
  * @see	Hard.Webclient.get
@@ -993,11 +993,11 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 		cleanUp.pattern = 1;
 		cleanUp.good = ( ( webserver = (struct webserver_t *) JS_GetPrivate( webserverObj ) ) != NULL );
 	}
-	if ( cleanUp.good) {
+	if ( cleanUp.good ) {
 		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
 	}
 	if ( cleanUp.good ) {
-		JS::HandleValueArray empty = JS::HandleValueArray::empty();
+		JS::HandleValueArray empty = JS::HandleValueArray::empty( );
 		cleanUp.good = ( ( payload = Payload_New( cx, webserverObj, &fnValRoot, &empty ,false ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -1010,9 +1010,9 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 		}
 	}
 	if ( cleanUp.good ) {
-		args.rval().setBoolean( true );
+		args.rval( ).setBoolean( true );
 	} else {
-		args.rval().setBoolean( false );
+		args.rval( ).setBoolean( false );
 	}
 	if ( cleanUp.pattern ) {
 		JS_free( cx, cPattern ); cPattern = NULL;
@@ -1033,7 +1033,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
  *
  * @example
  * var ws = this.Hard.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
- * ws.addDocumentRoot('^/static/(.*)', '/var/www/static/');
+ * ws.addDocumentRoot( '^/static/(.*)', '/var/www/static/' );
  *
  * @see	Hard.Webserver
  * @see	Hard.Webserver.addRoute
@@ -1066,13 +1066,13 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( webserver = (struct webserver_t *) JS_GetPrivate( webServerObj ) ) != NULL );
 	}
-	if ( cleanUp.good) {
+	if ( cleanUp.good ) {
 		Webserver_DocumentRoot( webserver, cDocumentRoot, cLocation );
 	}
 	if ( cleanUp.good ) {
-		args.rval().setBoolean( true );
+		args.rval( ).setBoolean( true );
 	} else {
-		args.rval().setBoolean( false );
+		args.rval( ).setBoolean( false );
 	}
 	if ( cleanUp.documentRoot ) {
 		JS_free( cx, cDocumentRoot ); cDocumentRoot = NULL;
@@ -1109,12 +1109,12 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the webserver section of the configurationFile.</p>
  *
  * @example
- * var ws = this.Hard.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
- * ws.addRoute('^/a$', function(client, returnCode) {
- * 	console.log('got ' + client.url);
- * 	client.response.content='<html><h1>response </h1><html>';
- * 	});
- * ws.addDocumentRoot('^/static/(.*)', '/var/www/static/');
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	console.log( 'got ' + client.url );
+ * 	client.response.content = '<html><h1>response</h1><html>';
+ * 	} );
+ * ws.addDocumentRoot( '^/static/(.*)', '/var/www/static/' );
  *
  * @see	Hard.Webserver.addRoute
  * @see	HarHardtpServer.addDocumentRoot
@@ -1155,20 +1155,20 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( thisObj ) ) != NULL );
 	}
-	if (cleanUp.good ) {
+	if ( cleanUp.good ) {
 
 		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, (unsigned char) timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Webserver_DocumentRoot( webserver, cPath, cDocumentRoot )== 1);
+		cleanUp.good = ( Webserver_DocumentRoot( webserver, cPath, cDocumentRoot ) == 1 );
 	}
 	if ( cleanUp.good ) {
 		JSObject * webserverObj = 	JS_NewObject( cx, &jscWebserver, JS::NullPtr( ), JS::NullPtr( ) );
 		JS_SetPrivate( webserverObj, ( void * ) webserver );
 		Webserver_JoinCore( webserver );
-		args.rval().setObject( *webserverObj );
+		args.rval( ).setObject( *webserverObj );
 	} else {
-		args.rval().setUndefined();
+		args.rval( ).setUndefined( );
 	}
 
 	JS_free( cx, cServerIp ); cServerIp = NULL;
@@ -1240,9 +1240,9 @@ static const JSClass jscHard = {
 
 static const JSFunctionSpec jsmHard[ ] = {
 	JS_FS( "shutdown", 			JsnHard_Shutdown, 1, 0 ),
-	JS_FS( "onLoad", 			JsnFunction_Stub, 0, 0),
-	JS_FS( "onReady", 			JsnFunction_Stub, 0, 0),
-	JS_FS( "onUnload", 			JsnFunction_Stub, 0, 0),
+	JS_FS( "onLoad", 			JsnFunction_Stub, 0, 0 ),
+	JS_FS( "onReady", 			JsnFunction_Stub, 0, 0 ),
+	JS_FS( "onUnload", 			JsnFunction_Stub, 0, 0 ),
 	JS_FS_END
 };
 
@@ -1284,7 +1284,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vpn );
-	args.rval().setUndefined();
+	args.rval( ).setUndefined( );
 	cString = NULL;
 	fileName = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
@@ -1396,7 +1396,7 @@ static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::Ro
  * 	include( './layouts/invoice.js' );
  * 	include( './bizlog/archive.js' );
  * } catch ( e ) {
- * 	console.log( 'loading failed: ' + e.getMessage() );
+ * 	console.log( 'loading failed: ' + e.getMessage( ) );
  * }
  */
 static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
@@ -1428,7 +1428,7 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 	}
 
 	success = ( cleanUp.good ) ? true : false;
-	args.rval().setBoolean( success);
+	args.rval( ).setBoolean( success );
 	return success;
 }
 
@@ -1487,12 +1487,12 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 		cleanUp.good = ( JS_ConvertValue( cx, dummyHandle, JSTYPE_FUNCTION, fnValMut ) == true ); \
 	} \
 	if ( cleanUp.good ) { \
-		if (args.length() > 2 ) { \
+		if ( args.length( ) > 2 ) { \
 			JS::HandleValueArray argsAt2 = JS::HandleValueArray::fromMarkedLocation( argc - 2, vpn ); \
 			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false ) ) != NULL ); \
 		} else { \
-			JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty(); \
-			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false) ) != NULL ); \
+			JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty( ); \
+			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false ) ) != NULL ); \
 		} \
 	} \
 	if ( cleanUp.good ) { \
@@ -1502,7 +1502,7 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	if ( cleanUp.good ) { \
 		cleanUp.timer = 1; \
 		timing->clearFunc_cb = (timerHandler_cb_t) Payload_Delete; \
-		args.rval().setInt32( (int32_t) timing->identifier ); \
+		args.rval( ).setInt32( (int32_t) timing->identifier ); \
 	} else { \
 		if ( cleanUp.timer ) { \
 			Core_DelTiming( javascript->core, timing ); \
@@ -1510,7 +1510,7 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 		if ( cleanUp.payload ) { \
 			Payload_Delete( payload ); payload = NULL; \
 		} \
-		args.rval().setUndefined(); \
+		args.rval( ).setUndefined( ); \
 	} \
 	return ( cleanUp.good ) ? true : false; \
 } while ( 0 );
@@ -1528,10 +1528,10 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
  * @param	{mixed}		[arguments]	Parameters arg1, arg2, ..
  *
  * @example
- * var timeoutId = setInterval(function(a, b) {
- * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
- * }, 3000, 'foo', 'bar');
- * ClearTimeout(timeoutId);
+ * var timeoutId = setInterval( function( a, b ) {
+ * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * }, 3000, 'foo', 'bar' );
+ * ClearTimeout( timeoutId );
  *
  * @see	setInterval
  * @see	clearTimeout
@@ -1556,10 +1556,10 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @param	{mixed}		[arguments]	Parameters arg1, arg2, ..
  *
  * @example
- * var timeoutId = setInterval(function(a, b) {
- * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
- * }, 3000, 'foo', 'bar');
- * clearInterval(timeoutId);
+ * var timeoutId = setInterval( function( a, b ) {
+ * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * }, 3000, 'foo', 'bar' );
+ * clearInterval( timeoutId );
  *
  * @see	setTimeout
  * @see	clearTimeout
@@ -1581,10 +1581,10 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
  * @param	{integer}		timerId	Reference to a timer that needs to be stopped.
  *
  * @example
- * var timeoutId = setInterval(function(a, b) {
- * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
- * }, 3000, 'foo', 'bar');
- * ClearTimeout(timeoutId);
+ * var timeoutId = setInterval( function( a, b ) {
+ * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * }, 3000, 'foo', 'bar' );
+ * ClearTimeout( timeoutId );
  *
  * @see	setInterval
  * @see	setTimeout
@@ -1601,10 +1601,10 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
  * @param	{integer}		timerId	Reference to a timer that needs to be stopped.
  *
  * @example
- * var timeoutId = setInterval(function(a, b) {
- * 	Hard.log('Foo : ' + a + ' Bar : ' + b);
- * }, 3000, 'foo', 'bar');
- * clearInterval(timeoutId);
+ * var timeoutId = setInterval( function( a, b ) {
+ * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * }, 3000, 'foo', 'bar' );
+ * clearInterval( timeoutId );
  *
  * @see	setInterval
  * @see	setTimeout
@@ -1619,7 +1619,7 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn )
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vpn );
-	args.rval().setUndefined();
+	args.rval( ).setUndefined( );
 	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "i", &identifier ) == true );
 	if ( cleanUp.good ) {
@@ -1627,7 +1627,7 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn )
 		Core_DelTimingId( javascript->core, identifier );
 	}
 
-	return (cleanUp.good ) ? true: false;
+	return ( cleanUp.good ) ? true: false;
 }
 
 static const JSClass jscGlobal = {
@@ -1660,16 +1660,16 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	len = strlen( cFile ) + strlen( javascript->path ) + 2;
-	cleanUp.good = (( script = (struct script_t *) malloc( sizeof( *script ) ) ) != NULL);
+	cleanUp.good = ( ( script = (struct script_t *) malloc( sizeof( *script ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.script = 1;
 		script->bytecode = NULL;
 		cleanUp.good = ( ( script->fileNameWithPath = (char *) malloc( len ) ) != NULL );
 	}
-	if (cleanUp.good ) {
+	if ( cleanUp.good ) {
 		cleanUp.fn = 1;
 		snprintf( script->fileNameWithPath, len, "%s/%s", javascript->path, cFile );
-		JS::RootedObject		globalObjRoot ( javascript->context, javascript->globalObj );
+		JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
 		JS::HandleObject 		globalObjHandle( globalObjRoot );
 		JS::RootedScript 		scriptRoot( javascript->context, script->bytecode );
 		JS::PersistentRootedScript scriptPer( javascript->context, script->bytecode );
@@ -1677,10 +1677,10 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 		JS::MutableHandleScript	scriptMut( &scriptRoot );
 		JS::CompileOptions		options( javascript->context );
 		options.setIntroductionType( "js include" )
-			.setUTF8(true)
-			.setFileAndLine( cFile, 1)
+			.setFileAndLine( cFile, 1 )
 			.setCompileAndGo( true )
-			.setNoScriptRval( true );
+			.setNoScriptRval( true )
+			.setUTF8( true );
 		cleanUp.good = 0; //  to reuse the JS:: scope, we deviate now from the cleanUp.good style
 		if ( JS::Compile( javascript->context, globalObjHandle, options, script->fileNameWithPath, scriptMut ) == true ) {
 			cleanUp.bytecode = 1;
@@ -1746,7 +1746,7 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	postgresqlObj =  JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 2, nullptr, jsmPostgresqlclient, nullptr, nullptr );
 	JS::RootedObject pgsqlclientObj( javascript->context, postgresqlObj );
 
-	cleanUp.good = ( Javascript_AddScript( javascript, javascript->fileName ) != NULL ) ;
+	cleanUp.good = ( Javascript_AddScript( javascript, javascript->fileName ) != NULL );
 
 	return cleanUp.good;
 }
@@ -1794,39 +1794,22 @@ static void JsnReport_Error( JSContext * cx, const char * message, JSErrorReport
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	javascript = (struct javascript_t *) JS_GetContextPrivate( cx );
 	//  http://egachine.berlios.de/embedding-sm-best-practice/ar01s02.html#id2464522
-	fileName = (report->filename != NULL)? report->filename : "<no filename>";
-#ifdef VERBOSE
-	if ( report->linebuf ) {
-		int where;
-
-		if ( report->tokenptr ) {
-			where = report->tokenptr - report->linebuf;
-			if ( ( where >= 0 ) && ( where < 80 ) ) {
-				printf("@%d\n", where);
-				where += 6;
-				while ( --where > 0 ) {
-					fputc(' ', stderr );
-				}
-				fprintf( stderr, "^\n" );
-			}
-		}
-	}
-#endif
+	fileName = ( report->filename != NULL )? report->filename : "<no filename>";
 	level = LOG_ERR;
 	state = "Error";
-	if (JSREPORT_IS_WARNING( report->flags) ) {
+	if ( JSREPORT_IS_WARNING( report->flags ) ) {
 		state = "Warning";
 		level = LOG_WARNING;
 	}
-	if (JSREPORT_IS_STRICT( report->flags ) ) {
+	if ( JSREPORT_IS_STRICT( report->flags ) ) {
 		state = "Strict";
 		level = LOG_ERR;
 	}
-	if (JSREPORT_IS_EXCEPTION( report->flags ) ) {
+	if ( JSREPORT_IS_EXCEPTION( report->flags ) ) {
 		state = "Exception";
 		level = LOG_CRIT;
 	}
-	len = 4 + 1 + 3 +strlen( state) + strlen( message );
+	len = 4 + 1 + 3 + strlen( state ) + strlen( message );
 	cleanUp.good = ( ( messageFmt = (char *) malloc( len ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.msg = 1;
@@ -1882,7 +1865,7 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	}
 	if ( cleanUp.good ) {
 		cleanUp.context = 1;
-		JS_SetContextPrivate( javascript->context, (void *)javascript );
+		JS_SetContextPrivate( javascript->context, (void *) javascript );
 		JS::RuntimeOptions options = JS::RuntimeOptionsRef( javascript->context);
 		options.setBaseline( true )
 					.setExtraWarnings( true )
@@ -1936,7 +1919,7 @@ static struct script_t * Javascript_AddScript( struct javascript_t * javascript,
 	struct {unsigned char good:1;
 			unsigned char script:1; } cleanUp;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) ) ;
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( (  script = Script_New( javascript, fileName ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.script = 1;
@@ -1960,7 +1943,7 @@ static void Javascript_DelScript( struct javascript_t * javascript, struct scrip
 	PRCList * next;
 
 	scriptFirst = javascript->scripts;
-	if ( script == scriptFirst ){
+	if ( script == scriptFirst ) {
 		next = PR_NEXT_LINK( &script->mLink );
 		if ( next  == &script->mLink ) {
 			javascript->scripts = NULL;

@@ -59,7 +59,7 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								dateString, \
 								PR_NAME, \
 								PR_VERSION
-#define HTTP_SERVER_TEMPLATE_SIZE (ssize_t) ( strlen( HTTP_SERVER_TEMPLATE ) + \
+#define HTTP_SERVER_TEMPLATE_SIZE	(ssize_t) ( strlen( HTTP_SERVER_TEMPLATE ) + \
 								( STRING_LENGTH_OF_INT( webclient->response.httpCode ) ) + \
 								( STRING_LENGTH_OF_INT( webclient->response.contentLength ) ) + \
 								strlen( connectionString ) + \
@@ -153,9 +153,9 @@ static struct route_t * Route_New( const char * pattern, enum routeType_t routeT
 	return route;
 }
 
-static void Route_Delete ( struct route_t * route ) {
+static void Route_Delete( struct route_t * route ) {
 	if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
-		free( (char *)route->details.documentRoot ); route->details.documentRoot = NULL;
+		free( (char *) route->details.documentRoot ); route->details.documentRoot = NULL;
 	}
 	onig_free( route->urlRegex ); route->urlRegex = NULL;
 	free( (char *) route->orgPattern ); route->orgPattern = NULL;
@@ -233,12 +233,12 @@ const char * Webclient_GetIp( const struct webclient_t * webclient ) {
 	if ( cleanUp.good ) {
 		len = sizeof addr;
 		getpeername( webclient->socketFd, (struct sockaddr *) &addr, &len );
-		if (addr.ss_family == AF_INET) {
+		if ( AF_INET == addr.ss_family ) {
 			struct sockaddr_in *s = (struct sockaddr_in *) &addr;
-			inet_ntop(AF_INET, &s->sin_addr, ip, INET6_ADDRSTRLEN );
+			inet_ntop( AF_INET, &s->sin_addr, ip, INET6_ADDRSTRLEN );
 		} else { // AF_INET6
 			struct sockaddr_in6 *s = (struct sockaddr_in6 *) &addr;
-			inet_ntop(AF_INET6, &s->sin6_addr, ip, INET6_ADDRSTRLEN );
+			inet_ntop( AF_INET6, &s->sin6_addr, ip, INET6_ADDRSTRLEN );
 		}
 	}
 	if ( ! cleanUp.good ) {
@@ -309,7 +309,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 				cleanUp.requestedPath = 1;
 				snprintf( requestedPath, pathLength, "%s", &webclient->header->RequestURI[webclient->webserver->region->beg[1]] );
 			}
-			//  check that the file is not higher then the documentRoot ( ../../../../etc/passwd )
+			//  check that the file is not higher then the documentRoot. Such as  ../../../../etc/passwd
 			for ( j = 0; j < pathLength - 1; j++ ) {
 				if ( requestedPath[j] == '.' && requestedPath[ j + 1] == '.' ) {
 					webclient->response.httpCode = HTTPCODE_FORBIDDEN;
@@ -351,7 +351,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 								break;
 							}
 						}
-						//  this is the place where a module handler can step into the arena ( e.g. .js / .py / .php );
+						//  this is the place where a module handler can step into the arena. e.g. .js / .py / .php
 						//  but we will not do this for spidermonkey, because we load that upon startup only once
 					}
 				} else {
@@ -402,7 +402,7 @@ static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
 	}
 	cleanUp.good = ( ( h3_request_header_parse( webclient->header, webclient->buffer, strlen( webclient->buffer ) ) ) == 0 );
 	if ( cleanUp.good ) {
-		if ( strncmp( webclient->header->RequestMethod, "POST", webclient->header->RequestMethodLen) == 0 ) {
+		if ( strncmp( webclient->header->RequestMethod, "POST", webclient->header->RequestMethodLen ) == 0 ) {
 			webclient->mode = MODE_POST;
 		}
 		for ( i = 0; i < webclient->header->HeaderSize; i++ ) {
@@ -481,7 +481,7 @@ static void Webclient_Delete( struct webclient_t * webclient ) {
 		free( webclient->response.content ); webclient->response.content = NULL;
 	}
 
-	free ( webclient ); webclient = NULL;
+	free( webclient ); webclient = NULL;
 }
 
 /*****************************************************************************/
@@ -533,7 +533,7 @@ static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, v
 
 	webserver = (struct webserver_t *) ws_arg;
 	newFd = accept( fd, NULL, NULL );
-	if (newFd != -1) {
+	if ( -1 != newFd ) {
 
 		SetupSocket( newFd, 1 );
 		webclient = Webclient_New( webserver, newFd );
@@ -546,7 +546,7 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	ssize_t r;
 
 	webclient = (struct webclient_t *) wc_arg;
-	if ( ( events & PICOEV_TIMEOUT) != 0 ) {
+	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
 		Webclient_CloseConn( webclient );
 	} else {
@@ -580,7 +580,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 
 	webclient = (struct webclient_t *) wc_arg;
 	connClosed = 0;
-	if ( ( events & PICOEV_TIMEOUT) != 0 ) {
+	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
 		Webclient_CloseConn( webclient );
 		connClosed = 1;
@@ -599,7 +599,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 			flags = MSG_DONTWAIT | MSG_NOSIGNAL;  */
 			webclient->response.end = time( 0 );
 			contentTypeString = MimeTypeDefinitions[webclient->response.mimeType].applicationString;
-			connectionString = (webclient->connection == CONNECTION_CLOSE ) ? "Close" : "Keep-Alive";
+			connectionString = ( CONNECTION_CLOSE == webclient->connection ) ? "Close" : "Keep-Alive";
 			time( &webclient->response.end );
 			tm_info = localtime( &webclient->response.end );
 			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", tm_info );
@@ -679,7 +679,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 		}
 		if ( ! connClosed && webclient->response.headersSent && webclient->response.contentSent ) {
 			//  listen again
-			if ( webclient->connection == CONNECTION_KEEPALIVE) {
+			if ( CONNECTION_KEEPALIVE == webclient->connection ) {
 				picoev_del( loop, fd );
 				Webclient_Reset( webclient );
 				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeoutSec , Webserver_HandleRead_cb, wc_arg );
@@ -769,7 +769,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 			onig_region_free( webserver->region, 1 ); webserver->region = NULL;
 		}
 		if ( cleanUp.socket ) {
-			shutdown( webserver->socketFd, SHUT_RDWR);
+			shutdown( webserver->socketFd, SHUT_RDWR );
 			close( webserver->socketFd );
 		}
 		if ( cleanUp.ip ) {
@@ -800,7 +800,7 @@ static void Webserver_DelRoute( struct webserver_t * webserver, struct route_t *
 	PRCList * next;
 
 	routeFirst = webserver->routes;
-	if ( route == routeFirst ){
+	if ( route == routeFirst ) {
 		next = PR_NEXT_LINK( &route->mLink );
 		if ( next  == &route->mLink ) {
 			webserver->routes = NULL;
@@ -866,7 +866,7 @@ void Webserver_Delete( struct webserver_t * webserver ) {
 	if ( picoev_is_active( webserver->core->loop, webserver->socketFd ) ) {
 		picoev_del( webserver->core->loop, webserver->socketFd );
 	}
-	shutdown( webserver->socketFd, SHUT_RDWR);
+	shutdown( webserver->socketFd, SHUT_RDWR );
 	close( webserver->socketFd );
 	webserver->socketFd = 0;
 	free( (char *) webserver->ip ); webserver->ip = NULL;

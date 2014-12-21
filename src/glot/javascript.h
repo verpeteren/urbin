@@ -3,8 +3,8 @@
 
 /*  kludge to avoid compile errors  */
 #ifndef SIZE_MAX
-#define UINT32_MAX ( (uint32_t) - 1 )
-#define SIZE_MAX UINT32_MAX
+#define UINT32_MAX 			( (uint32_t) - 1 )
+#define SIZE_MAX 				UINT32_MAX
 #endif
 #include <jsapi.h>
 #include <prclist.h>

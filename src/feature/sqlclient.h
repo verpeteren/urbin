@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 #if HAVE_MYSQL == 1
-#define MYSQL_BUFS ( 1024 * 1024 )
+#define MYSQL_BUFS		( 1024 * 1024 )
 #endif
 
 
