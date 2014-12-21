@@ -68,8 +68,7 @@ $(OBJ_DIR)/core.o:					EXCEPTION += -Wno-suggest-attribute=pure
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-suggest-attribute=noreturn
 else 
 $(OBJ_DIR)/main_server.o:			EXCEPTION +=
-#$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
-$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-cast-align
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/javascript.o:			EXCEPTION += -Wno-cast-align
 $(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code -Wno-cast-align -Wno-format-nonliteral
@@ -96,6 +95,9 @@ ifeq ($(MAKE_STATIC_LIBS),yes)
 	@echo "\tLD.a :\t"$@
 else
 	@echo "\tLD.so:\t"$@
+ifeq ($(HAS_MYSQL),yes)
+	@ln -fs $(LIB_MYS_SHARED) $(BIN_DIR)/libmysac.so.0.0
+endif
 endif
 	@$(CC) -o $@ $(CODE_OBJECTS) $(LIBS) $(LD_FLAGS) && \
 	cd $(BIN_DIR) && \
@@ -157,7 +159,7 @@ tags:	$(shell ls *.[ch])
 
 clean:
 	@echo cleaning
-	@rm -rf $(CODE_OBJECTS) $(THE_EXECUTABLE) $(DOC_OBJECTS) $(BIN_DIR)/*.a $(BIN_DIR)/*.so
+	@rm -rf $(CODE_OBJECTS) $(THE_EXECUTABLE) $(DOC_OBJECTS) $(BIN_DIR)/*.a $(BIN_DIR)/*.so*
 	
 propperclean: clean
 	@echo propper cleaning 
