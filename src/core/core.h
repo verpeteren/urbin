@@ -74,7 +74,7 @@ void							SetupSocket				( const int fd,  const unsigned char tcp );
 struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data ) ;
 void 							Module_Delete			( struct module_t * module );
 struct core_t *					Core_New				( const cfg_t * config );
-void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const int lineNr, const char * message );
+void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message );
 int 							Core_PrepareDaemon		( const struct core_t * core, const signalAction_cb_t signalHandler );
 void 							Core_GetHostByName		( const struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb );
 int								Core_AddModule			( struct core_t * core, struct module_t * module );

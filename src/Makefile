@@ -11,7 +11,7 @@ LD_FLAGS += -lpthread -lstdc++ -lrt -ldl -lm -Wl,-z,relro -Wl,-z,now
 ifdef STAGING_DEBUG
 CC_DEBUG_FLAGS += -g -g3 -gdwarf-2 -ggdb3 \
 	-Wstack-protector -fstack-protector-all \
-	-D_FORTIFY_SOURCE=2 $(OPTMIZATIONLEVEL)
+	-D_FORTIFY_SOURCE=2 $(OPTIMIZATION_LEVEL)
 LD_DEBUG_FLAGS +=  
 ifeq ($(CC),gcc)
 CC_DEBUG_FLAGS += -pg -fno-builtin-strlen --param ssp-buffer-size=4
@@ -20,8 +20,8 @@ endif
 endif
 
 ifdef STAGING_RELEASE
-CC_RELEASE_FLAGS += $(OPTMIZATIONLEVEL)
-LD_RELEASE_FLAGS += $(OPTMIZATIONLEVEL)
+CC_RELEASE_FLAGS += $(OPITMIZATION_LEVEL)
+LD_RELEASE_FLAGS += $(OPITMIZATION_LEVEL)
 ifeq ($(CC),gcc)
 else 
 endif
@@ -64,11 +64,14 @@ $(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return
 $(OBJ_DIR)/core.o:					EXCEPTION = -Wno-unused-result
 $(OBJ_DIR)/utils.o:					EXCEPTION = -Wno-unused-result
 ifeq ($(CC),gcc)
+$(OBJ_DIR)/core.o:					EXCEPTION += -Wno-suggest-attribute=pure
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-suggest-attribute=noreturn
 else 
 $(OBJ_DIR)/main_server.o:			EXCEPTION +=
-$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
+#$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-cast-align
 $(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
-$(OBJ_DIR)/javascript.o:			EXCEPTION += 
+$(OBJ_DIR)/javascript.o:			EXCEPTION += -Wno-cast-align
 $(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code -Wno-cast-align -Wno-format-nonliteral
 $(OBJ_DIR)/utils.o:					EXCEPTION += 
 $(OBJ_DIR)/configuration.o:			EXCEPTION += 

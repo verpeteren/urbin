@@ -75,6 +75,7 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
 			unsigned char javascript:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	javascript = NULL;
 	glotSection = cfg_getnsec( (cfg_t *) core->config, "glot", 0 );
 	javascriptSection = cfg_getnsec( glotSection, "javascript", 0 );
 	path = cfg_getstr( javascriptSection, (char *) "path" );
@@ -428,8 +429,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 	MYSAC_ROW *row;
 	MYSAC_RES * result;
 	jsval jValue, currentVal;
-	unsigned int rowId, rowCount;
-	int colId, colCount;
+	unsigned int rowId, rowCount, colId, colCount;
 	char * cFieldName, * cValue;
 	struct { unsigned char good:1;} cleanUp;
 
@@ -1273,6 +1273,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	args = CallArgsFromVp( argc, vpn );
 	args.rval().setUndefined();
 	cString = NULL;
+	fileName = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( cString = JS_EncodeString( cx, jString ) ) != NULL );
@@ -1638,7 +1639,7 @@ static const JSFunctionSpec jsmGlobal[ ] = {
 */
 static struct script_t * Script_New( const struct javascript_t * javascript, const char * cFile ) {
 	struct script_t * script;
-	int len;
+	size_t len;
 	struct {unsigned char good:1;
 			unsigned char script:1;
 			unsigned char bytecode:1;
@@ -1816,7 +1817,7 @@ static void JsnReport_Error( JSContext * cx, const char * message, JSErrorReport
 	cleanUp.good = ( ( messageFmt = (char *) malloc( len ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.msg = 1;
-		len = snprintf( messageFmt, len, "%s/%3d:\t%s", state, report->errorNumber, message );
+		snprintf( messageFmt, len, "%s/%3d:\t%s", state, report->errorNumber, message );
 		Core_Log( javascript->core, level, fileName, report->lineno, messageFmt );
 	}
 	if ( cleanUp.msg ) {

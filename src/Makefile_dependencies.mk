@@ -129,8 +129,9 @@ $(LIB_TADL_STATIC): $(DIR_TADL)
 $(LIB_TADL_SHARED): $(DIR_TADL)
 	@echo $@
 	@cd $(DIR_TADL) && \
-	$(CC) $(CC_DEBUG_FLAGS) $(CC_RELEASE_FLAGS) -c -o tadns.o tadns.c && \
 	$(CC) $(LD_DEBUG_FLAGS) $(LD_RELEASE_FLAGS) -fPIC -c -o tadns_shared.o tadns.c && \
+	$(CC) $(LD_DEBUG_FLAGS) $(LD_RELEASE_FLAGS) -shared -Wl,-soname,libtadns.so -o libtadns.so tadns_shared.o
+	@touch $@
 
 $(DIR_TADL):
 	@echo $@

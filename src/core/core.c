@@ -257,7 +257,7 @@ struct core_t * Core_New( const cfg_t * config ) {
 	return core;
 }
 
-void Core_Log( const struct core_t * core, const int logLevel, const char * fileName, const int lineNr, const char * message ) {
+void Core_Log( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message ) {
 	char * line;
 	size_t len;
 	struct {unsigned char good:1;
