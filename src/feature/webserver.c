@@ -72,10 +72,10 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 static struct route_t * 		Route_New				( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs );
 static void						Route_Delete			( struct route_t * route );
 
-static void						Webserver_HandleRead_cb	( picoev_loop * loop, int fd, int events, void * cbArgs );
-static void						Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * cbArgs );
-static void						Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * cbArgs );
-static void 					Webserver_FindRoute		( struct webserver_t * webserver, struct webclient_t * webclient );
+static void						Webserver_HandleRead_cb	( picoev_loop * loop, int fd, int events, void * wcArgs );
+static void						Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArgs );
+static void						Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArgs );
+static void 					Webserver_FindRoute		( const struct webserver_t * webserver, struct webclient_t * webclient );
 static void						Webserver_AddRoute		( struct webserver_t * webserver, struct route_t * route );
 static void						Webserver_DelRoute		( struct webserver_t * webserver, struct route_t * route );
 
@@ -286,7 +286,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 		Webclient_RenderNotFound( webclient );
 	} else {
 		if ( route->routeType == ROUTETYPE_DYNAMIC ) {
-			route->details.handlerCb( route->cbArgs );
+			route->details.handlerCb( webclient );
 		} else if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
 			struct stat fileStat;
 			const char * documentRoot;
@@ -407,7 +407,7 @@ static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
 		}
 		for ( i = 0; i < webclient->header->HeaderSize; i++ ) {
 			field = &webclient->header->Fields[i];
-			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http1.1 yadayadyada...
+			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada...
 				if ( strncmp( field->Value, "Keep-Alive", field->ValueLen ) == 0 ) {
 					webclient->connection = CONNECTION_KEEPALIVE;
 				} else 	if ( strncmp( field->Value, "close", field->ValueLen ) == 0 ) {
@@ -526,12 +526,12 @@ int Webserver_DynamicHandler( struct webserver_t * webserver, const char * patte
 
 	return ( cleanUp.good == 1 );
 }
-static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * ws_arg ) {
+static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArg ) {
 	struct webserver_t * webserver;
 	struct webclient_t * webclient;
 	int newFd;
 
-	webserver = (struct webserver_t *) ws_arg;
+	webserver = (struct webserver_t *) wsArg;
 	newFd = accept( fd, NULL, NULL );
 	if ( -1 != newFd ) {
 
@@ -541,11 +541,11 @@ static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, v
 	}
 }
 
-static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wc_arg ) {
+static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webclient_t * webclient;
 	ssize_t r;
 
-	webclient = (struct webclient_t *) wc_arg;
+	webclient = (struct webclient_t *) wcArg;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
 		Webclient_CloseConn( webclient );
@@ -568,17 +568,17 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 		default: /* got some data, send back */
 			picoev_del( loop, fd );
 			Webclient_PrepareRequest( webclient );
-			picoev_add( loop, fd, PICOEV_WRITE, webclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wc_arg );
+			picoev_add( loop, fd, PICOEV_WRITE, webclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wcArg );
 			break;
 		}
 	}
 }
 
-static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wc_arg ) {
+static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webclient_t * webclient;
 	int connClosed;
 
-	webclient = (struct webclient_t *) wc_arg;
+	webclient = (struct webclient_t *) wcArg;
 	connClosed = 0;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
@@ -682,7 +682,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 			if ( CONNECTION_KEEPALIVE == webclient->connection ) {
 				picoev_del( loop, fd );
 				Webclient_Reset( webclient );
-				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeoutSec , Webserver_HandleRead_cb, wc_arg );
+				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeoutSec , Webserver_HandleRead_cb, wcArg );
 			} else {
 				Webclient_CloseConn( webclient );
 				connClosed = 1;
@@ -764,6 +764,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 	}
 	if ( cleanUp.good ) {
 		cleanUp.onig = 1;
+		Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "New Webserver allocated" );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.onig ) {
@@ -793,6 +794,7 @@ static void Webserver_AddRoute( struct webserver_t * webserver, struct route_t *
 		} else {
 			PR_APPEND_LINK( &route->mLink, &webserver->routes->mLink );
 		}
+		Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "New Route allocated" );
 	}
 }
 
@@ -810,11 +812,12 @@ static void Webserver_DelRoute( struct webserver_t * webserver, struct route_t *
 			webserver->routes = routeNext;
 		}
 	}
+	Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "Delete Route free-ed" );
 	PR_REMOVE_AND_INIT_LINK( &route->mLink );
 	Route_Delete( route ); route = NULL;
 }
 
-static void Webserver_FindRoute( struct webserver_t * webserver, struct webclient_t * webclient ) {
+static void Webserver_FindRoute( const struct webserver_t * webserver, struct webclient_t * webclient ) {
 	struct route_t * route, *firstRoute;
 	PRCList * next;
 	unsigned char * range, * end, * start;
@@ -838,7 +841,7 @@ static void Webserver_FindRoute( struct webserver_t * webserver, struct webclien
 				r = onig_search( route->urlRegex, ( unsigned char * ) url, end, start, range, webserver->region, webserver->regexOptions );
 				found = ( r >= 0 );
 				if ( found ) {
-					webclient->route = webserver->routes;
+					webclient->route = route;
 					break;
 				}
 				route = FROM_NEXT_TO_ITEM( struct route_t );
@@ -871,6 +874,8 @@ void Webserver_Delete( struct webserver_t * webserver ) {
 	close( webserver->socketFd );
 	webserver->socketFd = 0;
 	free( (char *) webserver->ip ); webserver->ip = NULL;
+	Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "Delete Webserver free-ed" );
+	webserver->core = NULL;
 	free( webserver ); webserver = NULL;
 }
 

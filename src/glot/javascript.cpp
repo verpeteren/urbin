@@ -9,7 +9,7 @@
 #define MAIN_OBJ_NAME "Hard"
 
 struct payload_t {
-	JSContext *						cx;
+	JSContext *						context;
 	JS::RootedObject 				objRoot;
 	JS::RootedValue *				fnValRoot;
 	JS::HandleValueArray *			argsHVA;
@@ -271,18 +271,15 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 #define SQL_CLIENT_QUERY_RESULT_HANDLER_CB( formatter, sub ) do { \
 	struct payload_t * payload; \
 	JSContext * cx; \
-	JSCompartment * oldCompartment; \
-	JSObject * resultObj, * globalObj; \
+	JSObject * resultObj; \
 	jsval paramValArray[1], retVal; \
 	\
 	payload = ( struct payload_t * ) query->cbArgs; \
-	globalObj = NULL; \
 	retVal = JSVAL_NULL; \
 	paramValArray[0] = JSVAL_NULL; \
-	cx = payload->cx; \
-	JS_BeginRequest( cx ); \
-	oldCompartment = JS_EnterCompartment( cx, globalObj ); \
-	globalObj = JS_GetGlobalForObject( cx, payload->objRoot ); \
+	cx = payload->context; \
+	JSAutoRequest 			ar( payload->context ); \
+	JSAutoCompartment 		ac( payload->context, payload->objRoot ); \
 	JS::RootedValue paramValArrayRoot( cx, paramValArray[0] ); \
 	resultObj = formatter( cx, query->result.sub.res ); \
 	paramValArray[0] = OBJECT_TO_JSVAL( resultObj ); \
@@ -293,9 +290,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	JS::MutableHandleValue 	retValMut( &retValRoot ); \
 	JS_CallFunctionValue( cx, objHandle, fnValHandle, paramValArrayHandle, retValMut ); \
 	\
-	delete payload; 		payload = NULL; \
-	JS_LeaveCompartment( cx, oldCompartment ); \
-	JS_EndRequest( cx ); \
+	Payload_Delete( payload ); 		payload = NULL; \
 } while ( 0 );
 
 #define SQL_CLIENT_QUERY( handler ) do { \
@@ -346,7 +341,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 		} else if ( paramList.isString( ) || paramList.isNumber( ) ) { \
 			/*  it is a query like "SELECT user FROM users WHERE user_id = $1",				 	666, 		function( result ) {console.log( result );} ); */ \
 			nParams = 1; \
-			cleanUp.good = ( ( cParamValues = ( const char ** ) new char*[nParams] ) != NULL ); \
+			cleanUp.good = ( ( cParamValues = ( const char ** ) malloc( sizeof( *cParamValues ) * nParams ) ) != NULL ); \
 			if ( cleanUp.good ) { \
 				cleanUp.params = 1; \
 				if ( paramList.isNumber( ) ) { \
@@ -366,7 +361,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 			JS::HandleObject 		paramObjHandle( paramObjRoot ); \
 			JS_GetArrayLength( cx, paramObjHandle, &nParams ); \
 			if ( nParams > 0 ) { \
-				cleanUp.good = ( ( cParamValues = ( const char ** ) new char*[nParams] ) != NULL ); \
+				cleanUp.good = ( ( cParamValues = ( const char ** ) malloc( sizeof( *cParamValues ) * nParams ) ) != NULL ); \
 				if ( cleanUp.good ) { \
 					cleanUp.params = 1; \
 					paramIter = JS_NewPropertyIterator( cx, paramObjHandle ); \
@@ -405,7 +400,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 		JS_free( cx, ( char * ) cParamValues[i] ); cParamValues[i] = NULL; \
 	} \
 	if ( cleanUp.params ) { \
-		delete[ ] cParamValues; 	cParamValues = NULL; \
+		free( cParamValues ); 	cParamValues = NULL; \
 	} \
 	if ( cleanUp.statement ) { \
 		JS_free( cx, cStatement ); 	cStatement = NULL; \
@@ -415,7 +410,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 		args.rval( ).setBoolean( true ); \
 	} else { \
 		if ( cleanUp.payload ) { \
-			delete payload; payload = NULL; \
+			Payload_Delete( payload ); payload = NULL; \
 		} \
 		args.rval( ).setBoolean( false ); \
 	} \
@@ -582,7 +577,7 @@ static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * mysqlObj ) {
 	struct sqlclient_t * mysql;
 
 	if ( ( mysql = (struct sqlclient_t *) JS_GetPrivate( mysqlObj ) ) != NULL ) {
-		delete mysql; mysql = NULL;
+		Sqlclient_Delete( mysql ); mysql = NULL;
 	}
 }
 #endif
@@ -803,7 +798,7 @@ static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresql
 	struct sqlclient_t * postgresql;
 
 	if ( ( postgresql = (struct sqlclient_t *) JS_GetPrivate( postgresqlObj ) ) != NULL ) {
-		delete postgresql; postgresql = NULL;
+		Sqlclient_Delete( postgresql ); postgresql = NULL;
 	}
 }
 /*
@@ -841,7 +836,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 	clientObj = NULL;
 	jIp = jUrl = jMethod = NULL;
 	ip = url = NULL;
-	cx = payload->cx;
+	cx = payload->context;
 	JSAutoRequest ar( cx );
 	JSAutoCompartment ac( cx, globalObj );
 	cleanUp.good = ( ( ip = Webclient_GetIp( webclient ) ) != NULL );
@@ -917,31 +912,28 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 }
 
 static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclient ) {
+	struct payload_t * payload;
 	JSObject * clientObj, * globalObj;
 	jsval clientObjVal, retVal;
-	struct payload_t * payload;
-	JSCompartment * oldCompartment;
 
 	retVal = JSVAL_NULL;
 	clientObjVal = JSVAL_NULL;
 	clientObj = NULL;
 	payload = (struct payload_t *) webclient->route->cbArgs;
 	if ( payload != NULL ) {
-		JS_BeginRequest( payload->cx );
-		oldCompartment = JS_EnterCompartment( payload->cx, payload->objRoot );
-		globalObj = JS_GetGlobalForCompartmentOrNull( payload->cx, oldCompartment );
-		JS::RootedObject 		clientObjRoot( payload->cx, clientObj );
+		JSAutoRequest 			ar( payload->context );
+		JSAutoCompartment 		ac( payload->context, payload->objRoot );
+		globalObj = JS_GetGlobalForObject( payload->context, payload->objRoot );
+		JS::RootedObject 		clientObjRoot( payload->context, clientObj );
 		clientObj = Webserver_Route_ResultToJS( payload, globalObj, webclient );
-		JS::RootedValue 		clientValRoot( payload->cx, clientObjVal );
-		JS::RootedValue 		retValRoot( payload->cx, retVal );
+		JS::RootedValue 		clientValRoot( payload->context, clientObjVal );
+		JS::RootedValue 		retValRoot( payload->context, retVal );
 		JS::MutableHandleValue 	retValMut( &retValRoot );
 		JS::HandleObject 		serverObjHandle( payload->objRoot );
 		JS::HandleValue 		fnValHandle( *payload->fnValRoot );
 		clientObjVal = OBJECT_TO_JSVAL( clientObj );
-		JS_CallFunctionValue( payload->cx, serverObjHandle, fnValHandle, JS::HandleValueArray( clientValRoot ), retValMut );
+		JS_CallFunctionValue( payload->context, serverObjHandle, fnValHandle, JS::HandleValueArray( clientValRoot ), retValMut );
 		Payload_Delete( payload ); payload = NULL;
-		JS_LeaveCompartment( payload->cx, oldCompartment );
-		JS_EndRequest( payload->cx );
 	}
 }
 
@@ -988,8 +980,9 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	webserverObj = JS_THIS_OBJECT( cx, vpn );
 	webserver = (struct webserver_t *) JS_GetPrivate( webserverObj );
 	JS::RootedValue 		fnValRoot( cx, fnVal );
-	JS::HandleValue 		fnValHandle( fnValRoot );
 	JS::MutableHandleValue 	fnValMut( &fnValRoot );
+	JS::RootedValue 		fnOrgRoot( cx, args[1] );
+	JS::HandleValue 		fnOrgHandle( fnOrgRoot );
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*", &jPattern, &fnVal ) == true );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( cPattern = JS_EncodeString( cx, jPattern ) ) != NULL );
@@ -999,7 +992,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 		cleanUp.good = ( ( webserver = (struct webserver_t *) JS_GetPrivate( webserverObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
+		cleanUp.good = ( JS_ConvertValue( cx, fnOrgHandle, JSTYPE_FUNCTION, fnValMut ) == true );
 	}
 	if ( cleanUp.good ) {
 		JS::HandleValueArray empty = JS::HandleValueArray::empty( );
@@ -1011,7 +1004,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	} else {
 		if ( cleanUp.payload ) {
 			// this is the only thing that needs special care if something went wrong; we cleanup the rest any way,
-			delete payload; payload = NULL;
+			Payload_Delete( payload ); payload = NULL;
 		}
 	}
 	if ( cleanUp.good ) {
@@ -1348,10 +1341,12 @@ static const JSFunctionSpec jsmConsole[ ] = {
  * @namespace
  */
 static void Payload_Delete( struct payload_t * payload ) {
-	JSAutoRequest ar( payload->cx );
+	payload->context = NULL;
+	payload->objRoot = NULL;
 	payload->fnValRoot = NULL;
-	JS_free( payload->cx, payload->argsHVA ); payload->argsHVA = NULL;
-	JS_free( payload->cx, payload ); payload = NULL;
+	payload->argsHVA = NULL;
+	payload->repeat = 0;
+	free( payload ); payload = NULL;
 }
 
 static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, const bool repeat ) {
@@ -1361,21 +1356,23 @@ static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::Ro
 		unsigned char args:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( payload = (struct payload_t *) JS_malloc( cx, sizeof( *payload ) ) ) != NULL );
+	cleanUp.good = ( ( payload = (struct payload_t *) malloc( sizeof( *payload ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		payload->cx = cx;
+		payload->context = cx;
 		payload->objRoot = object;
 		payload->fnValRoot = fnVal;
 		payload->argsHVA = cbArgs;
 		payload->repeat = repeat;
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.args ) {
-			JS_free( cx, payload->argsHVA ); payload->argsHVA = NULL;
-		}
 		if ( cleanUp.payload ) {
-			JS_free( cx, payload ); payload = NULL;
+			payload->context = NULL;
+			payload->objRoot = NULL;
+			payload->fnValRoot = NULL;
+			payload->argsHVA = NULL;
+			payload->repeat = 0;
+			free( payload ); payload = NULL;
 		}
 	}
 	return payload;
@@ -1441,7 +1438,6 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 
 static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	struct payload_t * payload;
-	JSCompartment * oldCompartment;
 	jsval retVal;
 	int again;
 
@@ -1449,22 +1445,19 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	retVal = JSVAL_NULL;
 	payload = ( struct payload_t * ) cbArgs;
 	if ( payload != NULL ) {
-		JS_BeginRequest( payload->cx );
-		oldCompartment = 		JS_EnterCompartment( payload->cx, payload->objRoot );
-		JS::RootedValue 		retValRoot( payload->cx, retVal );
+		JSAutoRequest 			ar( payload->context ); \
+		JSAutoCompartment 		ac( payload->context, payload->objRoot ); \
+		JS::RootedValue 		retValRoot( payload->context, retVal );
 		JS::MutableHandleValue 	retValMut( &retValRoot );
 		JS::HandleObject 		objHandle( payload->objRoot );
 		JS::HandleValue 		fnValHandle( *payload->fnValRoot );
-		JS_CallFunctionValue( payload->cx, objHandle, fnValHandle, *payload->argsHVA, retValMut );
+		JS_CallFunctionValue( payload->context, objHandle, fnValHandle, *payload->argsHVA, retValMut );
 		if ( payload->repeat ) {
 			again = 1;
 		} else {
 			Payload_Delete( payload ); payload = NULL;
 			again = 0;
 		}
-
-		JS_LeaveCompartment( payload->cx, oldCompartment );
-		JS_EndRequest( payload->cx );
 	}
 	return again;
 }
@@ -1475,31 +1468,35 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	struct timing_t * timing; \
 	JSObject * globalObj; \
 	JS::CallArgs args; \
+	jsval dummyVal, fnVal; \
 	int ms; \
 	struct {	unsigned char payload:1; \
 				unsigned char timer:1; \
 				unsigned char good:1;} cleanUp; \
 	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
-	JS::RootedValue 		dummy( cx ); \
-	JS::HandleValue 		dummyHandle( dummy ); \
-	JS::RootedValue 		fnVal( cx ); \
-	JS::MutableHandleValue	fnValMut( &fnVal ); \
+	fnVal = JSVAL_NULL; \
+	dummyVal = JSVAL_NULL; \
+	JS::RootedValue 		dummyValRoot( cx ); \
+	JS::HandleValue 		dummyValHandle( dummyValRoot ); \
+	JS::RootedValue 		fnValRoot( cx, fnVal ); \
+	JS::HandleValue 		fnValHandle( fnValRoot ); \
+	JS::MutableHandleValue	fnValMut( &fnValRoot ); \
 	payload = NULL; \
 	timing = NULL; \
 	args = CallArgsFromVp( argc, vpn ); \
 	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) ); \
 	javascript = (struct javascript_t *) JS_GetPrivate( globalObj ); \
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "fi", &dummy, &ms ) == true ); \
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "*i", &dummyVal, &ms ) == true ); \
 	if ( cleanUp.good ) { \
-		cleanUp.good = ( JS_ConvertValue( cx, dummyHandle, JSTYPE_FUNCTION, fnValMut ) == true ); \
+		cleanUp.good = ( JS_ConvertValue( cx, args[0], JSTYPE_FUNCTION, fnValMut ) == true ); \
 	} \
 	if ( cleanUp.good ) { \
 		if ( args.length( ) > 2 ) { \
 			JS::HandleValueArray argsAt2 = JS::HandleValueArray::fromMarkedLocation( argc - 2, vpn ); \
-			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false ) ) != NULL ); \
+			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
 		} else { \
 			JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty( ); \
-			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnVal, &argsAt2, false ) ) != NULL ); \
+			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
 		} \
 	} \
 	if ( cleanUp.good ) { \
@@ -1698,9 +1695,9 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 		}
 	}
 	if ( cleanUp.good ) {
-		Core_Log( javascript->core, LOG_INFO, cFile, 0, "Script loaded" );
+		Core_Log( javascript->core, LOG_INFO, cFile ,0, "New script loaded" );
 	} else {
-		Core_Log( javascript->core, LOG_INFO, cFile, 0, "Script could not be loaded" );
+		Core_Log( javascript->core, LOG_INFO, cFile, 0, "New script could not be loaded" );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.bytecode ) {
@@ -1892,6 +1889,7 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	}
 	if ( cleanUp.good ) {
 		cleanUp.init = 1;
+		Core_Log( javascript->core, LOG_INFO, __FILE__ , __LINE__, "New Javascript allocated" );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.context ) {
@@ -1980,6 +1978,7 @@ void Javascript_Delete( struct javascript_t * javascript ) {
 	}
 	free( (char *) javascript->path ); javascript->path = NULL;
 	free( (char *) javascript->fileName ); javascript->fileName = NULL;
+	Core_Log( javascript->core, LOG_INFO, __FILE__ , __LINE__, "Delete Sqlclient free-ed" );
 	javascript->core = NULL;
 	free( javascript ); javascript = NULL;
 }

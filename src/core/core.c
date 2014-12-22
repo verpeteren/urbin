@@ -333,11 +333,13 @@ static void Core_ProcessTick( struct core_t * core ) {
 			next = PR_NEXT_LINK( &timing->mLink );
 			needToFire = ( timing->due < horizon && timing->due != 0 );
 			if ( needToFire ) {
+				timing->timerHandler_cb( timing->cbArgs );
 				if ( timing->repeat ) {
 					Timer_CalculateDue( timing, horizon );
 				} else {
 					Core_DelTiming( core, timing );
 				}
+
 			}
 			timing = FROM_NEXT_TO_ITEM( struct timing_t );
 		} while ( timing != firstTiming );

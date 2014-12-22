@@ -80,6 +80,9 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 			}
 			Sqlclient_PopQuery( sqlclient );
 		}
+	if ( cleanUp.good ) {
+		Core_Log( sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "New query allocated" );
+	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.statement ) {
 			free( ( char * ) query->statement );	query->statement = NULL;
@@ -128,6 +131,9 @@ void Query_Delete( struct query_t * query ) {
 	default:
 		break;
 	}
+	Core_Log( query->sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "Delete query free-ed" );
+	query->sqlclient = NULL;
+	free( query ); query = NULL;
 }
 
 /*****************************************************************************/
@@ -554,6 +560,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 #endif
 		sqlclient->currentQuery = NULL;
 		Sqlclient_Connect( sqlclient );
+		Core_Log( sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "New Sqlclient allocated" );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.hostName ) {
@@ -734,6 +741,8 @@ void Sqlclient_Delete( struct sqlclient_t * sqlclient ) {
 	free( (char *) sqlclient->loginName );		sqlclient->loginName = NULL;
 	free( (char *) sqlclient->password );		sqlclient->password = NULL;
 	free( (char *) sqlclient->dbName ); 		sqlclient->dbName = NULL;
+	Core_Log( sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "Delete Sqlclient free-ed" );
+	sqlclient->core = NULL;
 	free( sqlclient ); 							sqlclient = NULL;
 }
 
