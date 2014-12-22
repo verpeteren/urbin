@@ -1,8 +1,4 @@
 "use strict"
-var a  = Hard;
-
-console.log( "hee" );
-
 try {
 	console.log( "hee" );
 } catch ( e ) {
@@ -13,6 +9,8 @@ Hard.onLoad = function( ) {
 }
 Hard.onReady = function( ) {
 	console.log( "ready" );
+	var ws = Hard.Webserver( {ip: '127.0.0.1', port: 8888}, 60 );
+	ws.addDocumentRoot( '^/static/(.*)', '../var/www/static/' );
 }
 Hard.onUnload = function( ) {
 	console.log( "unload" );
