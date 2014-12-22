@@ -6,7 +6,7 @@ STDC = c99
 CC_FLAGS += $(GET_OFF_MY_LAWN) 
 LD_FLAGS += -lpthread -lstdc++ -lrt -ldl -lm -Wl,-z,relro -Wl,-z,now
 
-ifdef STAGING_DEBUG
+ifeq ($(STAGING_DEBUG),yes)
 CC_DEBUG_FLAGS += -g -g3 -gdwarf-2 -ggdb3 \
 	-Wstack-protector -fstack-protector-all \
 	-D_FORTIFY_SOURCE=2 $(OPTIMIZATION_LEVEL)
@@ -17,7 +17,7 @@ else
 endif
 endif
 
-ifdef STAGING_RELEASE
+ifeq ($(STAGING_RELEASE),yes)
 CC_RELEASE_FLAGS += $(OPITMIZATION_LEVEL)
 LD_RELEASE_FLAGS += $(OPITMIZATION_LEVEL)
 ifeq ($(CC),gcc)
@@ -103,7 +103,7 @@ endif
 	ln -fs $(DEPS) -t . && \
 	chmod  +x $@ lib* && \
 	export LD_LIBRARY_PATH=$(BIN_DIR)
-ifdef STAGING_RELEASE
+ifeq ($(STAGING_RELEASE),yes)
 	@$(STRIP) $@ $(DEPS)
 endif
 	@touch $@

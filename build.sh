@@ -27,13 +27,13 @@ else
 	esac
 	
 	if [ "$DEBUG" == "yes" ]; then
-		DEBUG_MK="STAGING_DEBUG = 1"
-		RELEASE_MK="STAGING_RELEASE = 0"
+		DEBUG_MK="STAGING_DEBUG = yes"
+		RELEASE_MK="STAGING_RELEASE = no"
 		DEBUG_C="#define DEBUG 1"
 		NDEBUG_C="//	#define NDEBUG 1"
 	else
-		DEBUG_MK="STAGING_DEBUG = 0"
-		RELEASE_MK="STAGING_RELEASE = 1"
+		DEBUG_MK="STAGING_DEBUG = no"
+		RELEASE_MK="STAGING_RELEASE = yes"
 		DEBUG_C="//  #define DEBUG 0"
 		NDEBUG_C="#define NDEBUG 1"
 	fi	
