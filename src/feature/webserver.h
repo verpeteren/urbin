@@ -32,11 +32,11 @@ enum connection_t{
 };
 
 enum httpCode_t {
-	HTTPCODE_NONE				= 0,
-	HTTPCODE_OK					= 200,
-	HTTPCODE_FORBIDDEN			= 403,
-	HTTPCODE_NOTFOUND			= 404,
-	HTTPCODE_ERROR				= 500,
+	HTTPCODE_NONE				 = 0,
+	HTTPCODE_OK					 = 200,
+	HTTPCODE_FORBIDDEN			 = 403,
+	HTTPCODE_NOTFOUND			 = 404,
+	HTTPCODE_ERROR				 = 500,
 };
 
 enum mimeType_t {

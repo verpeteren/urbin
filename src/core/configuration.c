@@ -10,8 +10,7 @@ void Usage( const char * prog_name, const int code ) {
 				"\t option                             default\n"
 				"\t configurationFileName   [FILE]     ( %s )\n"
 				, prog_name,
-				PR_MAINCONFIG_FILENAME
-		);
+				PR_MAINCONFIG_FILENAME );
 	exit( code );
 }
 

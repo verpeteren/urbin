@@ -1,0 +1,82 @@
+{	
+	Ignore malloc strdup logmodule dlinit
+	Memcheck:Leak
+	fun:malloc
+	fun:strdup
+	fun:PR_NewLogModule
+	...
+	fun:_dl_init
+}
+{
+	Ignore confuse sectiontitle
+	Memcheck:Leak
+	fun:malloc
+	fun:cfg_yyalloc
+	fun:main
+}
+{
+	Ignore nspr nspr dlinit
+	Memcheck:Leak
+	fun:malloc
+	...
+	fun:_dl_init
+}
+{
+	Ignore calloc dlerror
+	Memcheck:Leak
+	fun:calloc
+	fun:_dlerror_run
+	fun:dlopen@@GLIBC_2.1
+	...
+	fun:_dl_init
+}
+{
+	Ignore malloc nspr
+	Memcheck:Leak
+	fun:malloc
+	fun:PR_Malloc
+	...
+	fun:_dl_init
+}
+{
+	Ignore calloc nspr
+	Memcheck:Leak
+	fun:calloc
+	fun:PR_fun:calloc
+	...
+	fun:_dl_init
+}
+{
+	Ignore malloc nspr dlinit
+	Memcheck:Leak
+	fun:malloc
+	fun:PR_Malloc
+	fun:_dl_init
+}
+
+{	
+	Ignore calloc nspr monitor dlinit
+	Memcheck:Leak
+	fun:calloc
+	fun:PR_Calloc
+	fun:PR_NewMonitor
+	...
+	fun:_dl_init
+
+}
+{
+	Ignore calloc nspr dlinit
+	Memcheck:Leak
+	fun:calloc
+	fun:PR_Calloc
+	fun:_dl_init
+}
+
+{
+	Ignore calloc dlinit
+	Memcheck:Leak
+	fun:calloc
+	fun:PR_Calloc
+	...
+	fun:_dl_init
+}

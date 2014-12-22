@@ -334,7 +334,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 						exists = stat( fullPath, &fileStat );
 						if ( exists != 0 ) {
 							//  this is the place where a directory index handler can step into the arena;
-							//  but we will not do that, because: https://github.com/monkey/monkey/blob/master/plugins/dirlisting/dirlisting.c#L153 :-)
+							//  but we will not do that, because: https://github.com/monkey/monkey/blob/master/plugins/dirlisting/dirlisting.c#L153
 							webclient->response.httpCode = HTTPCODE_NOTFOUND;
 						}
 					}
@@ -720,10 +720,11 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 		if ( webserver->port == 0 ) {
 			webserver->port = PR_CFG_MODULES_WEBSERVER_PORT;
 		}
+		webserver->timeoutSec = timeoutSec;
 		if ( timeoutSec == 0 ) {
 			webserver->timeoutSec = (unsigned char) cfg_getint( webserverSection, "timeout_sec" );
 		}
-		if ( timeoutSec == 0 ) {
+		if ( webserver->timeoutSec == 0 ) {
 			webserver->timeoutSec = PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC;
 		}
 		if ( ip == NULL ) {
@@ -824,7 +825,7 @@ static void Webserver_FindRoute( struct webserver_t * webserver, struct webclien
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webclient->route = NULL;
-	cleanUp.good = ( ( url = Webclient_GetIp( webclient ) ) != NULL );
+	cleanUp.good = ( ( url = Webclient_GetUrl( webclient ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
 		start = ( unsigned char * ) url;

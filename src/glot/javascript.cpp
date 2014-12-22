@@ -91,7 +91,7 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.javascript ) {
-			Javascript_Delete( javascript ); javascript = NULL;
+			Javascript_Delete( javascript );
 		}
 	}
 	return ( cleanUp.good ) ? 1: 0;
@@ -458,7 +458,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 					currentVal = JSVAL_NULL;
 					JS::RootedObject 		recordObjRoot( cx, recordObj );
 					JS::HandleObject 		recordObjHandle( recordObjRoot );
-					cleanUp.good = ( (		recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+					cleanUp.good = ( ( recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
 					if ( cleanUp.good ) {
 						currentVal = OBJECT_TO_JSVAL( recordObj );
 						JS::RootedValue 	currentValRoot( cx, currentVal );
@@ -1671,6 +1671,7 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 	if ( cleanUp.good ) {
 		cleanUp.script = 1;
 		script->bytecode = NULL;
+		PR_INIT_CLIST( &script->mLink );
 		cleanUp.good = ( ( script->fileNameWithPath = (char *) malloc( len ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -1971,18 +1972,14 @@ void Javascript_Delete( struct javascript_t * javascript ) {
 		Javascript_DelScript( javascript, firstScript );
 		firstScript = javascript->scripts;
 	}
-	JSAutoRequest ar( javascript->context );
-	JSAutoCompartment ac( javascript->context, javascript->globalObj );
 	JS_DestroyContext( javascript->context );
 	JS_DestroyRuntime( javascript->runtime );
-
-	free( (char *) javascript->path ); javascript->path = NULL;
-	free( (char *) javascript->fileName ); javascript->fileName = NULL;
-	javascript->core = NULL;
-	free( javascript ); javascript = NULL;
-
 	if ( jsInterpretersAlive > 0 ) {
 		JS_ShutDown( );
 		jsInterpretersAlive--;
 	}
+	free( (char *) javascript->path ); javascript->path = NULL;
+	free( (char *) javascript->fileName ); javascript->fileName = NULL;
+	javascript->core = NULL;
+	free( javascript ); javascript = NULL;
 }

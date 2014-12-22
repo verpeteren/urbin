@@ -466,10 +466,10 @@ static void Mysql_HandleConnect_cb( picoev_loop * loop, const int fd, const int 
 
 struct sqlclient_t * Mysql_New( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
 	int prt;
-	uint16_t timeSec;
+	unsigned char timeSec;
 
 	SET_DEFAULTS_FOR_CONN( MY, "mysqlclient" ) \
-	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, ip, port, loginName, password, dbName, timeoutSec );
+	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, ip, port, loginName, password, dbName, timeSec );
 }
 #endif
 /*****************************************************************************/

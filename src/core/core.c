@@ -10,6 +10,8 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
+#include <oniguruma.h>
+
 #include "core.h"
 #include "utils.h"
 #include "configuration.h"
@@ -48,6 +50,7 @@ void Boot( const int fds ) {
 void Shutdown( ) {
 	fprintf( stdout, "Shutdown\n" );
 	picoev_deinit( );
+	onig_end( );
 }
 
 void SetupSocket( const int fd, const unsigned char tcp ) {
