@@ -52,16 +52,16 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 //  http://stackoverflow.com/questions/4143000/find-the-string-length-of-an-int
 #define STRING_LENGTH_OF_INT( value ) (ssize_t) ( value == 0 ? 1 : ( log10( value ) + 1 ) )
 #define HTTP_SERVER_TEMPLATE "HTTP/1.1 %d OK\r\nContent-Length: %d\r\nConnection: %s\r\nContent-Type: %s\r\nDate: %s\r\nServer: %s/%s\r\n\r\n"
-#define HTTP_SERVER_TEMPLATE_ARGS webclient->response.httpCode, \
-								webclient->response.contentLength, \
+#define HTTP_SERVER_TEMPLATE_ARGS webserverclient->response.httpCode, \
+								webserverclient->response.contentLength, \
 								connectionString, \
 								contentTypeString, \
 								dateString, \
 								PR_NAME, \
 								PR_VERSION
 #define HTTP_SERVER_TEMPLATE_SIZE	(ssize_t) ( strlen( HTTP_SERVER_TEMPLATE ) + \
-								( STRING_LENGTH_OF_INT( webclient->response.httpCode ) ) + \
-								( STRING_LENGTH_OF_INT( webclient->response.contentLength ) ) + \
+								( STRING_LENGTH_OF_INT( webserverclient->response.httpCode ) ) + \
+								( STRING_LENGTH_OF_INT( webserverclient->response.contentLength ) ) + \
 								strlen( connectionString ) + \
 								strlen( contentTypeString ) + \
 								strlen( dateString ) + \
@@ -73,145 +73,145 @@ static struct route_t * 		Route_New				( const char * pattern, const enum routeT
 static void						Route_Delete			( struct route_t * route );
 
 static void						Webserver_HandleRead_cb	( picoev_loop * loop, int fd, int events, void * wcArgs );
-static void						Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArgs );
-static void						Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArgs );
-static void 					Webserver_FindRoute		( const struct webserver_t * webserver, struct webclient_t * webclient );
-static void						Webserver_AddRoute		( struct webserver_t * webserver, struct route_t * route );
-static void						Webserver_DelRoute		( struct webserver_t * webserver, struct route_t * route );
+	static void						Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArgs );
+	static void						Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArgs );
+	static void 					Webserver_FindRoute		( const struct webserver_t * webserver, struct webserverclient_t * webserverclient );
+	static void						Webserver_AddRoute		( struct webserver_t * webserver, struct route_t * route );
+	static void						Webserver_DelRoute		( struct webserver_t * webserver, struct route_t * route );
 
-static struct webclient_t *		Webclient_New			( struct webserver_t * webserver, int socketFd);
-static void						Webclient_PrepareRequest( struct webclient_t * webclient );
-static void						Webclient_RenderRoute	( struct webclient_t * webclient );
-static void 					Webclient_CloseConn		( struct webclient_t * webclient );
-static void 					Webclient_Delete		( struct webclient_t * webclient );
+	static struct webserverclient_t *Webserverclient_New	( struct webserver_t * webserver, int socketFd);
+	static void						Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient );
+	static void						Webserverclient_RenderRoute	( struct webserverclient_t * webserverclient );
+	static void 					Webserverclient_CloseConn	( struct webserverclient_t * webserverclient );
+	static void 					Webserverclient_Delete		( struct webserverclient_t * webserverclient );
 
 
-/*****************************************************************************/
-/* Route                                                                    */
-/*****************************************************************************/
-static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs ) {
-	struct route_t * route;
-	OnigErrorInfo einfo;
-	UChar * pat;
-	char * lastChar;
-	struct { unsigned char good:1;
-			unsigned char route:1;
-			unsigned char onig:1;
-			unsigned char documentRoot:1;
-			unsigned char orgPattern:1;
-			} cleanUp;
+	/*****************************************************************************/
+	/* Route                                                                    */
+	/*****************************************************************************/
+	static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs ) {
+		struct route_t * route;
+		OnigErrorInfo einfo;
+		UChar * pat;
+		char * lastChar;
+		struct { unsigned char good:1;
+				unsigned char route:1;
+				unsigned char onig:1;
+				unsigned char documentRoot:1;
+				unsigned char orgPattern:1;
+				} cleanUp;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( route = malloc( sizeof( *route ) ) ) != NULL );
-	if ( cleanUp.good ) {
-		cleanUp.route = 1;
-		route->cbArgs = cbArgs;
-		cleanUp.good = ( ( route->orgPattern = Xstrdup( pattern ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.orgPattern = 1;
-		pat = ( unsigned char * ) route->orgPattern;
-		cleanUp.good = ( onig_new( &route->urlRegex, pat, pat + strlen( ( char * ) pat ), regexOptions, ONIG_ENCODING_ASCII, ONIG_SYNTAX_DEFAULT, &einfo ) == ONIG_NORMAL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.onig = 1;
-		route->routeType = routeType;
-		PR_INIT_CLIST( &route->mLink );
-		switch ( route->routeType ) {
-			case ROUTETYPE_DOCUMENTROOT:
-				cleanUp.good = ( ( route->details.documentRoot = Xstrdup( (char*) details ) ) != NULL );
-				if ( cleanUp.good ) {
-					cleanUp.documentRoot = 1;
-					lastChar = (char *) &route->details.documentRoot[ strlen( route->details.documentRoot ) - 1];
-					if ( '/' == *lastChar ) {
-						*lastChar = '\0';
-					}
-				}
-				break;
-			case ROUTETYPE_DYNAMIC:
-				route->details.handlerCb = (dynamicHandler_cb_t) details;
-				break;
-			default:
-				break;
+		memset( &cleanUp, 0, sizeof( cleanUp ) );
+		cleanUp.good = ( ( route = malloc( sizeof( *route ) ) ) != NULL );
+		if ( cleanUp.good ) {
+			cleanUp.route = 1;
+			route->cbArgs = cbArgs;
+			cleanUp.good = ( ( route->orgPattern = Xstrdup( pattern ) ) != NULL );
 		}
+		if ( cleanUp.good ) {
+			cleanUp.orgPattern = 1;
+			pat = ( unsigned char * ) route->orgPattern;
+			cleanUp.good = ( onig_new( &route->urlRegex, pat, pat + strlen( ( char * ) pat ), regexOptions, ONIG_ENCODING_ASCII, ONIG_SYNTAX_DEFAULT, &einfo ) == ONIG_NORMAL );
+		}
+		if ( cleanUp.good ) {
+			cleanUp.onig = 1;
+			route->routeType = routeType;
+			PR_INIT_CLIST( &route->mLink );
+			switch ( route->routeType ) {
+				case ROUTETYPE_DOCUMENTROOT:
+					cleanUp.good = ( ( route->details.documentRoot = Xstrdup( (char*) details ) ) != NULL );
+					if ( cleanUp.good ) {
+						cleanUp.documentRoot = 1;
+						lastChar = (char *) &route->details.documentRoot[ strlen( route->details.documentRoot ) - 1];
+						if ( '/' == *lastChar ) {
+							*lastChar = '\0';
+						}
+					}
+					break;
+				case ROUTETYPE_DYNAMIC:
+					route->details.handlerCb = (dynamicHandler_cb_t) details;
+					break;
+				default:
+					break;
+			}
+		}
+		if ( ! cleanUp.good ) {
+			if ( cleanUp.documentRoot ) {
+				free( (char *) route->details.documentRoot ); route->details.documentRoot = NULL;
+			}
+			if ( cleanUp.onig ) {
+				onig_free( route->urlRegex ); route->urlRegex = NULL;
+			}
+			if ( cleanUp.orgPattern ) {
+				free( (char * ) route->orgPattern ); route->orgPattern = NULL;
+			}
+			if ( cleanUp.route ) {
+				route->cbArgs = NULL;
+				free( route ); route = NULL;
+			}
+		}
+		return route;
 	}
-	if ( ! cleanUp.good ) {
-		if ( cleanUp.documentRoot ) {
+
+	static void Route_Delete( struct route_t * route ) {
+		if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
 			free( (char *) route->details.documentRoot ); route->details.documentRoot = NULL;
 		}
-		if ( cleanUp.onig ) {
-			onig_free( route->urlRegex ); route->urlRegex = NULL;
-		}
-		if ( cleanUp.orgPattern ) {
-			free( (char * ) route->orgPattern ); route->orgPattern = NULL;
-		}
-		if ( cleanUp.route ) {
-			route->cbArgs = NULL;
-			free( route ); route = NULL;
-		}
+		onig_free( route->urlRegex ); route->urlRegex = NULL;
+		free( (char *) route->orgPattern ); route->orgPattern = NULL;
+		route->cbArgs = NULL;
+		free( route ); route = NULL;
 	}
-	return route;
-}
 
-static void Route_Delete( struct route_t * route ) {
-	if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
-		free( (char *) route->details.documentRoot ); route->details.documentRoot = NULL;
-	}
-	onig_free( route->urlRegex ); route->urlRegex = NULL;
-	free( (char *) route->orgPattern ); route->orgPattern = NULL;
-	route->cbArgs = NULL;
-	free( route ); route = NULL;
-}
-
-/*****************************************************************************/
-/* Webclient                                                                 */
-/*****************************************************************************/
-static struct webclient_t * Webclient_New( struct webserver_t * webserver, int socketFd) {
-	struct webclient_t * webclient;
+	/*****************************************************************************/
+	/* webserverclient                                                                 */
+	/*****************************************************************************/
+	static struct webserverclient_t * Webserverclient_New( struct webserver_t * webserver, int socketFd) {
+	struct webserverclient_t * webserverclient;
 	struct {unsigned char good:1;
-			unsigned char webclient:1; } cleanUp;
+			unsigned char webserverclient:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( webclient = malloc( sizeof( *webclient) ) ) != NULL );
+	cleanUp.good = ( ( webserverclient = malloc( sizeof( *webserverclient) ) ) != NULL );
 	if ( cleanUp.good ) {
-		cleanUp.webclient = 1;
-		webclient->socketFd = socketFd;
-		webclient->webserver = webserver;
-		webclient->header = NULL;
-		webclient->route = NULL;
-		webclient->response.start = time( 0 );
-		webclient->response.end = 0;
-		webclient->response.mimeType = MIMETYPE_HTML;
-		webclient->response.contentType = CONTENTTYPE_BUFFER;
-		webclient->response.httpCode = HTTPCODE_OK;
-		webclient->response.headersSent = 0;
-		webclient->response.contentSent = 0;
-		webclient->connection = CONNECTION_CLOSE;
-		webclient->mode = MODE_GET;
-		memset( webclient->buffer, '\0', HTTP_BUFF_LENGTH );
-		webclient->response.contentLength = 0;
-		webclient->response.content = NULL;
+		cleanUp.webserverclient = 1;
+		webserverclient->socketFd = socketFd;
+		webserverclient->webserver = webserver;
+		webserverclient->header = NULL;
+		webserverclient->route = NULL;
+		webserverclient->response.start = time( 0 );
+		webserverclient->response.end = 0;
+		webserverclient->response.mimeType = MIMETYPE_HTML;
+		webserverclient->response.contentType = CONTENTTYPE_BUFFER;
+		webserverclient->response.httpCode = HTTPCODE_OK;
+		webserverclient->response.headersSent = 0;
+		webserverclient->response.contentSent = 0;
+		webserverclient->connection = CONNECTION_CLOSE;
+		webserverclient->mode = MODE_GET;
+		memset( webserverclient->buffer, '\0', HTTP_BUFF_LENGTH );
+		webserverclient->response.contentLength = 0;
+		webserverclient->response.content = NULL;
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.webclient ) {
-			free( webclient ); webclient = NULL;
+		if ( cleanUp.webserverclient ) {
+			free( webserverclient ); webserverclient = NULL;
 		}
 	}
 
-	return webclient;
+	return webserverclient;
 }
-const char * Webclient_GetUrl( const struct webclient_t * webclient ) {
+const char * Webserverclient_GetUrl( const struct webserverclient_t * webserverclient ) {
 	char * url;
 	int len;
 	struct {unsigned char good:1;
 			unsigned char url:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	len = webclient->header->RequestURILen;
+	len = webserverclient->header->RequestURILen;
 	cleanUp.good = ( ( url = malloc( len + 1 ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
-		snprintf( url, len + 1, "%s", webclient->header->RequestURI );
+		snprintf( url, len + 1, "%s", webserverclient->header->RequestURI );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.url ) {
@@ -221,7 +221,7 @@ const char * Webclient_GetUrl( const struct webclient_t * webclient ) {
 	return url;
 }
 
-const char * Webclient_GetIp( const struct webclient_t * webclient ) {
+const char * Webserverclient_GetIp( const struct webserverclient_t * webserverclient ) {
 	char * ip;
 	struct sockaddr_storage addr;
 	socklen_t len;
@@ -232,7 +232,7 @@ const char * Webclient_GetIp( const struct webclient_t * webclient ) {
 	cleanUp.good = ( ( ip = malloc( INET6_ADDRSTRLEN ) ) != NULL );
 	if ( cleanUp.good ) {
 		len = sizeof addr;
-		getpeername( webclient->socketFd, (struct sockaddr *) &addr, &len );
+		getpeername( webserverclient->socketFd, (struct sockaddr *) &addr, &len );
 		if ( AF_INET == addr.ss_family ) {
 			struct sockaddr_in *s = (struct sockaddr_in *) &addr;
 			inet_ntop( AF_INET, &s->sin_addr, ip, INET6_ADDRSTRLEN );
@@ -249,44 +249,44 @@ const char * Webclient_GetIp( const struct webclient_t * webclient ) {
 	return ip;
 }
 
-#define WEBCLIENT_RENDER( name, webpage ) \
-static void Webclient_Render##name( struct webclient_t * webclient) { \
+#define WEBSERVERCLIENT_RENDER( name, webpage ) \
+static void Webserverclient_Render##name( struct webserverclient_t * webserverclient) { \
 	struct {unsigned char good:1; \
 			unsigned char content:1; } cleanUp; \
 	\
 	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
-	if ( webclient->response.contentType == CONTENTTYPE_FILE && webclient->response.content ) { \
-		free( webclient->response.content ); webclient->response.content = NULL; \
+	if ( webserverclient->response.contentType == CONTENTTYPE_FILE && webserverclient->response.content ) { \
+		free( webserverclient->response.content ); webserverclient->response.content = NULL; \
 	} \
-	webclient->response.contentType = CONTENTTYPE_BUFFER; \
-	webclient->response.mimeType = MIMETYPE_HTML; \
-	cleanUp.good = ( ( webclient->response.content = Xstrdup( webpage ) ) != NULL ); \
+	webserverclient->response.contentType = CONTENTTYPE_BUFFER; \
+	webserverclient->response.mimeType = MIMETYPE_HTML; \
+	cleanUp.good = ( ( webserverclient->response.content = Xstrdup( webpage ) ) != NULL ); \
 	if ( cleanUp.good ) { \
 		cleanUp.content = 1; \
-		webclient->response.contentLength = strlen( webclient->response.content ); \
+		webserverclient->response.contentLength = strlen( webserverclient->response.content ); \
 	} \
 	if ( ! cleanUp.good ) { \
 		if ( cleanUp.good ) { \
 			cleanUp.content = 1; \
-			free( webclient->response.content ); webclient->response.content = NULL; \
-			webclient->response.contentLength = 0; \
+			free( webserverclient->response.content ); webserverclient->response.content = NULL; \
+			webserverclient->response.contentLength = 0; \
 		} \
 	} \
 }
 
-WEBCLIENT_RENDER( Forbidden, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Forbidden</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
-WEBCLIENT_RENDER( NotFound, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Not found</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
-WEBCLIENT_RENDER( Error, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Internal server error</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Forbidden, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Forbidden</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( NotFound, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Not found</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Error, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Internal server error</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
 
-static void Webclient_RenderRoute( struct webclient_t * webclient ) {
+static void Webserverclient_RenderRoute( struct webserverclient_t * webserverclient ) {
 	struct route_t * route;
 
-	route = webclient->route;
+	route = webserverclient->route;
 	if ( route == NULL ) {
-		Webclient_RenderNotFound( webclient );
+		Webserverclient_RenderNotFound( webserverclient );
 	} else {
 		if ( route->routeType == ROUTETYPE_DYNAMIC ) {
-			route->details.handlerCb( webclient );
+			route->details.handlerCb( webserverclient );
 		} else if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
 			struct stat fileStat;
 			const char * documentRoot;
@@ -301,22 +301,22 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 
 			memset( &cleanUp, '\0', sizeof( cleanUp ) );
 			fullPath = NULL;
-			webclient->response.contentType = CONTENTTYPE_FILE;
+			webserverclient->response.contentType = CONTENTTYPE_FILE;
 			documentRoot = route->details.documentRoot;
-			pathLength = webclient->webserver->region->end[1] - webclient->webserver->region->beg[1] + 1;
+			pathLength = webserverclient->webserver->region->end[1] - webserverclient->webserver->region->beg[1] + 1;
 			cleanUp.good = ( ( requestedPath = malloc( pathLength + 1 ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.requestedPath = 1;
-				snprintf( requestedPath, pathLength, "%s", &webclient->header->RequestURI[webclient->webserver->region->beg[1]] );
+				snprintf( requestedPath, pathLength, "%s", &webserverclient->header->RequestURI[webserverclient->webserver->region->beg[1]] );
 			}
 			//  check that the file is not higher then the documentRoot. Such as  ../../../../etc/passwd
 			for ( j = 0; j < pathLength - 1; j++ ) {
 				if ( requestedPath[j] == '.' && requestedPath[ j + 1] == '.' ) {
-					webclient->response.httpCode = HTTPCODE_FORBIDDEN;
+					webserverclient->response.httpCode = HTTPCODE_FORBIDDEN;
 						break;
 				}
 			}
-			cleanUp.good = ( webclient->response.httpCode == HTTPCODE_OK );
+			cleanUp.good = ( webserverclient->response.httpCode == HTTPCODE_OK );
 			if ( cleanUp.good ) {
 				fullPathLength = strlen( documentRoot ) + pathLength + 13;  //  13: that is  '/' + '/' + 'index.html' + '\0'
 				cleanUp.good = ( ( fullPath = malloc( fullPathLength ) ) != NULL );   //  if all goes successfull, this is stored in ->content, wich is free'd normally
@@ -327,7 +327,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 				FullPath( fullPath, fullPathLength ,documentRoot, requestedPath );
 				exists = stat( fullPath, &fileStat );
 				if ( exists == 0 ) {
-					webclient->response.httpCode = HTTPCODE_OK;
+					webserverclient->response.httpCode = HTTPCODE_OK;
 					if ( S_ISDIR( fileStat.st_mode ) ) {
 						//  if it is a dir, and has a index.html file that is readable, use that
 						snprintf( fullPath, fullPathLength, "%s/%s/index.html", documentRoot, requestedPath );
@@ -335,19 +335,19 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 						if ( exists != 0 ) {
 							//  this is the place where a directory index handler can step into the arena;
 							//  but we will not do that, because: https://github.com/monkey/monkey/blob/master/plugins/dirlisting/dirlisting.c#L153
-							webclient->response.httpCode = HTTPCODE_NOTFOUND;
+							webserverclient->response.httpCode = HTTPCODE_NOTFOUND;
 						}
 					}
 					//  all looks ok, we have access to a file
-					if ( webclient->response.httpCode == HTTPCODE_OK ) {
-						webclient->response.contentLength = fileStat.st_size;
-						webclient->response.content = fullPath;
+					if ( webserverclient->response.httpCode == HTTPCODE_OK ) {
+						webserverclient->response.contentLength = fileStat.st_size;
+						webserverclient->response.content = fullPath;
 						fullPathLength = strlen( fullPath );
 						//  determine mimetype
 						for ( j = 0; j < __MIMETYPE_LAST; j++ ) {
 							len = strlen( MimeTypeDefinitions[j].ext );
 							if ( strncmp( &fullPath[fullPathLength - len], MimeTypeDefinitions[j].ext, len ) == 0 ) {
-								webclient->response.mimeType = MimeTypeDefinitions[j].mime;
+								webserverclient->response.mimeType = MimeTypeDefinitions[j].mime;
 								break;
 							}
 						}
@@ -355,18 +355,18 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 						//  but we will not do this for spidermonkey, because we load that upon startup only once
 					}
 				} else {
-					webclient->response.httpCode = HTTPCODE_NOTFOUND;
+					webserverclient->response.httpCode = HTTPCODE_NOTFOUND;
 				}
 			}
-			switch ( webclient->response.httpCode ) {
+			switch ( webserverclient->response.httpCode ) {
 			case HTTPCODE_ERROR:
-				Webclient_RenderError( webclient );
+				Webserverclient_RenderError( webserverclient );
 				break;
 			case HTTPCODE_FORBIDDEN:
-				Webclient_RenderForbidden( webclient );
+				Webserverclient_RenderForbidden( webserverclient );
 				break;
 			case HTTPCODE_NOTFOUND:
-				Webclient_RenderNotFound( webclient );
+				Webserverclient_RenderNotFound( webserverclient );
 				break;
 			case HTTPCODE_OK:  //  ft
 				//  break;
@@ -388,7 +388,7 @@ static void Webclient_RenderRoute( struct webclient_t * webclient ) {
 	}
 }
 
-static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
+static void Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient ) {
 	HeaderField * field;
 	size_t i;
 	struct {unsigned char good:1;
@@ -396,92 +396,92 @@ static void Webclient_PrepareRequest( struct webclient_t * webclient ) {
 			unsigned char content:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( webclient->header = h3_request_header_new( ) ) != NULL );
+	cleanUp.good = ( ( webserverclient->header = h3_request_header_new( ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.h3 = 1;
 	}
-	cleanUp.good = ( ( h3_request_header_parse( webclient->header, webclient->buffer, strlen( webclient->buffer ) ) ) == 0 );
+	cleanUp.good = ( ( h3_request_header_parse( webserverclient->header, webserverclient->buffer, strlen( webserverclient->buffer ) ) ) == 0 );
 	if ( cleanUp.good ) {
-		if ( strncmp( webclient->header->RequestMethod, "POST", webclient->header->RequestMethodLen ) == 0 ) {
-			webclient->mode = MODE_POST;
+		if ( strncmp( webserverclient->header->RequestMethod, "POST", webserverclient->header->RequestMethodLen ) == 0 ) {
+			webserverclient->mode = MODE_POST;
 		}
-		for ( i = 0; i < webclient->header->HeaderSize; i++ ) {
-			field = &webclient->header->Fields[i];
+		for ( i = 0; i < webserverclient->header->HeaderSize; i++ ) {
+			field = &webserverclient->header->Fields[i];
 			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada...
 				if ( strncmp( field->Value, "Keep-Alive", field->ValueLen ) == 0 ) {
-					webclient->connection = CONNECTION_KEEPALIVE;
+					webserverclient->connection = CONNECTION_KEEPALIVE;
 				} else 	if ( strncmp( field->Value, "close", field->ValueLen ) == 0 ) {
-					webclient->connection = CONNECTION_CLOSE;
+					webserverclient->connection = CONNECTION_CLOSE;
 				}
 			}
 		}
 	}
 	if ( cleanUp.good ) {
-		Webserver_FindRoute( webclient->webserver, webclient );
-		Webclient_RenderRoute( webclient );
+		Webserver_FindRoute( webserverclient->webserver, webserverclient );
+		Webserverclient_RenderRoute( webserverclient );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.content = ( webclient->response.contentLength > 0 );
+		cleanUp.content = ( webserverclient->response.contentLength > 0 );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.content ) {
-			free( webclient->response.content ); webclient->response.content = NULL;
-			webclient->response.contentLength = 0;
+			free( webserverclient->response.content ); webserverclient->response.content = NULL;
+			webserverclient->response.contentLength = 0;
 		}
 		if ( cleanUp.h3 ) {
-			h3_request_header_free( webclient->header ); webclient->header = NULL;
+			h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
 		}
 	}
 }
 
-static void Webclient_Reset( struct webclient_t * webclient ) {
-	if ( webclient->header != NULL ) {
-		h3_request_header_free( webclient->header ); webclient->header = NULL;
-	}
-	memset( webclient->buffer, '\0', strlen( webclient->buffer ) );
-	webclient->route = NULL;
-	webclient->response.contentLength = 0;
-	webclient->response.start = time( 0 );
-	webclient->response.end = 0;
-	webclient->response.httpCode = HTTPCODE_OK;
-	webclient->response.mimeType = MIMETYPE_HTML;
-	webclient->response.contentType = CONTENTTYPE_BUFFER;
-	webclient->response.headersSent = 0;
-	webclient->response.contentSent = 0;
-	webclient->connection = CONNECTION_CLOSE;
-	webclient->mode = MODE_GET;
-	onig_region_free( webclient->webserver->region, 0 );
-	if ( webclient->response.content != NULL ) {
-		free( webclient->response.content ); webclient->response.content = NULL;
-	}
-}
-
-static void Webclient_CloseConn( struct webclient_t * webclient ) {
-	picoev_del( webclient->webserver->core->loop, webclient->socketFd );
-	close( webclient->socketFd );
-	Webclient_Delete( webclient );
-}
-
-static void Webclient_Delete( struct webclient_t * webclient ) {
-	if ( webclient->header != NULL ) {
-		h3_request_header_free( webclient->header ); webclient->header = NULL;
-	}
-	webclient->route = NULL;
-	webclient->response.httpCode = HTTPCODE_NONE;
-	webclient->response.contentLength = 0;
-	webclient->response.start = 0;
-	webclient->response.end = 0;
-	webclient->response.headersSent = 0;
-	webclient->response.contentSent = 0;
-	webclient->response.mimeType = MIMETYPE_HTML;
-	webclient->connection = CONNECTION_CLOSE;
-	webclient->response.contentType = CONTENTTYPE_BUFFER;
-	webclient->mode = MODE_GET;
-	if ( webclient->response.content != NULL ) {
-		free( webclient->response.content ); webclient->response.content = NULL;
+static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) {
+	if ( webserverclient->header != NULL ) {
+			h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
+		}
+		memset( webserverclient->buffer, '\0', strlen( webserverclient->buffer ) );
+		webserverclient->route = NULL;
+		webserverclient->response.contentLength = 0;
+		webserverclient->response.start = time( 0 );
+		webserverclient->response.end = 0;
+		webserverclient->response.httpCode = HTTPCODE_OK;
+		webserverclient->response.mimeType = MIMETYPE_HTML;
+		webserverclient->response.contentType = CONTENTTYPE_BUFFER;
+		webserverclient->response.headersSent = 0;
+		webserverclient->response.contentSent = 0;
+		webserverclient->connection = CONNECTION_CLOSE;
+		webserverclient->mode = MODE_GET;
+		onig_region_free( webserverclient->webserver->region, 0 );
+		if ( webserverclient->response.content != NULL ) {
+			free( webserverclient->response.content ); webserverclient->response.content = NULL;
+		}
 	}
 
-	free( webclient ); webclient = NULL;
+	static void Webserverclient_CloseConn( struct webserverclient_t * webserverclient ) {
+		picoev_del( webserverclient->webserver->core->loop, webserverclient->socketFd );
+		close( webserverclient->socketFd );
+		Webserverclient_Delete( webserverclient );
+	}
+
+	static void Webserverclient_Delete( struct webserverclient_t * webserverclient ) {
+		if ( webserverclient->header != NULL ) {
+		h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
+	}
+	webserverclient->route = NULL;
+	webserverclient->response.httpCode = HTTPCODE_NONE;
+	webserverclient->response.contentLength = 0;
+	webserverclient->response.start = 0;
+	webserverclient->response.end = 0;
+	webserverclient->response.headersSent = 0;
+	webserverclient->response.contentSent = 0;
+	webserverclient->response.mimeType = MIMETYPE_HTML;
+	webserverclient->connection = CONNECTION_CLOSE;
+	webserverclient->response.contentType = CONTENTTYPE_BUFFER;
+	webserverclient->mode = MODE_GET;
+	if ( webserverclient->response.content != NULL ) {
+		free( webserverclient->response.content ); webserverclient->response.content = NULL;
+	}
+
+	free( webserverclient ); webserverclient = NULL;
 }
 
 /*****************************************************************************/
@@ -528,7 +528,7 @@ int Webserver_DynamicHandler( struct webserver_t * webserver, const char * patte
 }
 static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArg ) {
 	struct webserver_t * webserver;
-	struct webclient_t * webclient;
+	struct webserverclient_t * webserverclient;
 	int newFd;
 
 	webserver = (struct webserver_t *) wsArg;
@@ -536,58 +536,58 @@ static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, v
 	if ( -1 != newFd ) {
 
 		SetupSocket( newFd, 1 );
-		webclient = Webclient_New( webserver, newFd );
-		picoev_add( loop, newFd, PICOEV_READ, webserver->timeoutSec , Webserver_HandleRead_cb, (void *) webclient );
+		webserverclient = Webserverclient_New( webserver, newFd );
+		picoev_add( loop, newFd, PICOEV_READ, webserver->timeoutSec , Webserver_HandleRead_cb, (void *) webserverclient );
 	}
 }
 
 static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
-	struct webclient_t * webclient;
+	struct webserverclient_t * webserverclient;
 	ssize_t r;
 
-	webclient = (struct webclient_t *) wcArg;
+	webserverclient = (struct webserverclient_t *) wcArg;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
-		Webclient_CloseConn( webclient );
+		Webserverclient_CloseConn( webserverclient );
 	} else {
 		/* update timeout, and read */
-		picoev_set_timeout( loop, fd, webclient->webserver->timeoutSec );
-		r = read( fd, webclient->buffer, HTTP_BUFF_LENGTH );
-		webclient->buffer[r] = '\0';
+		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
+		r = read( fd, webserverclient->buffer, HTTP_BUFF_LENGTH );
+		webserverclient->buffer[r] = '\0';
 		switch ( r ) {
 		case 0: /* connection closed by peer */
-			Webclient_CloseConn( webclient );
+			Webserverclient_CloseConn( webserverclient );
 			break;
 		case -1: /* error */
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /* try again later */
 				break;
 			} else { /* fatal error */
-				Webclient_CloseConn( webclient );
+				Webserverclient_CloseConn( webserverclient );
 			}
 			break;
 		default: /* got some data, send back */
 			picoev_del( loop, fd );
-			Webclient_PrepareRequest( webclient );
-			picoev_add( loop, fd, PICOEV_WRITE, webclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wcArg );
+			Webserverclient_PrepareRequest( webserverclient );
+			picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wcArg );
 			break;
 		}
 	}
 }
 
 static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
-	struct webclient_t * webclient;
+	struct webserverclient_t * webserverclient;
 	int connClosed;
 
-	webclient = (struct webclient_t *) wcArg;
+	webserverclient = (struct webserverclient_t *) wcArg;
 	connClosed = 0;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
-		Webclient_CloseConn( webclient );
+		Webserverclient_CloseConn( webserverclient );
 		connClosed = 1;
 	} else {
 		/* update timeout, and write */
-		picoev_set_timeout( loop, fd, webclient->webserver->timeoutSec );
-		if ( ! webclient->response.headersSent ) {
+		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
+		if ( ! webserverclient->response.headersSent ) {
 			ssize_t headerLength, wroteHeader;
 			struct tm * tm_info;
 			char headerBuffer[HTTP_BUFF_LENGTH];
@@ -597,11 +597,11 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 /*			int flags;
 
 			flags = MSG_DONTWAIT | MSG_NOSIGNAL;  */
-			webclient->response.end = time( 0 );
-			contentTypeString = MimeTypeDefinitions[webclient->response.mimeType].applicationString;
-			connectionString = ( CONNECTION_CLOSE == webclient->connection ) ? "Close" : "Keep-Alive";
-			time( &webclient->response.end );
-			tm_info = localtime( &webclient->response.end );
+			webserverclient->response.end = time( 0 );
+			contentTypeString = MimeTypeDefinitions[webserverclient->response.mimeType].applicationString;
+			connectionString = ( CONNECTION_CLOSE == webserverclient->connection ) ? "Close" : "Keep-Alive";
+			time( &webserverclient->response.end );
+			tm_info = localtime( &webserverclient->response.end );
 			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", tm_info );
 			headerLength = HTTP_SERVER_TEMPLATE_SIZE;
 			headerLength = (ssize_t) snprintf( headerBuffer, headerLength, HTTP_SERVER_TEMPLATE, HTTP_SERVER_TEMPLATE_ARGS );
@@ -613,23 +613,23 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 				if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /*  try again later  */
 					break;
 				} else { /*  fatal error  */
-					Webclient_CloseConn( webclient );
+					Webserverclient_CloseConn( webserverclient );
 					connClosed = 1;
 				}
 				break;
 			default: /*  got some data, send back  */
 				if ( headerLength != wroteHeader ) {
-					Webclient_CloseConn( webclient ); /*  failed to send all data at once, close  */
+					Webserverclient_CloseConn( webserverclient ); /*  failed to send all data at once, close  */
 					connClosed = 1;
 				} else {
-					webclient->response.headersSent = 1;
+					webserverclient->response.headersSent = 1;
 				}
 				break;
 			}
 		}
-		if ( ! connClosed && webclient->response.headersSent ) {
-			if ( webclient->response.contentLength == 0 ) {
-				webclient->response.contentSent = 1;
+		if ( ! connClosed && webserverclient->response.headersSent ) {
+			if ( webserverclient->response.contentLength == 0 ) {
+				webserverclient->response.contentSent = 1;
 			} else {
 				int fileHandle;
 				ssize_t wroteContent;
@@ -639,12 +639,12 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 
 				memset( &cleanUp, 0, sizeof( cleanUp ) );
 				wroteContent = 0;
-				switch ( webclient->response.contentType ) {
+				switch ( webserverclient->response.contentType ) {
 				case CONTENTTYPE_FILE:
-					cleanUp.good = ( ( fileHandle = open( webclient->response.content, O_RDONLY | O_NONBLOCK ) ) > 0 );
+					cleanUp.good = ( ( fileHandle = open( webserverclient->response.content, O_RDONLY | O_NONBLOCK ) ) > 0 );
 					if ( cleanUp.good ) {
 						cleanUp.fileHandle = 1;
-						wroteContent = sendfile( fd, fileHandle, 0, webclient->response.contentLength );
+						wroteContent = sendfile( fd, fileHandle, 0, webserverclient->response.contentLength );
 					}
 					if ( cleanUp.fileHandle ) {
 						close( fileHandle );
@@ -652,7 +652,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 					break;
 				default: //  FT
 				case CONTENTTYPE_BUFFER:
-					wroteContent = write( fd, webclient->response.content, webclient->response.contentLength /* , flags  */ );
+					wroteContent = write( fd, webserverclient->response.content, webserverclient->response.contentLength /* , flags  */ );
 				break;
 				}
 				switch ( wroteContent ) {
@@ -662,29 +662,29 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 					if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /*  try again later  */
 						break;
 					} else { /*  fatal error  */
-						Webclient_CloseConn( webclient );
+						Webserverclient_CloseConn( webserverclient );
 						connClosed = 1;
 					}
 					break;
 				default: /*  got some data, send back  */
-					if ( webclient->response.contentLength != wroteContent ) {
-						Webclient_CloseConn( webclient ); /*  failed to send all data at once, close  */
+					if ( webserverclient->response.contentLength != wroteContent ) {
+						Webserverclient_CloseConn( webserverclient ); /*  failed to send all data at once, close  */
 						connClosed = 1;
 					} else {
-						webclient->response.contentSent = 1;
+						webserverclient->response.contentSent = 1;
 					}
 					break;
 				}
 			}
 		}
-		if ( ! connClosed && webclient->response.headersSent && webclient->response.contentSent ) {
+		if ( ! connClosed && webserverclient->response.headersSent && webserverclient->response.contentSent ) {
 			//  listen again
-			if ( CONNECTION_KEEPALIVE == webclient->connection ) {
+			if ( CONNECTION_KEEPALIVE == webserverclient->connection ) {
 				picoev_del( loop, fd );
-				Webclient_Reset( webclient );
-				picoev_add( loop, fd, PICOEV_READ, webclient->webserver->timeoutSec , Webserver_HandleRead_cb, wcArg );
+				Webserverclient_Reset( webserverclient );
+				picoev_add( loop, fd, PICOEV_READ, webserverclient->webserver->timeoutSec , Webserver_HandleRead_cb, wcArg );
 			} else {
-				Webclient_CloseConn( webclient );
+				Webserverclient_CloseConn( webserverclient );
 				connClosed = 1;
 			}
 		}
@@ -817,7 +817,7 @@ static void Webserver_DelRoute( struct webserver_t * webserver, struct route_t *
 	Route_Delete( route ); route = NULL;
 }
 
-static void Webserver_FindRoute( const struct webserver_t * webserver, struct webclient_t * webclient ) {
+static void Webserver_FindRoute( const struct webserver_t * webserver, struct webserverclient_t * webserverclient ) {
 	struct route_t * route, *firstRoute;
 	PRCList * next;
 	unsigned char * range, * end, * start;
@@ -827,8 +827,8 @@ static void Webserver_FindRoute( const struct webserver_t * webserver, struct we
 			unsigned char url; }cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	webclient->route = NULL;
-	cleanUp.good = ( ( url = Webclient_GetUrl( webclient ) ) != NULL );
+	webserverclient->route = NULL;
+	cleanUp.good = ( ( url = Webserverclient_GetUrl( webserverclient ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
 		start = ( unsigned char * ) url;
@@ -841,7 +841,7 @@ static void Webserver_FindRoute( const struct webserver_t * webserver, struct we
 				r = onig_search( route->urlRegex, ( unsigned char * ) url, end, start, range, webserver->region, webserver->regexOptions );
 				found = ( r >= 0 );
 				if ( found ) {
-					webclient->route = route;
+					webserverclient->route = route;
 					break;
 				}
 				route = FROM_NEXT_TO_ITEM( struct route_t );

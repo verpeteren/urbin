@@ -339,7 +339,6 @@ static void Core_ProcessTick( struct core_t * core ) {
 				} else {
 					Core_DelTiming( core, timing );
 				}
-
 			}
 			timing = FROM_NEXT_TO_ITEM( struct timing_t );
 		} while ( timing != firstTiming );

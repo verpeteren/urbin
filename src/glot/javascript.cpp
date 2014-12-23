@@ -165,11 +165,13 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
  * @private
  * @object
  */
+#if 0
 #define SET_PROPERTY_ON( handle, key, value ) do {\
 	JS::RootedValue valRoot( cx, value ); \
 	JS::HandleValue valHandle( valRoot ); \
 	cleanUp.good = ( JS_DefineProperty( cx, handle, key, valHandle, attrs, JS_PropertyStub, JS_StrictPropertyStub ) == true ); \
 } while ( 0 );
+#endif
 
 #define CONNOBJ_GET_PROP_STRING( property, var ) do { \
 	if ( JS_GetProperty( cx, connObjHandle, property, valueMut ) == true ) { \
@@ -815,9 +817,9 @@ extern const char * MethodDefinitions[ ];
  * @object
  */
 static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
-
-static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webclient_t * webclient );
-static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webclient_t * webclient ) {
+#if 0
+static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webserverclient_t * webserverclient );
+static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webserverclient_t * webserverclient ) {
 	JSContext * cx;
 	JSObject * clientObj, * responseObj;
 	JSString * jIp, * jUrl, * jMethod;
@@ -839,14 +841,14 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 	cx = payload->context;
 	JSAutoRequest ar( cx );
 	JSAutoCompartment ac( cx, globalObj );
-	cleanUp.good = ( ( ip = Webclient_GetIp( webclient ) ) != NULL );
+	cleanUp.good = ( ( ip = Webserverclient_GetIp( webserverclient ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
 		cleanUp.good = ( ( jIp = JS_NewStringCopyZ( cx, ip ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.jip = 1;
-		cleanUp.good = ( ( url = Webclient_GetUrl( webclient ) ) != NULL );
+		cleanUp.good = ( ( url = webserverclient_GetUrl( webserverclient ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
@@ -854,7 +856,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 	}
 	if ( cleanUp.good ) {
 		cleanUp.jurl = 1;
-		cleanUp.good = ( ( jMethod = JS_NewStringCopyZ( cx, MethodDefinitions[webclient->mode] ) ) != NULL );
+		cleanUp.good = ( ( jMethod = JS_NewStringCopyZ( cx, MethodDefinitions[webserverclient->mode] ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.method = 1;
@@ -882,7 +884,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 		SET_PROPERTY_ON( clientObjHandle, "method", STRING_TO_JSVAL( jMethod ) );
 	}
 	if ( cleanUp.good ) {
-		JS_SetPrivate( responseObj, ( void * ) &webclient->response );
+		JS_SetPrivate( responseObj, ( void * ) &webserverclient->response );
 		//  @TODO:  editable fieldsJS_DefineProperties( cx, responseObj, JsnHttpScResponseProp );
 	}
 	if ( ! cleanUp.good ) {
@@ -910,8 +912,28 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 	}
 	return clientObj;
 }
+#endif
+static void Webserver_Route_TESTResultHandler_cb( const struct webserverclient_t * webserverclient ) {
+	struct payload_t * payload;
+	jsval clientVal, retVal;
 
-static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclient ) {
+	payload = (struct payload_t *) webserverclient->route->cbArgs;
+	if ( payload != NULL ) {
+		JSAutoRequest 			ar( payload->context );
+		JSAutoCompartment 		ac( payload->context, payload->objRoot );
+		clientVal = JSVAL_NULL;
+		JS::RootedValue clientValRoot( payload->context, clientVal );
+		JS::RootedValue retValRoot( payload->context, retVal );
+		JS::MutableHandleValue retValMut( &retValRoot );
+		JS::HandleValue fnValHandle( payload->fnValRoot );
+		JS::HandleObject webserverObjHandle( payload->objRoot );
+	JS_CallFunctionValue( payload->context, webserverObjHandle, fnValHandle, *payload->argsHVA, retValMut );
+	}
+
+}
+#if 0
+static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * webserverclient ) {
+
 	struct payload_t * payload;
 	JSObject * clientObj, * globalObj;
 	jsval clientObjVal, retVal;
@@ -919,24 +941,24 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
 	retVal = JSVAL_NULL;
 	clientObjVal = JSVAL_NULL;
 	clientObj = NULL;
-	payload = (struct payload_t *) webclient->route->cbArgs;
+	payload = (struct payload_t *) webserverclient->route->cbArgs;
 	if ( payload != NULL ) {
 		JSAutoRequest 			ar( payload->context );
 		JSAutoCompartment 		ac( payload->context, payload->objRoot );
 		globalObj = JS_GetGlobalForObject( payload->context, payload->objRoot );
 		JS::RootedObject 		clientObjRoot( payload->context, clientObj );
-		clientObj = Webserver_Route_ResultToJS( payload, globalObj, webclient );
+		clientObj = Webserver_Route_ResultToJS( payload, globalObj, webserverclient );
 		JS::RootedValue 		clientValRoot( payload->context, clientObjVal );
 		JS::RootedValue 		retValRoot( payload->context, retVal );
 		JS::MutableHandleValue 	retValMut( &retValRoot );
-		JS::HandleObject 		serverObjHandle( payload->objRoot );
+		JS::HandleObject 		webserverObjHandle( payload->objRoot );
 		JS::HandleValue 		fnValHandle( *payload->fnValRoot );
 		clientObjVal = OBJECT_TO_JSVAL( clientObj );
-		JS_CallFunctionValue( payload->context, serverObjHandle, fnValHandle, JS::HandleValueArray( clientValRoot ), retValMut );
+		JS_CallFunctionValue( payload->context, webserverObjHandle, fnValHandle, JS::HandleValueArray( clientValRoot ), retValMut );
 		Payload_Delete( payload ); payload = NULL;
 	}
 }
-
+#endif
 /**
  * Add a dynamic route to the webserver.
  *
@@ -958,7 +980,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webclient_t * webclie
  * 	} );
  * @see	Hard.Webserver
  * @see	Hard.Webserver.addDocumentRoot
- * @see	Hard.Webclient.get
+ * @see	Hard.webserverclient.get
  */
 static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
@@ -978,7 +1000,6 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	payload = NULL;
 	fnVal = JSVAL_NULL;
 	webserverObj = JS_THIS_OBJECT( cx, vpn );
-	webserver = (struct webserver_t *) JS_GetPrivate( webserverObj );
 	JS::RootedValue 		fnValRoot( cx, fnVal );
 	JS::MutableHandleValue 	fnValMut( &fnValRoot );
 	JS::RootedValue 		fnOrgRoot( cx, args[1] );
@@ -997,10 +1018,18 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.good ) {
 		JS::HandleValueArray empty = JS::HandleValueArray::empty( );
 		cleanUp.good = ( ( payload = Payload_New( cx, webserverObj, &fnValRoot, &empty ,false ) ) != NULL );
-	}
+			}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload );
+		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_TESTResultHandler_cb, ( void * ) payload );
+			{ //simulate direct call
+				struct webserverclient_t * webserverclient = (struct webserverclient_t *) malloc( sizeof(*webserverclient) );
+				webserverclient->route = webserver->routes;
+				webserverclient->route->cbArgs = payload;
+				Webserver_Route_TESTResultHandler_cb( webserverclient );
+			}
+
+		//Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload );
 	} else {
 		if ( cleanUp.payload ) {
 			// this is the only thing that needs special care if something went wrong; we cleanup the rest any way,
@@ -1035,7 +1064,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
  *
  * @see	Hard.Webserver
  * @see	Hard.Webserver.addRoute
- * @see	Hard.WebClient.get
+ * @see	Hard.webserverclient.get
  */
 static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
@@ -1438,26 +1467,29 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 
 static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	struct payload_t * payload;
+	JSObject * globalObj;
 	jsval retVal;
 	int again;
 
 	again = 0;
 	retVal = JSVAL_NULL;
+	globalObj = NULL;
 	payload = ( struct payload_t * ) cbArgs;
 	if ( payload != NULL ) {
-		JSAutoRequest 			ar( payload->context ); \
-		JSAutoCompartment 		ac( payload->context, payload->objRoot ); \
+		globalObj = JS_GetGlobalForObject( payload->context, payload->objRoot );
+		JSAutoRequest 			ar( payload->context );
+		JSAutoCompartment 		ac( payload->context, globalObj );
 		JS::RootedValue 		retValRoot( payload->context, retVal );
 		JS::MutableHandleValue 	retValMut( &retValRoot );
-		JS::HandleObject 		objHandle( payload->objRoot );
+		JS::HandleObject 		thisObjHandle( payload->objRoot );
 		JS::HandleValue 		fnValHandle( *payload->fnValRoot );
-		JS_CallFunctionValue( payload->context, objHandle, fnValHandle, *payload->argsHVA, retValMut );
+		JS_CallFunctionValue( payload->context, thisObjHandle, fnValHandle, *payload->argsHVA, retValMut );
 		if ( payload->repeat ) {
 			again = 1;
 		} else {
-			Payload_Delete( payload ); payload = NULL;
 			again = 0;
 		}
+		// the payload is cleaned-up by automatically, spawned by Core_ProcessTick and clearFunc_cb
 	}
 	return again;
 }
@@ -1466,7 +1498,7 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	struct javascript_t * javascript; \
 	struct payload_t * payload; \
 	struct timing_t * timing; \
-	JSObject * globalObj; \
+	JSObject * globalObj, *thisObj; \
 	JS::CallArgs args; \
 	jsval dummyVal, fnVal; \
 	int ms; \
@@ -1484,6 +1516,8 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	payload = NULL; \
 	timing = NULL; \
 	args = CallArgsFromVp( argc, vpn ); \
+	thisObj = JS_THIS_OBJECT( cx, vpn ); \
+	JS::RootedObject thisObjRoot( cx, thisObj ); \
 	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) ); \
 	javascript = (struct javascript_t *) JS_GetPrivate( globalObj ); \
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "*i", &dummyVal, &ms ) == true ); \
@@ -1493,11 +1527,19 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	if ( cleanUp.good ) { \
 		if ( args.length( ) > 2 ) { \
 			JS::HandleValueArray argsAt2 = JS::HandleValueArray::fromMarkedLocation( argc - 2, vpn ); \
-			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
 		} else { \
 			JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty( ); \
-			cleanUp.good = ( ( payload = Payload_New( cx, globalObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
+Payload_Timing_ResultHandler_cb( ( void *) payload ); \
 		} \
+\
+\
+\
+\
+\
+\
+\
 	} \
 	if ( cleanUp.good ) { \
 		cleanUp.payload = 1; \
@@ -1543,8 +1585,11 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
  */
 
 static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
-	JAVASCRIPT_GLOBAL_SET_TIMER( 0 )
-		return false;
+	const int repeat = 0;
+
+	JAVASCRIPT_GLOBAL_SET_TIMER( repeat );
+
+	return false;
 }
 
 /**
@@ -1571,7 +1616,10 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
  */
 
 static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) {
-	JAVASCRIPT_GLOBAL_SET_TIMER( 0 );
+	const int repeat = 1;
+
+	JAVASCRIPT_GLOBAL_SET_TIMER( repeat );
+
 	return false;
 }
 /**

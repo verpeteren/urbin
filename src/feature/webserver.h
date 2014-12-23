@@ -60,9 +60,9 @@ enum mimeType_t {
 	__MIMETYPE_LAST
 };
 
-struct webclient_t;
+struct webserverclient_t;
 
-typedef void 				(* dynamicHandler_cb_t)	( const struct webclient_t * webclient );
+typedef void 				(* dynamicHandler_cb_t)	( const struct webserverclient_t * webserverclient );
 
 enum routeType_t {
 	ROUTETYPE_DOCUMENTROOT,
@@ -99,7 +99,7 @@ struct webserver_t {
 
 };
 
-struct webclient_t{
+struct webserverclient_t{
 	int							socketFd;
 	enum requestMode_t			mode;
 	enum connection_t			connection;
@@ -120,8 +120,8 @@ struct webclient_t{
 							}	response;
 };
 
-const char *					Webclient_GetUrl		( const struct webclient_t * webclient );
-const char *					Webclient_GetIp			( const struct webclient_t * webclient );
+const char *					Webserverclient_GetUrl		( const struct webserverclient_t * webserverclient );
+const char *					Webserverclient_GetIp		( const struct webserverclient_t * webserverclient );
 
 int 							Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
 int 							Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs );
