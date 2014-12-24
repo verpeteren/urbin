@@ -10,9 +10,9 @@
 
 struct payload_t {
 	JSContext *						context;
-	JS::RootedObject 				objRoot;
-	JS::RootedValue *				fnValRoot;
-	JS::HandleValueArray *			argsHVA;
+	JS::Heap<JSObject*> 			scopeObj;
+	JS::Heap<JS::Value>				fnVal_cb;
+	JS::Heap<JS::Value> 			fnVal_cbArg;
 	bool							repeat;
 };
 struct script_t {
@@ -21,7 +21,8 @@ struct script_t {
 	PRCList						mLink;
 };
 
-static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, const bool repeat );
+static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * object, jsval fnVal_cb, jsval fnVal_cbArg, const bool repeat );
+static int 							Payload_Call					( const struct payload_t * payload );
 static int 							Payload_Timing_ResultHandler_cb	( void * cbArgs );
 static void 						Payload_Delete					( struct payload_t * payload );
 static struct script_t * 			Javascript_AddScript			( struct javascript_t * javascript, const char * fileName );
@@ -165,13 +166,11 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
  * @private
  * @object
  */
-#if 0
 #define SET_PROPERTY_ON( handle, key, value ) do {\
 	JS::RootedValue valRoot( cx, value ); \
 	JS::HandleValue valHandle( valRoot ); \
 	cleanUp.good = ( JS_DefineProperty( cx, handle, key, valHandle, attrs, JS_PropertyStub, JS_StrictPropertyStub ) == true ); \
 } while ( 0 );
-#endif
 
 #define CONNOBJ_GET_PROP_STRING( property, var ) do { \
 	if ( JS_GetProperty( cx, connObjHandle, property, valueMut ) == true ) { \
@@ -281,13 +280,16 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	paramValArray[0] = JSVAL_NULL; \
 	cx = payload->context; \
 	JSAutoRequest 			ar( payload->context ); \
-	JSAutoCompartment 		ac( payload->context, payload->objRoot ); \
+	JSAutoCompartment 		ac( payload->context, payload->scopeObj ); \
 	JS::RootedValue paramValArrayRoot( cx, paramValArray[0] ); \
+	/*  @TODO:  set the fnVal_cbArg paramater evt and use Payload_Call.*/ \
 	resultObj = formatter( cx, query->result.sub.res ); \
 	paramValArray[0] = OBJECT_TO_JSVAL( resultObj ); \
 	JS::HandleValueArray 	paramValArrayHandle( paramValArrayRoot ); \
-	JS::HandleValue 		fnValHandle( *payload->fnValRoot ); \
-	JS::HandleObject 		objHandle( payload->objRoot ); \
+	JS::RootedValue			fnValRoot( payload->context, payload->fnVal_cb ); \
+	JS::HandleValue 		fnValHandle( fnValRoot ); \
+	JS::RootedObject 		objRoot( payload->context, payload->scopeObj ); \
+	JS::HandleObject 		objHandle( objRoot ); \
 	JS::RootedValue 		retValRoot( cx, retVal ); \
 	JS::MutableHandleValue 	retValMut( &retValRoot ); \
 	JS_CallFunctionValue( cx, objHandle, fnValHandle, paramValArrayHandle, retValMut ); \
@@ -386,8 +388,8 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 		} \
 	} \
 	if ( cleanUp.good ) { \
-		JS::HandleValueArray dummy = JS::HandleValueArray::empty( ); \
-		cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, &fnValRoot, &dummy, false ) ) != NULL ); \
+		jsval dummy; \
+		cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, fnVal, dummy, false ) ) != NULL ); \
 	} \
 	if ( cleanUp.good ) { \
 		cleanUp.payload = 1; \
@@ -817,9 +819,9 @@ extern const char * MethodDefinitions[ ];
  * @object
  */
 static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
-#if 0
-static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webserverclient_t * webserverclient );
-static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObject * globalObj, const struct webserverclient_t * webserverclient ) {
+
+static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const struct webserverclient_t * webserverclient );
+static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const struct webserverclient_t * webserverclient ) {
 	JSContext * cx;
 	JSObject * clientObj, * responseObj;
 	JSString * jIp, * jUrl, * jMethod;
@@ -836,11 +838,12 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 
 	clientObj = NULL;
+
 	jIp = jUrl = jMethod = NULL;
 	ip = url = NULL;
 	cx = payload->context;
 	JSAutoRequest ar( cx );
-	JSAutoCompartment ac( cx, globalObj );
+	JSAutoCompartment ac( cx, payload->scopeObj );
 	cleanUp.good = ( ( ip = Webserverclient_GetIp( webserverclient ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
@@ -848,7 +851,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 	}
 	if ( cleanUp.good ) {
 		cleanUp.jip = 1;
-		cleanUp.good = ( ( url = webserverclient_GetUrl( webserverclient ) ) != NULL );
+		cleanUp.good = ( ( url = Webserverclient_GetUrl( webserverclient ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
@@ -912,53 +915,23 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, JSObje
 	}
 	return clientObj;
 }
-#endif
-static void Webserver_Route_TESTResultHandler_cb( const struct webserverclient_t * webserverclient ) {
-	struct payload_t * payload;
-	jsval clientVal, retVal;
 
-	payload = (struct payload_t *) webserverclient->route->cbArgs;
-	if ( payload != NULL ) {
-		JSAutoRequest 			ar( payload->context );
-		JSAutoCompartment 		ac( payload->context, payload->objRoot );
-		clientVal = JSVAL_NULL;
-		JS::RootedValue clientValRoot( payload->context, clientVal );
-		JS::RootedValue retValRoot( payload->context, retVal );
-		JS::MutableHandleValue retValMut( &retValRoot );
-		JS::HandleValue fnValHandle( payload->fnValRoot );
-		JS::HandleObject webserverObjHandle( payload->objRoot );
-	JS_CallFunctionValue( payload->context, webserverObjHandle, fnValHandle, *payload->argsHVA, retValMut );
-	}
-
-}
-#if 0
 static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * webserverclient ) {
-
 	struct payload_t * payload;
-	JSObject * clientObj, * globalObj;
-	jsval clientObjVal, retVal;
+	JSObject * webserverClientObj;
+	jsval webserverClientVal;
 
-	retVal = JSVAL_NULL;
-	clientObjVal = JSVAL_NULL;
-	clientObj = NULL;
 	payload = (struct payload_t *) webserverclient->route->cbArgs;
-	if ( payload != NULL ) {
-		JSAutoRequest 			ar( payload->context );
-		JSAutoCompartment 		ac( payload->context, payload->objRoot );
-		globalObj = JS_GetGlobalForObject( payload->context, payload->objRoot );
-		JS::RootedObject 		clientObjRoot( payload->context, clientObj );
-		clientObj = Webserver_Route_ResultToJS( payload, globalObj, webserverclient );
-		JS::RootedValue 		clientValRoot( payload->context, clientObjVal );
-		JS::RootedValue 		retValRoot( payload->context, retVal );
-		JS::MutableHandleValue 	retValMut( &retValRoot );
-		JS::HandleObject 		webserverObjHandle( payload->objRoot );
-		JS::HandleValue 		fnValHandle( *payload->fnValRoot );
-		clientObjVal = OBJECT_TO_JSVAL( clientObj );
-		JS_CallFunctionValue( payload->context, webserverObjHandle, fnValHandle, JS::HandleValueArray( clientValRoot ), retValMut );
-		Payload_Delete( payload ); payload = NULL;
-	}
+	JSAutoRequest 			ar( payload->context );
+	JSAutoCompartment 		ac( payload->context, payload->scopeObj );
+	webserverClientObj = Webserver_Route_ResultToJS( payload, webserverclient ) ;
+	JS::RootedObject webservClientObjRoot( payload->context, webserverClientObj );
+	JS::RootedValue webservClientObjVal( payload->context, webserverClientVal );
+	webserverClientVal = OBJECT_TO_JSVAL( webserverClientObj );
+	//  @TODO: Howto free/delete the default allocation of payload->fnVal_cbArg;
+	payload->fnVal_cbArg = JS::Heap<JS::Value>( webserverClientVal );
+	Payload_Call( payload );
 }
-#endif
 /**
  * Add a dynamic route to the webserver.
  *
@@ -988,7 +961,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	JSObject * webserverObj;
 	JSString * jPattern;
 	JS::CallArgs args;
-	jsval fnVal;
+	jsval fnVal, dummyVal, paramVal;
 	char * cPattern;
 	struct {unsigned char payload:1;
 		unsigned char pattern:1;
@@ -996,15 +969,16 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vpn );
+	dummyVal = JSVAL_NULL;
+	paramVal = JSVAL_NULL;
+	fnVal = args[1];
 	cPattern = NULL;
 	payload = NULL;
-	fnVal = JSVAL_NULL;
 	webserverObj = JS_THIS_OBJECT( cx, vpn );
 	JS::RootedValue 		fnValRoot( cx, fnVal );
+	JS::HandleValue 		fnValHandle( fnValRoot );
 	JS::MutableHandleValue 	fnValMut( &fnValRoot );
-	JS::RootedValue 		fnOrgRoot( cx, args[1] );
-	JS::HandleValue 		fnOrgHandle( fnOrgRoot );
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*", &jPattern, &fnVal ) == true );
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*", &jPattern, &dummyVal ) == true );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( cPattern = JS_EncodeString( cx, jPattern ) ) != NULL );
 	}
@@ -1013,23 +987,15 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 		cleanUp.good = ( ( webserver = (struct webserver_t *) JS_GetPrivate( webserverObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( JS_ConvertValue( cx, fnOrgHandle, JSTYPE_FUNCTION, fnValMut ) == true );
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
 	}
 	if ( cleanUp.good ) {
-		JS::HandleValueArray empty = JS::HandleValueArray::empty( );
-		cleanUp.good = ( ( payload = Payload_New( cx, webserverObj, &fnValRoot, &empty ,false ) ) != NULL );
+		paramVal = JSVAL_NULL;
+		cleanUp.good = ( ( payload = Payload_New( cx, webserverObj, fnVal, paramVal, false ) ) != NULL );
 			}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_TESTResultHandler_cb, ( void * ) payload );
-			{ //simulate direct call
-				struct webserverclient_t * webserverclient = (struct webserverclient_t *) malloc( sizeof(*webserverclient) );
-				webserverclient->route = webserver->routes;
-				webserverclient->route->cbArgs = payload;
-				Webserver_Route_TESTResultHandler_cb( webserverclient );
-			}
-
-		//Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload );
+		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload );
 	} else {
 		if ( cleanUp.payload ) {
 			// this is the only thing that needs special care if something went wrong; we cleanup the rest any way,
@@ -1369,43 +1335,6 @@ static const JSFunctionSpec jsmConsole[ ] = {
  * @public
  * @namespace
  */
-static void Payload_Delete( struct payload_t * payload ) {
-	payload->context = NULL;
-	payload->objRoot = NULL;
-	payload->fnValRoot = NULL;
-	payload->argsHVA = NULL;
-	payload->repeat = 0;
-	free( payload ); payload = NULL;
-}
-
-static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JS::RootedValue * fnVal, JS::HandleValueArray * cbArgs, const bool repeat ) {
-	struct payload_t * payload;
-	struct {unsigned char good:1;
-		unsigned char payload:1;
-		unsigned char args:1;} cleanUp;
-
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( payload = (struct payload_t *) malloc( sizeof( *payload ) ) ) != NULL );
-	if ( cleanUp.good ) {
-		cleanUp.payload = 1;
-		payload->context = cx;
-		payload->objRoot = object;
-		payload->fnValRoot = fnVal;
-		payload->argsHVA = cbArgs;
-		payload->repeat = repeat;
-	}
-	if ( ! cleanUp.good ) {
-		if ( cleanUp.payload ) {
-			payload->context = NULL;
-			payload->objRoot = NULL;
-			payload->fnValRoot = NULL;
-			payload->argsHVA = NULL;
-			payload->repeat = 0;
-			free( payload ); payload = NULL;
-		}
-	}
-	return payload;
-}
 
 /**
  * Load an other javascript file.
@@ -1465,33 +1394,73 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 	return success;
 }
 
+
+static struct payload_t * Payload_New( JSContext * cx, JSObject * object, jsval fnVal_cb, jsval fnVal_cbArg, const bool repeat ) {
+	struct payload_t * payload;
+	struct {unsigned char good:1;
+		unsigned char payload:1;
+		unsigned char args:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( payload = (struct payload_t *) malloc( sizeof( *payload ) ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.payload = 1;
+		payload->context = cx;
+		payload->scopeObj = JS::Heap<JSObject *>( object );
+		payload->fnVal_cb = JS::Heap<JS::Value>( fnVal_cb );
+		payload->fnVal_cbArg =  JS::Heap<JS::Value>( fnVal_cbArg );
+		payload->repeat = repeat;
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.payload ) {
+			payload->context = NULL;
+			payload->scopeObj = NULL;
+			payload->fnVal_cb = JSVAL_NULL;
+			payload->fnVal_cbArg = JSVAL_NULL;
+			payload->repeat = 0;
+			free( payload ); payload = NULL;
+		}
+	}
+	return payload;
+}
+
+static int Payload_Call( const struct payload_t * payload ) {
+	if ( payload != NULL ) {
+		jsval retVal;
+		retVal = JSVAL_NULL;
+		JSAutoRequest 			ar( payload->context );
+		JSAutoCompartment 		ac( payload->context, payload->scopeObj );
+		JS::RootedObject objRoot( payload->context, payload->scopeObj );
+		JS::HandleObject objHandle( objRoot );
+		JS::RootedValue fnValCbRoot( payload->context, payload->fnVal_cb );
+		JS::HandleValue fnValHandle( fnValCbRoot );
+		JS::RootedValue fnValCbArgRoot( payload->context, payload->fnVal_cbArg );
+		JS::HandleValueArray fnValArrayHandle( fnValCbArgRoot );
+		JS::HandleValue fnValCbArgHandle( &fnValCbArgRoot );
+		JS::RootedValue retValRoot( payload->context, retVal );
+		JS::MutableHandleValue retValMut( &retValRoot );
+		JS_CallFunctionValue( payload->context, objHandle, fnValHandle, fnValArrayHandle, retValMut );
+		// the payload is cleaned-up by automatically, spawned by Core_ProcessTick and clearFunc_cb
+		// We don't need to clear the payload, because that is needed also the next time that this route will be called
+	}
+	return (payload->repeat) ? 1 : 0;
+}
+
 static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	struct payload_t * payload;
-	JSObject * globalObj;
-	jsval retVal;
-	int again;
 
-	again = 0;
-	retVal = JSVAL_NULL;
-	globalObj = NULL;
 	payload = ( struct payload_t * ) cbArgs;
-	if ( payload != NULL ) {
-		globalObj = JS_GetGlobalForObject( payload->context, payload->objRoot );
-		JSAutoRequest 			ar( payload->context );
-		JSAutoCompartment 		ac( payload->context, globalObj );
-		JS::RootedValue 		retValRoot( payload->context, retVal );
-		JS::MutableHandleValue 	retValMut( &retValRoot );
-		JS::HandleObject 		thisObjHandle( payload->objRoot );
-		JS::HandleValue 		fnValHandle( *payload->fnValRoot );
-		JS_CallFunctionValue( payload->context, thisObjHandle, fnValHandle, *payload->argsHVA, retValMut );
-		if ( payload->repeat ) {
-			again = 1;
-		} else {
-			again = 0;
-		}
-		// the payload is cleaned-up by automatically, spawned by Core_ProcessTick and clearFunc_cb
-	}
-	return again;
+
+	return Payload_Call( payload );
+}
+
+static void Payload_Delete( struct payload_t * payload ) {
+	payload->context = NULL;
+	payload->scopeObj = NULL;
+	payload->fnVal_cb = JSVAL_NULL;
+	payload->fnVal_cbArg = JSVAL_NULL;
+	payload->repeat = 0;
+	free( payload ); payload = NULL;
 }
 
 #define JAVASCRIPT_GLOBAL_SET_TIMER( repeat ) do { \
@@ -1500,7 +1469,7 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	struct timing_t * timing; \
 	JSObject * globalObj, *thisObj; \
 	JS::CallArgs args; \
-	jsval dummyVal, fnVal; \
+	jsval dummyVal, fnVal, *argsAt2; \
 	int ms; \
 	struct {	unsigned char payload:1; \
 				unsigned char timer:1; \
@@ -1526,20 +1495,11 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	} \
 	if ( cleanUp.good ) { \
 		if ( args.length( ) > 2 ) { \
-			JS::HandleValueArray argsAt2 = JS::HandleValueArray::fromMarkedLocation( argc - 2, vpn ); \
-			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
+			argsAt2 = vpn + 2; \
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnVal, *argsAt2, false ) ) != NULL ); \
 		} else { \
-			JS::HandleValueArray argsAt2 = JS::HandleValueArray::empty( ); \
-			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, &fnValRoot, &argsAt2, false ) ) != NULL ); \
-Payload_Timing_ResultHandler_cb( ( void *) payload ); \
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValRoot, JSVAL_NULL, false ) ) != NULL ); \
 		} \
-\
-\
-\
-\
-\
-\
-\
 	} \
 	if ( cleanUp.good ) { \
 		cleanUp.payload = 1; \
