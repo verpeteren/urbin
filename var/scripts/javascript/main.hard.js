@@ -8,19 +8,20 @@ try {
 
 	Hard.onReady = function( ) {
 		var ws = Hard.Webserver( {ip: '127.0.0.1', port: 8888}, 60 );
-//		ws.addDocumentRoot( '^/static2/(.*)', '/var/www/' );
-//		ws.addDocumentRoot( '^/static1/(.*)', '../var/www/static/' );
-		ws.addRoute( "^/dynamic/(.*)", function( arg ) {
-				console.log( "handlin" );
-				console.log( arg );
+		ws.addDocumentRoot( '^/static/(.*)', '../var/www/static/' );
+		ws.addDocumentRoot( '^/docs/(.*)', '../var/www/docs/' );
+		ws.addRoute( "^/dynamic/(.*)", function( client ) {
+				console.log( client );
+				console.log( "requested" + client.method + " " + client.ip + " " + client.url );
+				client.response.setContent( "okidokie" ).setMime( 'html' ).setCode( 200 );
 			}
 		);
 		console.log( "ready" );
-/*
-		setTimeout( function( ) {
+		/*
+		setInterval( function( ) {
 					 console.log( "tttt" );
 					}, 1000 );
-*/
+		*/
 	}
 	Hard.onUnload = function( ) {
 		console.log( "unload" );

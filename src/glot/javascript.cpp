@@ -1167,14 +1167,14 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	thisObj = payload->scopeObj;
 	JS::RootedObject thisObjRoot( cx, thisObj );
 	JS::HandleObject thisObjHandle( thisObjRoot );
-	JS::RootedObject	webserverclientObjRoot( cx, webserverclientObj );
-	JS::HandleObject	webserverclientObjHandle( webserverclientObjRoot );
+	cleanUp.good = ( ( webserverclientObj = 	JS_InitClass( cx, thisObjHandle, JS::NullPtr( ), &jscWebserverclient, nullptr, 0, nullptr, jsmWebserverclient, nullptr, nullptr ) ) != NULL );
 	JS::RootedObject	responseObjRoot( cx, responseObj );
 	JS::HandleObject	responseObjHandle( responseObjRoot );
+	JS::RootedObject	webserverclientObjRoot( cx, webserverclientObj );
+	JS::HandleObject	webserverclientObjHandle( webserverclientObjRoot );
 	if ( cleanUp.good ) {
 		cleanUp.cli = 1;
 		JS_SetPrivate( webserverclientObj, (void * ) webserverclient );
-		cleanUp.good = ( ( responseObj = 	JS_InitClass( cx, webserverclientObjHandle, JS::NullPtr( ), &jscWebserverclientresponse, nullptr, 0, nullptr, jsmWebserverclientresponse, nullptr, nullptr ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.resp = 1;
@@ -1198,7 +1198,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.method = 1;
-		cleanUp.good = ( ( webserverclientObj = 	JS_InitClass( cx, thisObjHandle, JS::NullPtr( ), &jscWebserverclient, nullptr, 0, nullptr, jsmWebserverclient, nullptr, nullptr ) ) != NULL );
+		cleanUp.good = ( ( responseObj = 	JS_InitClass( cx, webserverclientObjHandle, JS::NullPtr( ), &jscWebserverclientresponse, nullptr, 0, nullptr, jsmWebserverclientresponse, nullptr, nullptr ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		SET_PROPERTY_ON( webserverclientObjHandle, "ip", STRING_TO_JSVAL( jIp ) );
@@ -1304,6 +1304,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	fnVal = args[1];
 	cPattern = NULL;
 	payload = NULL;
+	webserverObj = NULL;
 	webserverObj = JS_THIS_OBJECT( cx, vpn );
 	JS::RootedValue 		fnValRoot( cx, fnVal );
 	JS::HandleValue 		fnValHandle( fnValRoot );
@@ -1733,6 +1734,7 @@ static struct payload_t * Payload_New( JSContext * cx, JSObject * object, jsval 
 		unsigned char args:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	payload = NULL;
 	cleanUp.good = ( ( payload = (struct payload_t *) malloc( sizeof( *payload ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
@@ -1767,7 +1769,6 @@ static int Payload_Call( const struct payload_t * payload ) {
 		JS::HandleValue fnValHandle( fnValCbRoot );
 		JS::RootedValue fnValCbArgRoot( payload->context, payload->fnVal_cbArg );
 		JS::HandleValueArray fnValArrayHandle( fnValCbArgRoot );
-		JS::HandleValue fnValCbArgHandle( &fnValCbArgRoot );
 		JS::RootedValue retValRoot( payload->context, retVal );
 		JS::MutableHandleValue retValMut( &retValRoot );
 		JS_CallFunctionValue( payload->context, objHandle, fnValHandle, fnValArrayHandle, retValMut );
