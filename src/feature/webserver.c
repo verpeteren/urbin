@@ -73,17 +73,17 @@ static struct route_t * 		Route_New				( const char * pattern, const enum routeT
 static void						Route_Delete			( struct route_t * route );
 
 static void						Webserver_HandleRead_cb	( picoev_loop * loop, int fd, int events, void * wcArgs );
-	static void						Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArgs );
-	static void						Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArgs );
-	static void 					Webserver_FindRoute		( const struct webserver_t * webserver, struct webserverclient_t * webserverclient );
-	static void						Webserver_AddRoute		( struct webserver_t * webserver, struct route_t * route );
-	static void						Webserver_DelRoute		( struct webserver_t * webserver, struct route_t * route );
+static void						Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArgs );
+static void						Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArgs );
+static void 					Webserver_FindRoute		( const struct webserver_t * webserver, struct webserverclient_t * webserverclient );
+static void						Webserver_AddRoute		( struct webserver_t * webserver, struct route_t * route );
+static void						Webserver_DelRoute		( struct webserver_t * webserver, struct route_t * route );
 
-	static struct webserverclient_t *Webserverclient_New	( struct webserver_t * webserver, int socketFd);
-	static void						Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient );
-	static void						Webserverclient_RenderRoute	( struct webserverclient_t * webserverclient );
-	static void 					Webserverclient_CloseConn	( struct webserverclient_t * webserverclient );
-	static void 					Webserverclient_Delete		( struct webserverclient_t * webserverclient );
+static struct webserverclient_t *Webserverclient_New	( struct webserver_t * webserver, int socketFd);
+static void						Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient );
+static void						Webserverclient_RenderRoute	( struct webserverclient_t * webserverclient );
+static void 					Webserverclient_CloseConn	( struct webserverclient_t * webserverclient );
+static void 					Webserverclient_Delete		( struct webserverclient_t * webserverclient );
 
 
 	/*****************************************************************************/
@@ -200,6 +200,63 @@ static void						Webserver_HandleRead_cb	( picoev_loop * loop, int fd, int event
 
 	return webserverclient;
 }
+
+unsigned char Webserverclientresponse_SetContent( struct webserverclientresponse_t * response, const char * content ) {
+	struct { unsigned char good:1;
+			unsigned char content:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	if ( response->content != NULL ) {
+		free( response->content );
+	}
+	cleanUp.good = ( ( response->content = Xstrdup( content ) ) != NULL );
+	if ( cleanUp.good ) {
+		response->contentType = CONTENTTYPE_BUFFER;
+		cleanUp.content = 1;
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.content )  {
+			free( response->content ); response->content = NULL;
+		}
+	}
+	response->contentLength = strlen( response->content );
+
+	return ( cleanUp.good ) ? 1 : 0;
+}
+
+unsigned char Webserverclientresponse_SetCode( struct webserverclientresponse_t * response, const unsigned int code ) {
+	enum httpCode_t codeId;
+	unsigned char found;
+
+	found = 0;
+	for ( codeId = HTTPCODE_NONE; codeId < __HTTPCODE_LAST; codeId++ ) {
+		if ( codeId == code ) {
+			response->httpCode = codeId;
+			found = 1;
+			break;
+		}
+	}
+	return found;
+}
+
+unsigned char Webserverclientresponse_SetMime( struct webserverclientresponse_t * response, const char * mimeString ) {
+	enum mimeType_t mimeId;
+	struct mimeDetail_t * mimeDetail;
+	unsigned char found;
+
+	found = 0;
+	for ( mimeId = MIMETYPE_HTML; mimeId < __MIMETYPE_LAST; mimeId++ ) {
+		mimeDetail = &MimeTypeDefinitions[mimeId];
+		if ( strcmp( mimeString, mimeDetail->ext ) == 0 || strcmp( mimeString, mimeDetail-> applicationString ) == 0 ) {
+			response->mimeType = mimeId;
+			found = 1;
+			break;
+		}
+	}
+	return found;
+}
+
+
 const char * Webserverclient_GetUrl( const struct webserverclient_t * webserverclient ) {
 	char * url;
 	int len;
@@ -256,22 +313,11 @@ static void Webserverclient_Render##name( struct webserverclient_t * webservercl
 	\
 	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
 	if ( webserverclient->response.contentType == CONTENTTYPE_FILE && webserverclient->response.content ) { \
+		/* In this case, the content field holds the file name */ \
 		free( webserverclient->response.content ); webserverclient->response.content = NULL; \
 	} \
-	webserverclient->response.contentType = CONTENTTYPE_BUFFER; \
 	webserverclient->response.mimeType = MIMETYPE_HTML; \
-	cleanUp.good = ( ( webserverclient->response.content = Xstrdup( webpage ) ) != NULL ); \
-	if ( cleanUp.good ) { \
-		cleanUp.content = 1; \
-		webserverclient->response.contentLength = strlen( webserverclient->response.content ); \
-	} \
-	if ( ! cleanUp.good ) { \
-		if ( cleanUp.good ) { \
-			cleanUp.content = 1; \
-			free( webserverclient->response.content ); webserverclient->response.content = NULL; \
-			webserverclient->response.contentLength = 0; \
-		} \
-	} \
+	Webserverclientresponse_SetContent( &webserverclient->response, webpage ); \
 }
 
 WEBSERVERCLIENT_RENDER( Forbidden, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Forbidden</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
@@ -371,6 +417,7 @@ static void Webserverclient_RenderRoute( struct webserverclient_t * webservercli
 			case HTTPCODE_OK:  //  ft
 				//  break;
 			case HTTPCODE_NONE:  //  ft
+			case __HTTPCODE_LAST:  //  ft
 				//  break;
 			default:
 				break;

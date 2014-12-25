@@ -820,10 +820,330 @@ extern const char * MethodDefinitions[ ];
  */
 static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
 
+/**
+ * Set the HTTP response
+ *
+ * In a dynamic route, the body can be set manually
+ *
+ * @name	Hard.Webserverclient.setContent
+ * @function
+ * @public
+ * @since	0.0.8a
+ * @returns	{Hard.Webserverclient}
+ * @param	{string}		the content of the http response.
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
+ * //  or as the longer form
+ * 	client.response.setMime( 'text/html' );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.response
+ * @see	Hard.webserverclient.response.setMime
+ * @see	Hard.webserverclient.response.setCode
+ */
+static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc, jsval * vpn ) {
+	struct webserverclientresponse_t * response;
+	JS::CallArgs args;
+	JSString * jString;
+	JSObject * thisObj;
+	char * cString;
+	struct {unsigned char good:1;
+			unsigned char cstring:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vpn );
+	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
+	cString = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cString = JS_EncodeString( cx, jString ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.cstring = 1;
+		cleanUp.good = ( ( response = (struct webserverclientresponse_t *) JS_GetPrivate( thisObj ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Webserverclientresponse_SetContent( response, cString ) ) ? 1 : 0;
+	}
+	//  always cleanUp
+	if ( cleanUp.cstring ) {
+		JS_free( cx, cString ); cString = NULL;
+	}
+
+	return ( cleanUp.good ) ? true : false;
+}
+
+/**
+ * Set the HTTP return code
+ *
+ * In a dynamic route, the http code can be set manually
+ *
+ * @name	Hard.Webserverclient.setCode
+ * @function
+ * @public
+ * @since	0.0.8a
+ * @returns	{Hard.Webserverclient}
+ * @param	{integer}		the return code. e.g. 404 for 'Not Found'
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.response
+ * @see	Hard.webserverclient.response.setContent
+ * @see	Hard.webserverclient.response.setMime
+ */
+
+static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, jsval * vpn ) {
+	struct webserverclientresponse_t * response;
+	JS::CallArgs args;
+	JSObject * thisObj;
+	int code;
+	struct {unsigned char good:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vpn );
+	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "i", &code ) == true );
+	if ( cleanUp.good ) {
+		thisObj = JS_THIS_OBJECT( cx, vpn );
+		cleanUp.good = ( ( response = (struct webserverclientresponse_t *) JS_GetPrivate( thisObj ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Webserverclientresponse_SetCode( response, (unsigned int) code ) ) ? 1 : 0;
+	}
+
+	return ( cleanUp.good ) ? true : false;
+}
+
+/**
+ * Set the HTTP Mimetype header
+ *
+ * In a dynamic route, the mimetype can be set manually
+ *
+ * @name	Hard.Webserverclient.setMime
+ * @function
+ * @public
+ * @since	0.0.8a
+ * @returns	{Hard.Webserverclient}
+ * @param	{string}		the mimetype to set. Currently the list of mime types is limited as is the background a typedef is used
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
+ * //  or as the longer form
+ * 	client.response.setMime( 'text/html' );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.response
+ * @see	Hard.webserverclient.response.setContent
+ * @see	Hard.webserverclient.response.setCode
+ */
+static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, jsval * vpn ) {
+	struct webserverclientresponse_t * response;
+	JS::CallArgs args;
+	JSString * jString;
+	JSObject * thisObj;
+	char * cString;
+	struct {unsigned char good:1;
+			unsigned char cstring:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vpn );
+	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
+	cString = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cString = JS_EncodeString( cx, jString ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.cstring = 1;
+		cleanUp.good = ( ( response = (struct webserverclientresponse_t *) JS_GetPrivate( thisObj ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Webserverclientresponse_SetMime( response, cString ) ) ? 1 : 0;
+	}
+	//  always cleanUp
+	if ( cleanUp.cstring ) {
+		JS_free( cx, cString ); cString = NULL;
+	}
+
+	return ( cleanUp.good ) ? true : false;
+}
+
+
+/**
+ * The HTTP client object
+ *
+ * In a dynamic route, this is variable is available in the callback function
+ *
+ * @name	Hard.Webserverclient
+ * @object
+ * @public
+ * @since	0.0.8a
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.response
+ * @see	Hard.webserverclient.ip
+ * @see	Hard.webserverclient.url
+ * @see	Hard.webserverclient.method
+ * @see	Hard.webserverclient.response
+ * @see	Hard.webserverclient.response.setContent
+ * @see	Hard.webserverclient.response.setCode
+ * @see	Hard.webserverclient.response.setMime
+ */
+
+JSClass jscWebserverclient = {
+	"Webserverclient",
+	JSCLASS_HAS_PRIVATE,
+	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
+};
+
+static const JSFunctionSpec jsmWebserverclient[ ] = {
+	JS_FS_END
+};
+
+/**
+ * The HTTP response object
+ *
+ * In a dynamic route, this is variable is available in the callback function
+ *
+ * @name	Hard.Webserverclient.response
+ * @object
+ * @public
+ * @since	0.0.8a
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.response
+ * @see	Hard.webserverclient.response.setContent
+ * @see	Hard.webserverclient.response.setCode
+ * @see	Hard.webserverclient.response.setMime
+ */
+
+
+JSClass jscWebserverclientresponse = {
+	"Webserverclientresponse",
+	JSCLASS_HAS_PRIVATE,
+	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
+};
+
+static const JSFunctionSpec jsmWebserverclientresponse[ ] = {
+	JS_FS( "setContent", 			JsnWebserverclientresponse_SetContent, 1, 0 ),
+	JS_FS( "setCode", 				JsnWebserverclientresponse_SetCode, 1, 0 ),
+	JS_FS( "setMime", 				JsnWebserverclientresponse_SetMime, 1, 0 ),
+	JS_FS_END
+};
+
+/**
+ * The Ip address of the connected HTTP client
+ *
+ * @name	Hard.Webserverclient.ip
+ * @field
+ * @public
+ * @since	0.0.8a
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	console.log( "ip: " + client.response.ip );
+ * 	console.log( "url: " + client.response.url );
+ * 	console.log( "method: " + client.response.method );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.url
+ * @see	Hard.webserverclient.method
+ * @see	Hard.webserverclient.response.setContent
+ * @see	Hard.webserverclient.response.setCode
+ * @see	Hard.webserverclient.response.setMime
+ */
+
+
+/**
+ * The url requested by of the connected HTTP client
+ *
+ * @name	Hard.Webserverclient.url
+ * @field
+ * @public
+ * @since	0.0.8a
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	console.log( "ip: " + client.response.ip );
+ * 	console.log( "url: " + client.response.url );
+ * 	console.log( "method: " + client.response.method );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.ip
+ * @see	Hard.webserverclient.method
+ * @see	Hard.webserverclient.response.setContent
+ * @see	Hard.webserverclient.response.setCode
+ * @see	Hard.webserverclient.response.setMime
+ */
+
+/**
+ * The method [POST or GET ] that was requested by the connected HTTP client
+ *
+ * @name	Hard.Webserverclient.method
+ * @field
+ * @public
+ * @since	0.0.8a
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	console.log( "ip: " + client.response.ip );
+ * 	console.log( "url: " + client.response.url );
+ * 	console.log( "method: " + client.response.method );
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.ip
+ * @see	Hard.webserverclient.url
+ * @see	Hard.webserverclient.response.setContent
+ * @see	Hard.webserverclient.response.setCode
+ * @see	Hard.webserverclient.response.setMime
+ */
+
+
 static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const struct webserverclient_t * webserverclient );
 static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const struct webserverclient_t * webserverclient ) {
 	JSContext * cx;
-	JSObject * clientObj, * responseObj;
+	JSObject * webserverclientObj, * responseObj, * thisObj;
 	JSString * jIp, * jUrl, * jMethod;
 	const char * ip, * url;
 	const unsigned int attrs = JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT;
@@ -837,14 +1157,29 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		unsigned char good:1;} cleanUp;
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 
-	clientObj = NULL;
-
+	webserverclientObj = NULL;
+	responseObj = NULL;
 	jIp = jUrl = jMethod = NULL;
 	ip = url = NULL;
 	cx = payload->context;
 	JSAutoRequest ar( cx );
 	JSAutoCompartment ac( cx, payload->scopeObj );
-	cleanUp.good = ( ( ip = Webserverclient_GetIp( webserverclient ) ) != NULL );
+	thisObj = payload->scopeObj;
+	JS::RootedObject thisObjRoot( cx, thisObj );
+	JS::HandleObject thisObjHandle( thisObjRoot );
+	JS::RootedObject	webserverclientObjRoot( cx, webserverclientObj );
+	JS::HandleObject	webserverclientObjHandle( webserverclientObjRoot );
+	JS::RootedObject	responseObjRoot( cx, responseObj );
+	JS::HandleObject	responseObjHandle( responseObjRoot );
+	if ( cleanUp.good ) {
+		cleanUp.cli = 1;
+		JS_SetPrivate( webserverclientObj, (void * ) webserverclient );
+		cleanUp.good = ( ( responseObj = 	JS_InitClass( cx, webserverclientObjHandle, JS::NullPtr( ), &jscWebserverclientresponse, nullptr, 0, nullptr, jsmWebserverclientresponse, nullptr, nullptr ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.resp = 1;
+		cleanUp.good = ( ( ip = Webserverclient_GetIp( webserverclient ) ) != NULL );
+	}
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;
 		cleanUp.good = ( ( jIp = JS_NewStringCopyZ( cx, ip ) ) != NULL );
@@ -863,32 +1198,22 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.method = 1;
-		cleanUp.good = ( ( clientObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
-	}
-	JS::RootedObject clientObjRoot( cx, clientObj );
-	JS::HandleObject clientObjHandle( clientObjRoot );
-	if ( cleanUp.good ) {
-		cleanUp.cli = 1;
-		cleanUp.good = ( ( responseObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
-		//  cleanUp.good = ( ( responseObj = JS_NewObject( cx, &JsnWebserverResponseClass, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
-	}
-	//  readonly
-	if ( cleanUp.good ) {
-		cleanUp.resp = 1;
-		SET_PROPERTY_ON( clientObjHandle, "ip", STRING_TO_JSVAL( jIp ) );
+		cleanUp.good = ( ( webserverclientObj = 	JS_InitClass( cx, thisObjHandle, JS::NullPtr( ), &jscWebserverclient, nullptr, 0, nullptr, jsmWebserverclient, nullptr, nullptr ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( clientObjHandle, "url", STRING_TO_JSVAL( jUrl ) );
+		SET_PROPERTY_ON( webserverclientObjHandle, "ip", STRING_TO_JSVAL( jIp ) );
 	}
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( clientObjHandle, "response", OBJECT_TO_JSVAL( responseObj ) );
+		SET_PROPERTY_ON( webserverclientObjHandle, "url", STRING_TO_JSVAL( jUrl ) );
 	}
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( clientObjHandle, "method", STRING_TO_JSVAL( jMethod ) );
+		SET_PROPERTY_ON( webserverclientObjHandle, "response", OBJECT_TO_JSVAL( responseObj ) );
+	}
+	if ( cleanUp.good ) {
+		SET_PROPERTY_ON( webserverclientObjHandle, "method", STRING_TO_JSVAL( jMethod ) );
 	}
 	if ( cleanUp.good ) {
 		JS_SetPrivate( responseObj, ( void * ) &webserverclient->response );
-		//  @TODO:  editable fieldsJS_DefineProperties( cx, responseObj, JsnHttpScResponseProp );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.ip ) {
@@ -913,7 +1238,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 			// clientObj
 		}
 	}
-	return clientObj;
+	return webserverclientObj;
 }
 
 static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * webserverclient ) {
@@ -924,7 +1249,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * w
 	payload = (struct payload_t *) webserverclient->route->cbArgs;
 	JSAutoRequest 			ar( payload->context );
 	JSAutoCompartment 		ac( payload->context, payload->scopeObj );
-	webserverClientObj = Webserver_Route_ResultToJS( payload, webserverclient ) ;
+	webserverClientObj = Webserver_Route_ResultToJS( payload, webserverclient );
 	JS::RootedObject webservClientObjRoot( payload->context, webserverClientObj );
 	JS::RootedValue webservClientObjVal( payload->context, webserverClientVal );
 	webserverClientVal = OBJECT_TO_JSVAL( webserverClientObj );
@@ -932,6 +1257,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * w
 	payload->fnVal_cbArg = JS::Heap<JS::Value>( webserverClientVal );
 	Payload_Call( payload );
 }
+
 /**
  * Add a dynamic route to the webserver.
  *
@@ -949,11 +1275,15 @@ static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * w
  * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	console.log( 'got ' + client.url );
- * 	client.response.content = '<html><h1>response</h1><html>';
+ * 	client.response.setContent = '<html><h1>response</h1><html>';
  * 	} );
  * @see	Hard.Webserver
  * @see	Hard.Webserver.addDocumentRoot
- * @see	Hard.webserverclient.get
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.setContent
+ * @see	Hard.webserverclient.setCode
+ * @see	Hard.webserverclient.setMime
+ * @see	Hard.webserverclient.response
  */
 static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
@@ -1108,12 +1438,13 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	console.log( 'got ' + client.url );
- * 	client.response.content = '<html><h1>response</h1><html>';
+ * 	client.response.setContent = '<html><h1>response</h1><html>';
  * 	} );
  * ws.addDocumentRoot( '^/static/(.*)', '/var/www/static/' );
  *
  * @see	Hard.Webserver.addRoute
- * @see	HarHardtpServer.addDocumentRoot
+ * @see	hard.Webserver.addDocumentRoot
+ * @see	hard.Webserverclient
  */
 static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
@@ -1443,7 +1774,7 @@ static int Payload_Call( const struct payload_t * payload ) {
 		// the payload is cleaned-up by automatically, spawned by Core_ProcessTick and clearFunc_cb
 		// We don't need to clear the payload, because that is needed also the next time that this route will be called
 	}
-	return (payload->repeat) ? 1 : 0;
+	return ( payload->repeat ) ? 1 : 0;
 }
 
 static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
