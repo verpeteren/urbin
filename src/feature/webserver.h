@@ -37,6 +37,7 @@ enum httpCode_t {
 	HTTPCODE_FORBIDDEN			 = 403,
 	HTTPCODE_NOTFOUND			 = 404,
 	HTTPCODE_ERROR				 = 500,
+	__HTTPCODE_LAST				 = 999,
 };
 
 enum mimeType_t {
@@ -99,36 +100,42 @@ struct webserver_t {
 
 };
 
-struct webserverclient_t{
-	int							socketFd;
-	enum requestMode_t			mode;
-	enum connection_t			connection;
-	struct webserver_t * 		webserver;
-	struct route_t *			route;
-	RequestHeader *	 			header;
-	char						buffer[HTTP_BUFF_LENGTH];
-	struct {
-			time_t					start;
-			time_t					end;
-			int						contentLength;
-			enum contentType_t		contentType;
-			enum httpCode_t			httpCode;
-			enum mimeType_t			mimeType;
-			unsigned char			headersSent:1;
-			unsigned char			contentSent:1;
-			char *	 				content;
-							}	response;
+struct webserverclientresponse_t {
+	time_t					start;
+	time_t					end;
+	int						contentLength;
+	enum contentType_t		contentType;
+	enum httpCode_t			httpCode;
+	enum mimeType_t			mimeType;
+	unsigned char			headersSent:1;
+	unsigned char			contentSent:1;
+	char *	 				content;
 };
 
-const char *					Webserverclient_GetUrl		( const struct webserverclient_t * webserverclient );
-const char *					Webserverclient_GetIp		( const struct webserverclient_t * webserverclient );
 
-int 							Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
-int 							Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs );
+struct webserverclient_t{
+	int									socketFd;
+	enum requestMode_t					mode;
+	enum connection_t					connection;
+	struct webserver_t *		 		webserver;
+	struct route_t *					route;
+	RequestHeader *	 					header;
+	char								buffer[HTTP_BUFF_LENGTH];
+	struct webserverclientresponse_t	response;
+	};
 
-struct webserver_t *			Webserver_New			( const struct core_t * core, const char * ip, const uint16_t port, const unsigned char timeoutSec );
-void 							Webserver_JoinCore		( struct webserver_t * webserver );
-void							Webserver_Delete		( struct webserver_t * webserver );
+unsigned char					Webserverclientresponse_SetContent	( struct webserverclientresponse_t * response, const char * content );
+unsigned char					Webserverclientresponse_SetCode		( struct webserverclientresponse_t * response, const unsigned int code );
+unsigned char					Webserverclientresponse_SetMime		( struct webserverclientresponse_t * response, const char * mimeString );
+const char *					Webserverclient_GetUrl				( const struct webserverclient_t * webserverclient );
+const char *					Webserverclient_GetIp				( const struct webserverclient_t * webserverclient );
+
+int 							Webserver_DocumentRoot				( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
+int 							Webserver_DynamicHandler			( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs );
+
+struct webserver_t *			Webserver_New						( const struct core_t * core, const char * ip, const uint16_t port, const unsigned char timeoutSec );
+void 							Webserver_JoinCore					( struct webserver_t * webserver );
+void							Webserver_Delete					( struct webserver_t * webserver );
 
 
 #ifdef __cplusplus
