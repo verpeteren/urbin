@@ -985,7 +985,77 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
 
 	return ( cleanUp.good ) ? true : false;
 }
+struct namedRegex_t{
+	JSContext * 			context;
+	JSObject * 				matchObj;
+	OnigRegion * 			region;
+};
 
+static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int ngroupNum, int* group_nums, regex_t* reg, void* cbArgs ) {
+	int i, gn;
+	struct namedRegex_t * namedRegex;
+	JSString * jString;
+	jsval jValue;
+
+	namedRegex = (struct namedRegex_t *) cbArgs;
+	JS::RootedValue	jValueRoot( namedRegex->context, jValue );
+	JS::HandleValue	jValueHandle( jValueRoot );
+	JS::RootedObject matchObjRoot( namedRegex->context, namedRegex->matchObj );
+	for ( i = 0; i < ngroupNum; i++ ) {
+		gn = group_nums[i];
+		onig_name_to_backref_number( reg, name, nameEnd, namedRegex->region );
+		jString = JS_NewStringCopyN( namedRegex->context, (const char *) namedRegex->region->beg[gn], (size_t) ( namedRegex->region->end[gn] - namedRegex->region->beg[gn] ) );
+		jValue =  STRING_TO_JSVAL( jString );
+		JS::HandleObject matchObjHandle( matchObjRoot );
+		JS_SetProperty( namedRegex->context, matchObjHandle, (const char *) name, jValueHandle );
+	}
+	return 0;  /* 0: continue */
+}
+
+/**
+ * Get the named groups that matched the routing regex
+ *
+ * In a dynamic route, the route can be defined with regexes with named groups. these will be set in an object
+ *
+ * @name	Hard.Webserverclient.getNamedGroups
+ * @function
+ * @public
+ * @since	0.0.8a
+ * @returns	{object}
+ *
+ * @example
+ * var ws = this.Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/blog/(?<year>\d{4})/(?<month>\d{1,2}/(?<day>\d{1,2}))', function( client ) {
+ * 	var params = client.getNamedGroups( );
+ * 	console.log( params.year + '-' + params.month + '-' + params.day )
+ * 	} );
+ * @see	Hard.Webserver
+ * @see	Hard.Webserver.addRoute
+ * @see	Hard.webserverclient
+ * @see	Hard.webserverclient.response
+ */
+
+static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, jsval * vpn ) {
+	struct webserverclient_t * webserverclient;
+	struct namedRegex_t namedRegex;
+	JSObject * thisObj;
+	JS::CallArgs args;
+	struct {unsigned char good:1;
+			unsigned char cstring:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vpn );
+	webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
+	JS::RootedObject thisObjRoot( cx, thisObj );
+	namedRegex.context = cx;
+	namedRegex.matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) );
+	namedRegex.region = webserverclient->webserver->region;
+	JS::RootedObject matchObjRoot( cx, namedRegex.matchObj );
+	onig_foreach_name( webserverclient->route->urlRegex, Webclient_NamedGroup_cb, (void * ) &namedRegex );
+	args.rval( ).set( OBJECT_TO_JSVAL( namedRegex.matchObj ) );
+	return ( cleanUp.good ) ? true : false;
+}
 
 /**
  * The HTTP client object
@@ -1006,6 +1076,7 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
  * @see	Hard.Webserver.addRoute
  * @see	Hard.webserverclient
  * @see	Hard.webserverclient.response
+ * @see	Hard.webserverclient.getNamedGroups
  * @see	Hard.webserverclient.ip
  * @see	Hard.webserverclient.url
  * @see	Hard.webserverclient.method
@@ -1022,6 +1093,7 @@ JSClass jscWebserverclient = {
 };
 
 static const JSFunctionSpec jsmWebserverclient[ ] = {
+	JS_FS( "getNamedGroups", 			JsnWebserverclient_GetNamedGroups, 0, 0 ),
 	JS_FS_END
 };
 
