@@ -1,6 +1,8 @@
 #ifndef SRC_CORE_UTILS_H_
 #define SRC_CORE_UTILS_H_
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

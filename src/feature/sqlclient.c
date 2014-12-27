@@ -218,25 +218,23 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 	sqlclient = (struct sqlclient_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
-	} else if ( ( events & PICOEV_READ ) != 0 ) {
+	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
 		PostgresPollingStatusType status;
 		ConnStatusType statusType;
 
-		if ( ( statusType = PQstatus( sqlclient->connection.pg.conn ) ) == CONNECTION_BAD ) {
+		statusType = PQstatus( sqlclient->connection.pg.conn );
+		if ( statusType == CONNECTION_BAD ) {
 			Sqlclient_CloseConn( sqlclient );
 		} else {
 			status = PQconnectPoll( sqlclient->connection.pg.conn );
 			if ( status != PGRES_POLLING_FAILED && status != PGRES_POLLING_OK ) {
-				if ( PQstatus( sqlclient->connection.pg.conn ) != CONNECTION_OK ) {
-					Sqlclient_CloseConn( sqlclient );
-				} else {
+				statusType = PQstatus( sqlclient->connection.pg.conn );
+				if ( statusType == CONNECTION_OK ) {
 					//  We are connected, and have the database, we are good to go.
 					picoev_del( loop, fd );
 					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
 				}
-			} else {
-				Sqlclient_CloseConn( sqlclient );
 			}
 		}
 	}
@@ -615,7 +613,7 @@ static void Sqlclient_Connect( struct sqlclient_t * sqlclient ) {
 				}
 				if ( cleanUp.good ) {
 					cleanUp.conn = 1;
-					picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleConnect_cb, (void * ) sqlclient );
+					picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READWRITE, sqlclient->timeoutSec, Postgresql_HandleConnect_cb, (void * ) sqlclient );
 					PQsetnonblocking( sqlclient->connection.pg.conn, 1 );
 				}
 				if ( ! cleanUp.good ) {
@@ -633,19 +631,20 @@ static void Sqlclient_Connect( struct sqlclient_t * sqlclient ) {
 				cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
 				if ( cleanUp.good ) {
 					cleanUp.connString = 1;
-					snprintf( connString, len, CONNSTRING_TEMPLATE, sqlclient->hostName, sqlclient->port);
+					snprintf( connString, len, CONNSTRING_TEMPLATE, sqlclient->ip, sqlclient->port);
 #undef CONNSTRING_TEMPLATE
 					if ( cleanUp.good ) {
 						cleanUp.good = ( ( sqlclient->connection.my.conn = mysac_new( MYSQL_BUFS ) ) != NULL );
 					}
 					if ( cleanUp.good ) {
 						cleanUp.conn = 1;
+						mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0 );
+						mysac_connect( sqlclient->connection.my.conn );
 						cleanUp.good = ( ( sqlclient->socketFd = mysac_get_fd( sqlclient->connection.my.conn ) ) > 0 );
 					}
 					if ( cleanUp.good ) {
 						picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READ, sqlclient->timeoutSec, Mysql_HandleConnect_cb, (void * ) sqlclient );
 						SetupSocket( sqlclient->socketFd, 0 );
-						mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0 );
 					}
 					if ( ! cleanUp.good ) {
 						if ( cleanUp.conn ) {

@@ -1,5 +1,8 @@
 "use strict"
 
+var apedev = {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 };
+var mysqlDetective = {host : 'localhost', db : 'SQLDETECTIVE', user : 'sqldetective', password : 'sherlock', port : 3306 };
+var pgsqlDetective = {host : 'localhost', db : 'sqldetective', user : 'sqldetective', password : 'sherlock', port : 5432 };
 try {
 
 	Hard.onLoad = function( ) {
@@ -21,7 +24,17 @@ try {
 		setInterval( function( ) {
 					 console.log( "tttt" );
 					}, 1000 );
-		*/
+		*/ 
+		var sql = Hard.PostgresqlClient( pgsqlDetective , 60 );
+		//var sql = Hard.MysqlClient( mysqlDetective , 60 );
+			sql.query( "SELECT *  FROM employee WHERE hair_colour = '$1' );", ['black' ], function( res ) {
+				if ( typeof query == array ) {
+					for ( var rowId = 0; rowId < res.length; rowId++ ) {
+						row = res[rowId];
+						console.log( rowId + ' ' + row.name + ' ' + row.sales );
+					}
+				}
+			} );
 	}
 	Hard.onUnload = function( ) {
 		console.log( "unload" );

@@ -2,6 +2,7 @@
 #define SRC_FEATURE_SQLCLIENT_H_
 
 #include <stdint.h>
+#include <stddef.h>
 
 #include "../core/core.h"
 
@@ -21,7 +22,8 @@ extern "C" {
 
 struct query_t;
 
-typedef void				( * queryHandler_cb_t )			( const struct query_t * query );
+typedef void					( * queryHandler_cb_t )			( const struct query_t * query );
+typedef struct sqlclient_t *	( * sqlNew_cb_t)				( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
 
 enum sqlAdapter_t {
 	SQLADAPTER_POSTGRESQL,
@@ -48,7 +50,6 @@ struct sqlclient_t {
 							}	connection;
 	const char *				hostName;
 	const char *				ip;
-	const char *				hostString;
 	const char *				loginName;
 	const char *				password;
 	const char *				dbName;
