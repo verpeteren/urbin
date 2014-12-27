@@ -25,16 +25,29 @@ try {
 					 console.log( "tttt" );
 					}, 1000 );
 		*/ 
+		/*
 		var sql = Hard.PostgresqlClient( pgsqlDetective , 60 );
-		//var sql = Hard.MysqlClient( mysqlDetective , 60 );
-			sql.query( "SELECT *  FROM employee WHERE hair_colour = '$1' );", ['black' ], function( res ) {
-				if ( typeof query == array ) {
-					for ( var rowId = 0; rowId < res.length; rowId++ ) {
-						row = res[rowId];
-						console.log( rowId + ' ' + row.name + ' ' + row.sales );
-					}
+		sql.query( "SELECT *  FROM employee WHERE hair_colour = $1;", ['black' ], function( rows ) {
+			if ( Array.isArray( rows ) ) {
+				for ( var rowId = 0; rowId < rows.length; rowId++ ) {
+					var row = rows[rowId];
+					console.log( "\t" + row.employee_id +":" + row.last_name + "," + row.first_name );
 				}
-			} );
+			} else {
+				console.log( " no data " );
+			}
+		} );*/
+		var sql = Hard.MysqlClient( mysqlDetective , 60 );
+		sql.query( "SELECT *  FROM employee WHERE hair_colour = '$1';", ['black' ], function( rows ) {
+			if ( Array.isArray( rows ) ) {
+				for ( var rowId = 0; rowId < rows.length; rowId++ ) {
+					var row = rows[rowId];
+					console.log( "\t" + row.employee_id +":" + row.last_name + "," + row.first_name );
+				}
+			} else {
+				console.log( " no data " );
+			}
+		} );
 	}
 	Hard.onUnload = function( ) {
 		console.log( "unload" );
