@@ -316,11 +316,11 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 	payload = NULL;
 	dummyVal = JSVAL_NULL;
 	cleanUp.good = ( argc == 3 );
+	paramList = JSVAL_NULL;
 	if ( cleanUp.good ) {
 		paramList = args[1];
 		fnVal = args[2];
 	}
-	paramList = JSVAL_NULL;
 	sqlObj = JS_THIS_OBJECT( cx, vpn );
 	JS::RootedObject        sqlObjRoot( cx, sqlObj );
 	JS::RootedValue 		paramListRoot( cx, paramList );
@@ -343,7 +343,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 			/*  it is a query like "SELECT user FROM users WHERE user_id = 666", 				null, 		function( result ) {console.log( result );} ); */
 			nParams = 0;
 		} else if ( paramList.isString( ) || paramList.isNumber( ) ) {
-			/*  it is a query like "SELECT user FROM users WHERE user_id = '$1'",				 	666, 		function( result ) {console.log( result );} ); */
+			/*  it is a query like "SELECT user FROM users WHERE user_id = $1",				 	666, 		function( result ) {console.log( result );} ); */
 			nParams = 1;
 			cleanUp.good = ( ( cParamValues = ( const char ** ) malloc( sizeof( *cParamValues ) * nParams ) ) != NULL );
 			if ( cleanUp.good ) {
@@ -354,7 +354,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 				cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, value.toString( ) ) ) != NULL );
 			}
 		} else {
-			/*  it is a query like "SELECT user FROM users WHERE user_id BETWEEN '$1' AND '$2'",	[664, 668],	function( result ) {console.log( result );} ); */
+			/*  it is a query like "SELECT user FROM users WHERE user_id BETWEEN $1 AND $2",	[664, 668],	function( result ) {console.log( result );} ); */
 			JSObject * paramObj;
 			jsval paramVal;
 			jsid indexId;
@@ -448,6 +448,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 	JS::HandleObject resultArrayHandle( resultArrayRoot );
 	if ( cleanUp.good ) {
 		if ( result != NULL ) {
+			mysac_first_row( result );
 			rowCount = ( unsigned int ) mysac_num_rows( result );
 			if ( rowCount > 0 ) {
 				colCount = mysac_field_count( result );
@@ -455,9 +456,9 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 				while ( cleanUp.good && ( row = mysac_fetch_row( result ) ) != NULL ) {
 					jValue = JSVAL_NULL;
 					currentVal = JSVAL_NULL;
+					cleanUp.good = ( ( recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
 					JS::RootedObject 		recordObjRoot( cx, recordObj );
 					JS::HandleObject 		recordObjHandle( recordObjRoot );
-					cleanUp.good = ( ( recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
 					if ( cleanUp.good ) {
 						currentVal = OBJECT_TO_JSVAL( recordObj );
 						JS::RootedValue 	currentValRoot( cx, currentVal );
@@ -508,14 +509,14 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * @public
  * @since	0.0.5b
  * @returns	{boolean}					If the query could be registered successfully it returns true; else false is returned
- * @param	{string}	statement		A sql command or query.
+ * @param	{string}	statement		A sql command or query. Please not that for postgres the placeholders are marked as $n etc. and for mysql these are ?
  * @param	{array}		[parameters]	A list of parameters that can be used in a query.<p>default: []</p>
  * @param	{function}	fn				The callback function {response}
  *
  * @example
- * var pg = Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432}, 60 );
- * pg.query( "SELECT name, sales FROM sales WHERE customer = '$1' );" , ['foobar' ], function( res ) {
- * 	if ( typeof query == array ) {
+ * var my = Hard.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 3306}, 60 );
+ * my.query( "SELECT name, sales FROM sales WHERE customer = $1 );" , ['foobar' ], function( res ) {
+ * 	if ( Array.isArray( rows ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];
  * 				console.log( rowId + ' ' + row.name + ' ' + row.sales );
@@ -560,7 +561,7 @@ static JSFunctionSpec jsmMysqlclient[ ] = {
  *
  * @example
  * var my = Hard.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
- * my.query( "SELECT name, sales FROM sales WHERE customer = '$1' );" , ['foobar' ], function( res ) {
+ * my.query( "SELECT name, sales FROM sales WHERE customer = ? );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];
@@ -692,7 +693,6 @@ static JSObject * Postgresqlclient_Query_ResultToJS( JSContext * cx, const void 
 								}
 								JS::RootedValue 	jValueRoot( cx, jValue );
 								JS::HandleValue 	jValueHandle( jValueRoot );
-							printf( "\t%s %d %d\n", cFieldName, rowId, colId );
 								JS_SetProperty( cx, recordObjHandle, cFieldName, jValueHandle );  //  hmm, what if postgresql columns do not have ascii chars, ecma does not allow that...?
 							}
 						}
@@ -725,13 +725,13 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * @public
  * @since	0.0.5b
  * @returns	{boolean}					If the query could be registered successfully it returns true; else false is returned
- * @param	{string}	statement		A sql command or query.
+ * @param	{string}	statement		A sql command or query. Please not that for postgres the placeholders are marked as $n etc. and for mysql these are ?
  * @param	{array}		[parameters]	A list of parameters that can be used in a query.<p>default: []</p>
  * @param	{function}	fn				The callback function {response}
  *
  * @example
  * var pg = Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
- * pg.query( "SELECT name, sales FROM sales WHERE customer = '$1' );" , ['foobar' ], function( res ) {
+ * pg.query( "SELECT name, sales FROM sales WHERE customer = $1 );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];
@@ -777,7 +777,7 @@ static JSFunctionSpec jsmPostgresqlclient[ ] = {
  *
  * @example
  * var pg = Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
- * pg.query( "SELECT name, sales FROM sales WHERE customer = '$1' );" , ['foobar' ], function( res ) {
+ * pg.query( "SELECT name, sales FROM sales WHERE customer = $1 );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
  * 				row = res[rowId];

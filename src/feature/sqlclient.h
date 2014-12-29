@@ -44,7 +44,6 @@ struct sqlclient_t {
 #if HAVE_MYSQL == 1
 		struct {
 			MYSAC *							conn;
-			unsigned int					statementId;
 						}			my;
 #endif
 							}	connection;

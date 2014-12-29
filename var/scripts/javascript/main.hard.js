@@ -3,6 +3,19 @@
 var apedev = {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 };
 var mysqlDetective = {host : 'localhost', db : 'SQLDETECTIVE', user : 'sqldetective', password : 'sherlock', port : 3306 };
 var pgsqlDetective = {host : 'localhost', db : 'sqldetective', user : 'sqldetective', password : 'sherlock', port : 5432 };
+
+var showResults = function( rows ) {
+	if ( Array.isArray( rows ) ) {
+		for ( var rowId = 0; rowId < rows.length; rowId++ ) {
+			var row = rows[rowId];
+		console.log( "\t" + row.employee_id +":" + row.last_name + "," + row.first_name );
+		}
+	} else {
+		console.log( " no data " );
+	}
+	console.log( "--------------------------------------------------------------------------" );
+}
+
 try {
 
 	Hard.onLoad = function( ) {
@@ -22,32 +35,19 @@ try {
 		console.log( "ready" );
 		/*
 		setInterval( function( ) {
-					 console.log( "tttt" );
-					}, 1000 );
+			console.log( "tttt" );
+		}, 1000 );
 		*/ 
-		/*
-		var sql = Hard.PostgresqlClient( pgsqlDetective , 60 );
-		sql.query( "SELECT *  FROM employee WHERE hair_colour = $1;", ['black' ], function( rows ) {
-			if ( Array.isArray( rows ) ) {
-				for ( var rowId = 0; rowId < rows.length; rowId++ ) {
-					var row = rows[rowId];
-					console.log( "\t" + row.employee_id +":" + row.last_name + "," + row.first_name );
-				}
-			} else {
-				console.log( " no data " );
-			}
-		} );*/
+				var sql = Hard.PostgresqlClient( pgsqlDetective , 60 );
+		sql.query( "SELECT * FROM employee WHERE hair_colour = $1", ['black' ], showResults );
+		sql.query( "SELECT * FROM employee WHERE hair_colour = 'black'", null, showResults );
+		sql.query( "SELECT * FROM employee", null, showResults ); 
+		sql.query( "SELECT * FROM employee", [], showResults ) ;
+
 		var sql = Hard.MysqlClient( mysqlDetective , 60 );
-		sql.query( "SELECT *  FROM employee WHERE hair_colour = '$1';", ['black' ], function( rows ) {
-			if ( Array.isArray( rows ) ) {
-				for ( var rowId = 0; rowId < rows.length; rowId++ ) {
-					var row = rows[rowId];
-					console.log( "\t" + row.employee_id +":" + row.last_name + "," + row.first_name );
-				}
-			} else {
-				console.log( " no data " );
-			}
-		} );
+		sql.query( "SELECT * FROM employee WHERE hair_colour = ?", ['black' ], showResults );
+		sql.query( "SELECT * FROM employee WHERE hair_colour = 'black'", null,  showResults );
+		sql.query( "SELECT * FROM employee", null, showResults );
 	}
 	Hard.onUnload = function( ) {
 		console.log( "unload" );
