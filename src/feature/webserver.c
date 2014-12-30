@@ -840,29 +840,26 @@ static void Webserver_AddRoute( struct webserver_t * webserver, struct route_t *
 		if ( webserver->routes == NULL ) {
 			webserver->routes = route;
 		} else {
-			PR_APPEND_LINK( &route->mLink, &webserver->routes->mLink );
+			PR_INSERT_BEFORE( &route->mLink, &webserver->routes->mLink );
 		}
 		Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "New Route allocated" );
 	}
 }
 
 static void Webserver_DelRoute( struct webserver_t * webserver, struct route_t * route ) {
-	struct route_t * routeFirst, * routeNext;
+	struct route_t * routeNext;
 	PRCList * next;
 
-	routeFirst = webserver->routes;
-	if ( route == routeFirst ) {
+	if ( PR_CLIST_IS_EMPTY( &route->mLink ) ) {
+		webserver->routes = NULL;
+	} else {
 		next = PR_NEXT_LINK( &route->mLink );
-		if ( next  == &route->mLink ) {
-			webserver->routes = NULL;
-		} else {
-			routeNext = FROM_NEXT_TO_ITEM( struct route_t );
-			webserver->routes = routeNext;
-		}
+		routeNext = FROM_NEXT_TO_ITEM( struct route_t );
+		webserver->routes = routeNext;
 	}
-	Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "Delete Route free-ed" );
 	PR_REMOVE_AND_INIT_LINK( &route->mLink );
 	Route_Delete( route ); route = NULL;
+	Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "Delete Route free-ed" );
 }
 
 static void Webserver_FindRoute( const struct webserver_t * webserver, struct webserverclient_t * webserverclient ) {

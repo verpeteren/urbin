@@ -445,37 +445,36 @@ int Core_AddModule( struct core_t * core, struct module_t * module ) {
 		if ( core->modules == NULL ) {
 			core->modules = module;
 		} else {
-			PR_APPEND_LINK( &module->mLink, &core->modules->mLink );
+			PR_INSERT_BEFORE( &module->mLink, &core->modules->mLink );
 		}
 		if ( module->onLoad != NULL ) {
 			cleanUp.good = ( module->onLoad( core, module, module->cbArgs ) ) ? 1 : 0;
 		}
+		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "New Module allocated" );
 	}
 	return ( cleanUp.good ) ? 1 : 0;
 }
 
 int Core_DelModule( struct core_t * core, struct module_t * module ) {
-	struct module_t * moduleFirst, * moduleNext;
+	struct module_t * moduleNext;
 	PRCList * next;
 	struct {unsigned char good:1;}cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = 1;
-	moduleFirst = core->modules;
-	if ( module == moduleFirst ) {
+	if ( PR_CLIST_IS_EMPTY( &module->mLink ) ) {
+		core->modules = NULL;
+	} else {
 		next = PR_NEXT_LINK( &module->mLink );
-		if ( next  == &module->mLink ) {
-			core->modules = NULL;
-		} else {
-			moduleNext = FROM_NEXT_TO_ITEM( struct module_t );
-			core->modules = moduleNext;
-		}
+		moduleNext = FROM_NEXT_TO_ITEM( struct module_t );
+		core->modules = moduleNext;
 	}
 	PR_REMOVE_AND_INIT_LINK( &module->mLink );
 	if ( module->onUnload != NULL ) {
 		cleanUp.good = ( module->onUnload( core, module, module->cbArgs ) ) ? 1 : 0;
 	}
 	Module_Delete( module ); module = NULL;
+	Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Delete Module free-ed" );
 	return ( cleanUp.good ) ? 1 : 0;
 }
 
@@ -492,8 +491,9 @@ struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, 
 		if ( core->timings == NULL ) {
 			core->timings = timing;
 		} else {
-			PR_APPEND_LINK( &timing->mLink, &core->timings->mLink );
+			PR_INSERT_BEFORE( &timing->mLink, &core->timings->mLink );
 		}
+		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "New Timing allocated" );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.timing ) {
@@ -505,18 +505,15 @@ struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, 
 }
 
 void Core_DelTiming( struct core_t * core, struct timing_t * timing ) {
-	struct timing_t * timingFirst;
+	struct timing_t * timingNext;
 	PRCList * next;
 
-	timingFirst = core->timings;
-	if ( timing == timingFirst ) {
+	if ( PR_CLIST_IS_EMPTY( &timing->mLink ) ) {
+		core->timings = NULL;
+	} else {
 		next = PR_NEXT_LINK( &timing->mLink );
-		if ( next  == &timing->mLink ) {
-			core->timings = NULL;
-		} else {
-			timingFirst = FROM_NEXT_TO_ITEM( struct timing_t );
-			core->timings = timingFirst;
-		}
+		timingNext = FROM_NEXT_TO_ITEM( struct timing_t );
+		core->timings = timingNext;
 	}
 	PR_REMOVE_AND_INIT_LINK( &timing->mLink );
 	Timing_Delete( timing ); timing = NULL;

@@ -38,16 +38,21 @@ try {
 			console.log( "tttt" );
 		}, 1000 );
 		*/ 
-				var sql = Hard.PostgresqlClient( pgsqlDetective , 60 );
-		sql.query( "SELECT * FROM employee WHERE hair_colour = $1", ['black' ], showResults );
-		sql.query( "SELECT * FROM employee WHERE hair_colour = 'black'", null, showResults );
-		sql.query( "SELECT * FROM employee", null, showResults ); 
-		sql.query( "SELECT * FROM employee", [], showResults ) ;
-
+		/*	var sql = Hard.PostgresqlClient( pgsqlDetective , 60 );
+		sql.query( "SELECT * FROM employee WHERE first_name = $1", [ 'Marla' ], showResults );
+		sql.query( "SELECT * FROM employee WHERE first_name = $1", [ 'Neal' ], showResults );
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Neal'", null, showResults );
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Zelda'", [], showResults ) ;
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Dong'", [], showResults ) ;
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Anne'", null, showResults ); 
+*/
 		var sql = Hard.MysqlClient( mysqlDetective , 60 );
-		sql.query( "SELECT * FROM employee WHERE hair_colour = ?", ['black' ], showResults );
-		sql.query( "SELECT * FROM employee WHERE hair_colour = 'black'", null,  showResults );
-		sql.query( "SELECT * FROM employee", null, showResults );
+		sql.query( "SELECT * FROM employee WHERE first_name = ?", [ 'Marla' ], showResults );
+		sql.query( "SELECT * FROM employee WHERE first_name = ?", [ 'Neal' ], showResults );
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Neal'", null, showResults );
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Zelda'", [], showResults ) ;
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Dong'", [], showResults ) ;
+		sql.query( "SELECT * FROM employee WHERE first_name = 'Anne'", null, showResults ); 
 	}
 	Hard.onUnload = function( ) {
 		console.log( "unload" );

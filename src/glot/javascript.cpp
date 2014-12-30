@@ -302,7 +302,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 	char * cStatement;
 	struct {unsigned char good:1;
 		unsigned char params:1;
-		unsigned char statement:1; \
+		unsigned char statement:1;
 		unsigned char payload:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -2332,8 +2332,9 @@ static struct script_t * Javascript_AddScript( struct javascript_t * javascript,
 		if ( javascript->scripts == NULL ) {
 			javascript->scripts = script;
 		} else {
-			PR_APPEND_LINK( &script->mLink, &javascript->scripts->mLink );
+			PR_INSERT_BEFORE( &script->mLink, &javascript->scripts->mLink );
 		}
+		Core_Log( javascript->core, LOG_INFO, __FILE__ , __LINE__, "New Script allocated" );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.script ) {
@@ -2345,21 +2346,19 @@ static struct script_t * Javascript_AddScript( struct javascript_t * javascript,
 }
 
 static void Javascript_DelScript( struct javascript_t * javascript, struct script_t * script ) {
-	struct script_t * scriptFirst;
+	struct script_t * scriptNext;
 	PRCList * next;
 
-	scriptFirst = javascript->scripts;
-	if ( script == scriptFirst ) {
+	if ( PR_CLIST_IS_EMPTY( &script->mLink ) ) {
+		javascript->scripts = NULL;
+	} else {
 		next = PR_NEXT_LINK( &script->mLink );
-		if ( next  == &script->mLink ) {
-			javascript->scripts = NULL;
-		} else {
-			scriptFirst = FROM_NEXT_TO_ITEM( struct script_t );
-			javascript->scripts = scriptFirst;
-		}
+		scriptNext = FROM_NEXT_TO_ITEM( struct script_t );
+		javascript->scripts = scriptNext;
 	}
 	PR_REMOVE_AND_INIT_LINK( &script->mLink );
 	Script_Delete( script ); script = NULL;
+	Core_Log( javascript->core, LOG_INFO, __FILE__ , __LINE__, "Delete Script free-ed" );
 }
 
 void Javascript_Delete( struct javascript_t * javascript ) {
@@ -2378,7 +2377,7 @@ void Javascript_Delete( struct javascript_t * javascript ) {
 	}
 	free( (char *) javascript->path ); javascript->path = NULL;
 	free( (char *) javascript->fileName ); javascript->fileName = NULL;
-	Core_Log( javascript->core, LOG_INFO, __FILE__ , __LINE__, "Delete Sqlclient free-ed" );
+	Core_Log( javascript->core, LOG_INFO, __FILE__ , __LINE__, "Delete Javascript free-ed" );
 	javascript->core = NULL;
 	free( javascript ); javascript = NULL;
 }

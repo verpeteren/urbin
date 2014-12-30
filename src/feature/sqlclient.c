@@ -80,9 +80,6 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 			}
 			Sqlclient_PopQuery( sqlclient );
 		}
-	if ( cleanUp.good ) {
-		Core_Log( sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "New query allocated" );
-	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.statement ) {
 			free( ( char * ) query->statement );	query->statement = NULL;
@@ -147,6 +144,7 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
 	struct {unsigned char good:1;} cleanUp;
+	int done;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	sqlclient = (struct sqlclient_t *) cbArgs;
@@ -155,30 +153,57 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		cleanUp.good = ( PQstatus( sqlclient->connection.pg.conn ) == CONNECTION_OK );
-		if ( cleanUp.good ) {
-			cleanUp.good = ( PQconsumeInput( sqlclient->connection.pg.conn ) == 1 );
-		}
-		if ( cleanUp.good ) {
-			if ( PQisBusy( sqlclient->connection.pg.conn ) != 1 ) {
-				do {
-					query->result.pg.res = PQgetResult( sqlclient->connection.pg.conn );
-					if ( query->cbHandler != NULL ) {
-						if ( query->result.pg.res != NULL ) {
-							//  Most of the time all the results are returend in the first loop, but just in case we have to call it again.
-							query->cbHandler( query );
+		if ( PQstatus( sqlclient->connection.pg.conn ) == CONNECTION_OK ) {
+			if ( PQconsumeInput( sqlclient->connection.pg.conn ) == 1 ) {
+				if ( PQisBusy( sqlclient->connection.pg.conn ) == 0 ) {
+					do {
+						query->result.pg.res = PQgetResult( sqlclient->connection.pg.conn );
+						done = (query->result.pg.res == NULL );
+						if ( !done && query->cbHandler != NULL ) {
+							if ( query->result.pg.res != NULL ) {
+								//  Most of the time all the results are returend in the first loop, but just in case we have to call it again.
+								query->cbHandler( query );
+							}
+							PQclear( query->result.pg.res ); query->result.pg.res = NULL;
 						}
-						PQclear( query->result.pg.res ); query->result.pg.res = NULL;
-					}
-				} while ( query->result.pg.res != NULL );
+					} while ( ! done );
+					//  We're done with this query, go back to start and collect 20k
+					sqlclient->currentQuery = NULL;
+					picoev_del( loop, fd );
+					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
+				}
 			}
+	 	} else  {
+			Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, PQerrorMessage( sqlclient->connection.pg.conn ) );
+			Sqlclient_CloseConn( sqlclient );
 		}
-		//  We're done with this query, go back to start and collect 20k
-		sqlclient->currentQuery = NULL;
-		picoev_del( loop, fd );
-		picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
 	}
 }
+
+static void Postgresql_HandleFlush_cb( picoev_loop * loop, const int fd, const int events, void * cbArgs ) {
+	struct sqlclient_t * sqlclient;
+	int flush;
+	struct {unsigned char good:1;} cleanUp;;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	sqlclient = (struct sqlclient_t *) cbArgs;
+	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
+		Sqlclient_CloseConn( sqlclient );
+	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
+		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
+		flush = PQflush( sqlclient->connection.pg.conn );
+		if ( flush == 1 ) {
+			//  loop once more
+		} else if ( flush == 0 ) {
+			picoev_del( loop, fd );
+			picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleRead_cb, cbArgs );
+		} else {
+			Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, PQerrorMessage( sqlclient->connection.pg.conn ) );
+			Sqlclient_CloseConn( sqlclient );
+		}
+	}
+}
+
 
 static void Postgresql_HandleWrite_cb( picoev_loop * loop, const int fd, const int events, void * cbArgs ) {
 	struct sqlclient_t * sqlclient;
@@ -194,20 +219,20 @@ static void Postgresql_HandleWrite_cb( picoev_loop * loop, const int fd, const i
 		//  Let's get some work
 		query = Sqlclient_PopQuery( sqlclient );
 		if ( query != NULL ) {
-			if ( query->paramCount == 0 ) {
-				picoev_del( loop, fd );
-				picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleRead_cb, cbArgs );
-				cleanUp.good = ( PQsendQuery( sqlclient->connection.pg.conn, query->statement ) == 1 );
-			} else {
-				//  Send out the query and the parameters to the datebase engine
-				picoev_del( loop, fd );
-				picoev_add( loop, fd, PICOEV_READ, sqlclient->timeoutSec, Postgresql_HandleRead_cb, cbArgs );
-				//  only Version 2 protocoll, and only one command per statement
-				cleanUp.good = ( PQsendQueryParams( sqlclient->connection.pg.conn, query->statement, (int) query->paramCount, NULL, query->paramValues, (const int *) query->paramLengths, NULL, 0 ) == 1 );
+			cleanUp.good = ( PQstatus( sqlclient->connection.pg.conn ) == CONNECTION_OK );
+			if ( cleanUp.good ) {
+				if ( query->paramCount == 0 ) {
+					cleanUp.good = ( PQsendQuery( sqlclient->connection.pg.conn, query->statement ) == 1 );
+				} else {
+					//  Send out the query and the parameters to the datebase engine. only Version 2 protocoll, and only one command per statement
+					cleanUp.good = ( PQsendQueryParams( sqlclient->connection.pg.conn, query->statement, (int) query->paramCount, NULL, query->paramValues, (const int *) query->paramLengths, NULL, 0 ) == 1 );
+				}
 			}
 			if ( cleanUp.good ) {
-				cleanUp.good = ( PQflush( sqlclient->connection.pg.conn ) == 0 );
+				picoev_del( loop, fd );
+				picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Postgresql_HandleFlush_cb, cbArgs );
 			} else {
+				Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, PQerrorMessage( sqlclient->connection.pg.conn ) );
 				Sqlclient_CloseConn( sqlclient );
 			}
 		}
@@ -227,10 +252,12 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 
 		statusType = PQstatus( sqlclient->connection.pg.conn );
 		if ( statusType == CONNECTION_BAD ) {
+			Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, PQerrorMessage( sqlclient->connection.pg.conn ) );
 			Sqlclient_CloseConn( sqlclient );
 		} else {
 			status = PQconnectPoll( sqlclient->connection.pg.conn );
 			if ( status == PGRES_POLLING_FAILED ) {
+				Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, PQerrorMessage( sqlclient->connection.pg.conn ) );
 				Sqlclient_CloseConn( sqlclient );
 			} else if ( status == PGRES_POLLING_OK ) {
 				statusType = PQstatus( sqlclient->connection.pg.conn );
@@ -711,13 +738,27 @@ static void Sqlclient_CloseConn( struct sqlclient_t * sqlclient ) {
 	sqlclient->socketFd = 0;
 }
 
+#if 0
+static void ShowLink( const PRCList * start, const char * label, const size_t count ) {
+	PRCList * current;
+	size_t i;
+	current = (PRCList *) start;
+	printf( "------------------------------------------------%s----------------------\n", label );
+	for ( i = 0; i < count; i++ ) {
+		printf( "%d\t%u\t%u\t%u\n", i, (unsigned int) current, (unsigned int) current->prev, (unsigned int) current->next );
+		current = current->next;
+	}
+}
+#endif
+
 static void Sqlclient_PushQuery( struct sqlclient_t * sqlclient, struct query_t * query ) {
 	if ( query != NULL ) {
 		if ( sqlclient->queries == NULL ) {
 			sqlclient->queries = query;
 		} else {
-			PR_APPEND_LINK( &query->mLink, &sqlclient->queries->mLink );
+			PR_INSERT_BEFORE( &query->mLink, &sqlclient->queries->mLink );
 		}
+		Core_Log( sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "New Query allocated" );
 	}
 }
 
@@ -727,11 +768,10 @@ static struct query_t * Sqlclient_PopQuery( struct sqlclient_t * sqlclient ) {
 	if ( sqlclient->currentQuery == NULL ) {
 		if ( sqlclient->queries != NULL ) {
 			sqlclient->currentQuery = sqlclient->queries;
-			next = PR_NEXT_LINK( &sqlclient->currentQuery->mLink );
-			if ( next == PR_LIST_HEAD( &sqlclient->currentQuery->mLink ) ) {
+			if ( PR_CLIST_IS_EMPTY( &sqlclient->currentQuery->mLink ) ) {
 				sqlclient->queries = NULL;
 			} else {
-				next = PR_NEXT_LINK( next );
+				next = PR_NEXT_LINK( &sqlclient->currentQuery->mLink );
 				sqlclient->queries = FROM_NEXT_TO_ITEM( struct query_t );
 			}
 			PR_REMOVE_AND_INIT_LINK( &sqlclient->currentQuery->mLink );
