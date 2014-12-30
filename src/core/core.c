@@ -82,6 +82,20 @@ static int GetPriorityFromName( const char * name ) {
 
 	return logLevel;
 }
+
+#ifdef DEBUG
+void ShowLink( const PRCList * start, const char * label, const size_t count ) {
+	PRCList * current;
+	size_t i;
+	current = (PRCList *) start;
+	printf( "------------------------------------------------%s----------------------\n", label );
+	for ( i = 0; i < count; i++ ) {
+		printf( "%d\t%u\t%u\t%u\n", i, (unsigned int) current, (unsigned int) current->prev, (unsigned int) current->next );
+		current = current->next;
+	}
+}
+#endif
+
 /*****************************************************************************/
 /* Modules                                                                   */
 /*****************************************************************************/

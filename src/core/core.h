@@ -85,6 +85,10 @@ void 							Core_DelTimingId		( struct core_t * core, uint32_t id );
 void 							Core_DelTiming 			( struct core_t * core, struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );
 
+#ifdef DEBUG
+void ShowLink( const PRCList * start, const char * label, const size_t count );
+#endif
+
 #ifdef __cplusplus
 }
 #endif

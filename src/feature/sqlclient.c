@@ -158,8 +158,8 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 				if ( PQisBusy( sqlclient->connection.pg.conn ) == 0 ) {
 					do {
 						query->result.pg.res = PQgetResult( sqlclient->connection.pg.conn );
-						done = (query->result.pg.res == NULL );
-						if ( !done && query->cbHandler != NULL ) {
+						done = ( query->result.pg.res == NULL );
+						if ( ! done && query->cbHandler != NULL ) {
 							if ( query->result.pg.res != NULL ) {
 								//  Most of the time all the results are returend in the first loop, but just in case we have to call it again.
 								query->cbHandler( query );
@@ -168,6 +168,7 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 						}
 					} while ( ! done );
 					//  We're done with this query, go back to start and collect 20k
+					Query_Delete( query ); query = NULL;
 					sqlclient->currentQuery = NULL;
 					picoev_del( loop, fd );
 					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
@@ -345,9 +346,10 @@ static void	Mysql_HandleRead_cb	( picoev_loop * loop, const int fd, const int ev
 				mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
 			}
 			//  We're done with this query, go back to start and collect 20k
+			Query_Delete( query ); query = NULL;
 			sqlclient->currentQuery = NULL;
 			picoev_del( loop, fd );
-			//picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArgs );
+			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArgs );
 		} else {
 			Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, mysac_error( sqlclient->connection.my.conn ) );
 			Sqlclient_CloseConn( sqlclient );
@@ -737,19 +739,6 @@ static void Sqlclient_CloseConn( struct sqlclient_t * sqlclient ) {
 	}
 	sqlclient->socketFd = 0;
 }
-
-#if 0
-static void ShowLink( const PRCList * start, const char * label, const size_t count ) {
-	PRCList * current;
-	size_t i;
-	current = (PRCList *) start;
-	printf( "------------------------------------------------%s----------------------\n", label );
-	for ( i = 0; i < count; i++ ) {
-		printf( "%d\t%u\t%u\t%u\n", i, (unsigned int) current, (unsigned int) current->prev, (unsigned int) current->next );
-		current = current->next;
-	}
-}
-#endif
 
 static void Sqlclient_PushQuery( struct sqlclient_t * sqlclient, struct query_t * query ) {
 	if ( query != NULL ) {
