@@ -101,7 +101,7 @@ $(LIB_H3_SHARED): $(DIR_H3)
 $(DIR_H3):
 	@echo $@
 	@cd $(DEP_DIR) && \
-	wget -q https://github.com/verpeteren/h3/archive/master.zip -O h3.zip && \
+	wget -q https://github.com/c9s/h3/archive/master.zip -O h3.zip && \
 	unzip -qq h3.zip && \
 	mv h3-master h3 
 
