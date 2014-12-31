@@ -1642,6 +1642,81 @@ static const JSFunctionSpec jsmHard[ ] = {
 };
 
 /**
+ * Os object.
+ *
+ * namespace for the operating system
+ *
+ * @name os
+ * @public
+ * @namespace
+ */
+
+/**
+ * get an environment varibale.
+ *
+ * @name	os.getEnv
+ * @function
+ * @public
+ * @since	0.0.8b
+ * @returns	{string}
+ * @param	{string}		name	variable name to lookup
+ *
+ * @example
+ * os.getEnv( 'SHELL' );
+ */
+static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
+	JSString * jString, *jValueString;
+	JS::CallArgs args;
+	const char * cValue;
+	char * cString;
+	struct {unsigned char good:1;
+			unsigned char cString:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vpn );
+	args.rval( ).setUndefined( );
+	cString = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cString = JS_EncodeString( cx, jString ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.cString = 1;
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cValue = getenv( cString ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( jValueString = JS_NewStringCopyZ( cx, cValue ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		args.rval( ).set( STRING_TO_JSVAL( jValueString ) );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.cString = 1;
+
+	}
+	if ( cleanUp.cString ) {
+		JS_free( cx, cString ); cString = NULL;
+	}
+
+	return ( cleanUp.good ) ? true : false;
+}
+
+
+static const JSClass jscOs = {
+	"os",
+	JSCLASS_HAS_PRIVATE,
+	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
+};
+
+static const JSFunctionSpec jsmOs[ ] = {
+	JS_FS( "getEnv", 			JsnOs_GetEnv, 1, 0 ),
+	JS_FS_END
+};
+
+
+/**
  * Standard javascript object.
  * Log messages to the console and the logger
  *
@@ -2132,6 +2207,12 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	consoleObj = 	JS_InitClass( javascript->context, globalObjHandle, JS::NullPtr( ), &jscConsole, nullptr, 0, nullptr, jsmConsole, nullptr, nullptr );
 	JS::RootedObject 			consoleObjRoot( javascript->context, consoleObj );
 	JS_SetPrivate( consoleObj, (void * ) javascript );
+
+	JSObject * osObj;
+	osObj = 	JS_InitClass( javascript->context, globalObjHandle, JS::NullPtr( ), &jscOs, nullptr, 0, nullptr, jsmOs, nullptr, nullptr );
+	JS::RootedObject 			osObjRoot( javascript->context, osObj );
+	JS_SetPrivate( osObj, (void * ) javascript );
+
 
 	JSObject * hardObj;
 	hardObj = 	JS_InitClass( javascript->context, globalObjHandle, JS::NullPtr( ), &jscHard, nullptr, 0, nullptr, jsmHard, nullptr, nullptr );

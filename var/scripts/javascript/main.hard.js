@@ -32,6 +32,8 @@ try {
 				client.response.setContent( "okidokie" ).setMime( 'html' ).setCode( 200 );
 			}
 		);
+		var env = 'SHELL';
+		console.log(" env : " + env + ": " + os.getEnv( env ) );
 		console.log( "ready" );
 		/*
 		setInterval( function( ) {
