@@ -95,25 +95,15 @@ $(LIB_H3_STATIC): $(DIR_H3)
 $(LIB_H3_SHARED): $(DIR_H3)
 	@echo $@
 	@cd $(DIR_H3) && \
-	make -f Makefile.dist libh3 
+	make -f Makefile.dist libh3.a libh3.so 
 	@touch $@
 
 $(DIR_H3):
 	@echo $@
 	@cd $(DEP_DIR) && \
-	wget -q https://github.com/c9s/h3/archive/master.zip -O h3.zip && \
+	wget -q https://github.com/verpeteren/h3/archive/master.zip -O h3.zip && \
 	unzip -qq h3.zip && \
-	mv h3-master h3 && \
-	mv h3/Makefile.dist h3/Makefile.dist.org && \
-	sed -e "s/.*-o libh3\.a.*/&\n\tar -cr libh3.a $$^; ranlib libh3.a;/" h3/Makefile.dist.org | \
-		sed -e"s/-static//" \
-			-e"s/-shared//" \
-			-e"s/parser.o//"|\
-		sed -e"s/.*DEPS.*/%.o: %.c\nsrc\/%.o: src\/%.c/" \
-			-e"s/all: /all: parser.o /" \
-			-e"s/-rf/-rf test parser.o/" \
-			-e"s/# gcc -o test test.c/gcc -o test parser.o /"| \
-		sed -e"1,/-o libh3.a/s/-o libh3.a/-shared -Wl,-soname,libh3.so -o libh3.so/"  > h3/Makefile.dist
+	mv h3-master h3 
 
 ###############################################################################
 # TADns - Tiny Asyncronous Dns Lookup library
