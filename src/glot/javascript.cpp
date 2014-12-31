@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
+#include <sys/stat.h>
 
 #include "javascript.h"
 #include "../feature/sqlclient.h"
@@ -1690,7 +1691,7 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
 		cleanUp.good = ( ( jValueString = JS_NewStringCopyZ( cx, cValue ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		args.rval( ).set( STRING_TO_JSVAL( jValueString ) );
+		args.rval( ).setString( jValueString );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.cString = 1;
@@ -1703,6 +1704,189 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
 	return ( cleanUp.good ) ? true : false;
 }
 
+/**
+ * Write a string to a file.
+ *
+ * @name os.writefile
+ * @public
+ * @static
+ * @function
+ * @since	0.0.8a
+ *
+ * @param {string} 		filename 	Filename to write to. If the filename is null, then a temporary file will be created. e.g /tmp/hardXXXXXX
+ * @param {string} 		content 	The content that will be written to the file
+ * @param {boolean} 	append 	Append to the file: False: create a new file. True: appends if the file exists, else it creates a new one:
+ * @returns {string} 	The filename on success, false on failure, null on incorrect parameters
+ * @see os
+ * @see os.readfile
+ *
+ * @example
+ * var content = os.writefile( '/tmp/dummy.txt', 'blabla', true );
+ */
+static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vpn ) {
+	struct javascript_t * javascript;
+	JSObject * thisObj;
+	JS::CallArgs args;
+	JSString *jFileName, * jContent;
+	bool append;
+	char *cContent;
+	char *cFileName;
+	char mode[3] = {'w', 'b', '+'};
+	struct stat sb;
+	FILE *fOut;
+	char * tFileName;
+	int rc = 0, temp;
+	struct {unsigned char good:1;
+			unsigned char cFileName:1;
+			unsigned char tFileName:1;
+			unsigned char content:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	temp = 0;
+	cContent = NULL;
+	cFileName = NULL;
+	tFileName = NULL;
+	args = CallArgsFromVp( argc, vpn );
+	args.rval( ).setUndefined( );
+	thisObj = JS_THIS_OBJECT( cx, vpn );
+	javascript = (struct javascript_t *) JS_GetPrivate( thisObj );
+	cleanUp.good = ( argc >= 2 );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( JS_ConvertArguments( cx, args, "SS/b", &jFileName, &jContent, &append ) == true );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cContent = JS_EncodeString( cx, jContent ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.content = 1;
+		if ( args[0].isUndefined( ) ) {
+			temp = 1;
+		} else if ( args[0].isString( ) ) {
+			if ( JS_GetStringLength( jFileName ) == 0 ) {
+				temp = 1;
+			} else {
+				cleanUp.good = ( ( cFileName = JS_EncodeString( cx, jFileName ) ) != NULL );
+				if ( cleanUp.good ) {
+					cleanUp.cFileName = 1;
+				}
+			}
+		}
+		if ( temp ) {
+			cleanUp.good = ( ( tFileName = (char *) malloc( strlen( MAIN_OBJ_NAME ) + 5 + 1 + 6 ) ) != NULL );
+			if ( cleanUp.good ) {
+				cleanUp.tFileName = 1;
+				snprintf( tFileName, 15, "/tmp/%-4s/XXXXXX", MAIN_OBJ_NAME );
+				cFileName = tFileName;
+			}
+		}
+	}
+	if ( cleanUp.good ) {
+		if ( append == true && ( stat( cFileName, &sb ) == 0 && S_ISREG( sb.st_mode ) ) ) {
+			mode[0] = 'a';
+		}
+		cleanUp.good = ( ( fOut = fopen( cFileName, mode ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		Core_Log( javascript->core, LOG_INFO, __FILE__, __LINE__, "Writing file" );
+		if ( fputs ( cContent, fOut ) != EOF ) {
+			rc = 1;
+		}
+		if ( fclose( fOut ) == EOF ) {
+			rc = 0;
+		}
+	}
+	if ( cleanUp.good ) {
+		if ( rc > 0 || ( rc == 0 && *cContent == '\0' ) ) {
+			if ( temp ) {
+				cleanUp.good = ( ( jFileName = JS_NewStringCopyZ( cx, cFileName ) ) != NULL );
+			}
+		}
+	}
+	if ( cleanUp.good ) {
+		args.rval( ) .setString( jFileName );
+	} else {
+		args.rval( ).setBoolean( false );
+	}
+	if ( cleanUp.tFileName ) {
+		free( cFileName );
+	}
+	if ( cleanUp.cFileName ) {
+		JS_free( cx, cFileName );
+	}
+	if ( cleanUp.content ) {
+		JS_free( cx, cContent );
+	}
+	return ( cleanUp.good ) ? true : false;
+}
+
+
+/**
+ * Get the content of a file.
+ *
+ * @name os.readfile
+ * @function
+ * @public
+ * @static
+ * @ignore
+ * @since	0.0.8a
+ *
+ * @param {string}		filename 	The filename to read
+ * @returns {string}		content	The content of the file or NULL
+ * @see os
+ * @see os.writefile
+ *
+ * @example
+ * var content = os.readfile( '/etc/hosts' );
+ */
+static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vpn ) {
+	struct javascript_t * javascript;
+	JSObject * thisObj;
+	JSString *jFileName, * jContent;
+	char *cFileName;
+	char *content;
+	JS::CallArgs args;
+	struct {unsigned char good:1;
+			unsigned char fileName:1;
+			unsigned char contents:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vpn );
+	args.rval( ).setUndefined( );
+	cFileName = NULL;
+	content = NULL;
+	thisObj = JS_THIS_OBJECT( cx, vpn );
+	javascript = (struct javascript_t *) JS_GetPrivate( thisObj );
+	cleanUp.good = ( argc == 1 );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jFileName ) == true );
+	}
+	if ( cleanUp.good )  {
+		cleanUp.good = ( ( cFileName = JS_EncodeString( cx, jFileName ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.fileName = 1;
+		cleanUp.good = ( fopen( cFileName, "r" ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		Core_Log( javascript->core, LOG_INFO, __FILE__, __LINE__, "Reading file" );
+		cleanUp.good = ( ( content = FileGetContents( cFileName ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.contents = 1;
+		cleanUp.good = ( ( jContent = JS_NewStringCopyZ( cx, content ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		args.rval( ).setString( jContent );
+	}
+	if ( cleanUp.contents ) {
+		free( content );
+	}
+	if ( cleanUp.fileName ) {
+		JS_free( cx, cFileName );
+	}
+	return ( cleanUp.good ) ? true : false;
+}
+
 
 static const JSClass jscOs = {
 	"os",
@@ -1712,6 +1896,8 @@ static const JSClass jscOs = {
 
 static const JSFunctionSpec jsmOs[ ] = {
 	JS_FS( "getEnv", 			JsnOs_GetEnv, 1, 0 ),
+	JS_FS( "readFile", 			JsnOs_ReadFile, 1, 0 ),
+	JS_FS( "writeFile",			JsnOs_WriteFile, 2, 0 ),
 	JS_FS_END
 };
 

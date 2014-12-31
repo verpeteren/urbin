@@ -21,7 +21,6 @@ try {
 	Hard.onLoad = function( ) {
 		console.log( "load" );
 	}
-
 	Hard.onReady = function( ) {
 		var ws = Hard.Webserver( {ip: '127.0.0.1', port: 8888}, 60 );
 		ws.addDocumentRoot( '^/static/(.*)', '../var/www/static/' );
@@ -33,6 +32,18 @@ try {
 			}
 		);
 		var env = 'SHELL';
+		var fileName = '/tmp/test.txt';
+		var writeContent = "blabalbla";
+		
+		os.writeFile( fileName, writeContent, false );
+		var readContent = os.readFile( fileName ); 
+		if ( readContent == writeContent ) { 
+			console.log( "ok" );
+		} else {
+			console.log( "os read/write function failed! got: '" + readContent + "'" + 
+						 "                          expected: '" + writeContent + "'");
+		}
+		
 		console.log(" env : " + env + ": " + os.getEnv( env ) );
 		console.log( "ready" );
 		/*
