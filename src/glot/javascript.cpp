@@ -2094,6 +2094,7 @@ static const JSFunctionSpec jsmConsole[ ] = {
  * Load an other javascript file.
  *
  * Files will be interpreted only upon loading. Once the file has been loaded, any changes to the file will be ignored. The files will be relative to the 'javascript/scripts_path' configuration settings.
+ * Please note that the files must be marked executable by the user. See also the loop_run_as_user and loop_run_as_group configuration settings.
  *
  * @name	include
  * @function
@@ -2410,6 +2411,7 @@ static const JSFunctionSpec jsmGlobal[ ] = {
 */
 static struct script_t * Script_New( const struct javascript_t * javascript, const char * cFile ) {
 	struct script_t * script;
+	struct stat sb;
 	size_t len;
 	struct {unsigned char good:1;
 			unsigned char script:1;
@@ -2417,8 +2419,8 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 			unsigned char fn:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	len = strlen( cFile ) + strlen( javascript->path ) + 2;
 	cleanUp.good = ( ( script = (struct script_t *) malloc( sizeof( *script ) ) ) != NULL );
+	len = strlen( cFile ) + strlen( javascript->path ) + 2;
 	if ( cleanUp.good ) {
 		cleanUp.script = 1;
 		script->bytecode = NULL;
@@ -2428,6 +2430,9 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 	if ( cleanUp.good ) {
 		cleanUp.fn = 1;
 		snprintf( script->fileNameWithPath, len, "%s/%s", javascript->path, cFile );
+		cleanUp.good = ( stat( script->fileNameWithPath, &sb ) >= 0 && S_ISREG( sb.st_mode ) && ( sb.st_mode & S_IXUSR ) );
+	}
+	if ( cleanUp.good ) {
 		JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
 		JS::HandleObject 		globalObjHandle( globalObjRoot );
 		JS::RootedScript 		scriptRoot( javascript->context, script->bytecode );
