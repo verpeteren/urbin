@@ -315,40 +315,44 @@ static int Core_SwitchToUser( const struct core_t * core ) {
 	runAsUser = cfg_getstr( mainSection, "loop_run_as_user" );
 	runAsGroup = cfg_getstr( mainSection, "loop_run_as_group" );
 	/* Get the user information */
-	cleanUp.good = ( ( pwd = getpwnam( runAsUser ) ) != NULL );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( pwd->pw_uid != 0 );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.good = ( setuid( pwd->pw_uid ) != -1 );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.pwd = 1;
-		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Switched user" );
-	} else {
-		Core_Log( core, LOG_WARNING, __FILE__ , __LINE__, "Could not switch user" );
+	if  ( strcmp( runAsUser, "none" ) != 0 ) {
+		cleanUp.good = ( ( pwd = getpwnam( runAsUser ) ) != NULL );
+		if ( cleanUp.good ) {
+			cleanUp.good = ( pwd->pw_uid != 0 );
+		}
+		if ( cleanUp.good ) {
+			cleanUp.good = ( setuid( pwd->pw_uid ) != -1 );
+		}
+		if ( cleanUp.good ) {
+			cleanUp.pwd = 1;
+			Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Switched user" );
+		} else {
+			Core_Log( core, LOG_WARNING, __FILE__ , __LINE__, "Could not switch user" );
+		}
 	}
 	cleanUp.good = 0;
 
 	/* Get the group information */
-	cleanUp.good = ( ( grp = getgrnam( runAsGroup ) ) != NULL );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( grp->gr_gid != 0 );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.good = ( setgid( grp->gr_gid ) != 1 );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.grp = 1;
-		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Switched group" );
-	} else {
-		Core_Log( core, LOG_WARNING, __FILE__ , __LINE__, "Could not switch group" );
+	if  ( strcmp( runAsGroup, "none" ) != 0 ) {
+		cleanUp.good = ( ( grp = getgrnam( runAsGroup ) ) != NULL );
+		if ( cleanUp.good ) {
+			cleanUp.good = ( grp->gr_gid != 0 );
+		}
+		if ( cleanUp.good ) {
+			cleanUp.good = ( setgid( grp->gr_gid ) != 1 );
+		}
+		if ( cleanUp.good ) {
+			cleanUp.grp = 1;
+			Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Switched group" );
+		} else {
+			Core_Log( core, LOG_WARNING, __FILE__ , __LINE__, "Could not switch group" );
+		}
 	}
 	cleanUp.good = 0;
 	/* set other information */
 	cleanUp.good = ( setgroups( 0, NULL ) != -1 );
 	if ( cleanUp.pwd && cleanUp.grp ) {
-		cleanUp.good = ( initgroups( runAsUser, grp->gr_gid) == 0 );
+		cleanUp.good = ( initgroups( runAsUser, grp->gr_gid ) == 0 );
 	}
 	if ( getuid( ) == 0 ) {
 		Core_Log( core, LOG_CRIT, __FILE__ , __LINE__, "Running as root!" );
