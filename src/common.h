@@ -11,6 +11,8 @@
 #define PR_VERSION									"0.0.8a"
 #define PR_MAINCONFIG_FILENAME						"./etc/" PR_NAME ".conf"
 #define PR_CFG_LOOP_MAX_FDS							1024						//  cfg:  main/loop_max_fds
+#define PR_CFG_LOOP_RUN_AS_USER						"daemon"					//  cfg:  main/loop_run_as_user
+#define PR_CFG_LOOP_RUN_AS_GROUP					"daemon"					//  cfg:  main/loop_run_as_group
 #define PR_CFG_LOOP_TIMEOUT_SEC						60							//  cfg:  main/loop_timeout_sec
 #define PR_CFG_LOOP_TICKS_MS						50							//  cfg:  main/loop_ticks_ms
 #define PR_CFG_LOOP_MAX_WAIT						10							//  cfg:  main/loop_max_wait

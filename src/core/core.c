@@ -5,11 +5,14 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/resource.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include <oniguruma.h>
 
@@ -293,6 +296,67 @@ void Core_Log( const struct core_t * core, const int logLevel, const char * file
 	}
 }
 
+extern int setgroups( size_t __n, __const gid_t *__groups );
+extern int initgroups( const char * user, gid_t group );
+
+static int Core_SwitchToUser( const struct core_t * core ) {
+	cfg_t * mainSection;
+	struct group *grp;
+	struct passwd *pwd;
+	char * runAsUser, * runAsGroup;
+	struct {unsigned char good:1;
+			unsigned char pwd:1;
+			unsigned char grp:1;} cleanUp;
+  //  @TODO:  windows
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	grp = NULL;
+	pwd = NULL;
+	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
+	runAsUser = cfg_getstr( mainSection, "loop_run_as_user" );
+	runAsGroup = cfg_getstr( mainSection, "loop_run_as_group" );
+	/* Get the user information */
+	cleanUp.good = ( ( pwd = getpwnam( runAsUser ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( pwd->pw_uid != 0 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( setuid( pwd->pw_uid ) != -1 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.pwd = 1;
+		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Switched user" );
+	} else {
+		Core_Log( core, LOG_WARNING, __FILE__ , __LINE__, "Could not switch user" );
+	}
+	cleanUp.good = 0;
+
+	/* Get the group information */
+	cleanUp.good = ( ( grp = getgrnam( runAsGroup ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( grp->gr_gid != 0 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( setgid( grp->gr_gid ) != 1 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.grp = 1;
+		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Switched group" );
+	} else {
+		Core_Log( core, LOG_WARNING, __FILE__ , __LINE__, "Could not switch group" );
+	}
+	cleanUp.good = 0;
+	/* set other information */
+	cleanUp.good = ( setgroups( 0, NULL ) != -1 );
+	if ( cleanUp.pwd && cleanUp.grp ) {
+		cleanUp.good = ( initgroups( runAsUser, grp->gr_gid) == 0 );
+	}
+	if ( getuid( ) == 0 ) {
+		Core_Log( core, LOG_CRIT, __FILE__ , __LINE__, "Running as root!" );
+		return 0;
+	}
+	return 1;
+}
+
 int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t signalHandler ) {
 	struct rlimit limit;
 	cfg_t * mainSection;
@@ -329,7 +393,9 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 			}
 		}
 	}
-
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Core_SwitchToUser( core ) ) ? 1 : 0;
+	}
 	return cleanUp.good;
 }
 
