@@ -46,6 +46,8 @@ try {
 		
 		console.log(" env : " + env + ": " + os.getEnv( env ) );
 		console.log( "ready" );
+		var r = os.system( '/usr/bin/wget', 'http://www.verpeteren.nl -o /tmp/www.verpeteren.nl.html' );
+		console.log( r );
 		/*
 		setInterval( function( ) {
 			console.log( "tttt" );
@@ -60,7 +62,7 @@ try {
 			sql.query( "SELECT * FROM employee WHERE first_name = 'Dong'", [], showResults ) ;
 			sql.query( "SELECT * FROM employee WHERE first_name = 'Anne'", null, showResults ); 
 		}
-		if ( 1 ) {
+		if ( 0 ) {
 			var sql = Hard.MysqlClient( mysqlDetective , 60 );
 			sql.query( "SELECT * FROM employee WHERE first_name = ?", [ 'Marla' ], showResults );
 			sql.query( "SELECT * FROM employee WHERE first_name = ?", [ 'Neal' ], showResults );

@@ -1,7 +1,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
+#include <stddef.h>
+#include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include "javascript.h"
 #include "../feature/sqlclient.h"
@@ -1888,6 +1891,95 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 }
 
 
+
+/**
+ * execute a command via system call
+ * Please note that this function call is blocking!
+ *
+
+ * @name: os.system
+ * @function
+ * @static
+ * @public
+ * @deprecated: // @TODO:  future versions will probably run in a seperate thread
+ * @since 0.08a
+ *
+ * @param {string} exec The full path to the executable. This must exist and executable
+ * @param {string} paramstring Parameters
+ * @returns {null|boolean}  undefined: if the parameters were incorrect, false if execute could not start  or the exit code if launched successfull
+ *
+ * @example:var r = os.exec( '/usr/bin/wget', 'http://www.verpeteren.nl -o /tmp/www.verpeteren.nl.html' );
+ * console.log( r );
+ */
+static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vpn ) {
+	struct javascript_t * javascript;
+	JSObject * thisObj;
+	JSString * jParams, * jExec;
+	JS::CallArgs args = CallArgsFromVp( argc, vpn );
+	char * cParams, * cExec, * cmd;
+	int rExec;
+	size_t execLen, paramLen, len;
+	struct stat sb;
+	struct {unsigned char good:1;
+			unsigned char params:1;
+			unsigned char cmd:1;
+			unsigned char exec:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	len = 0;
+	execLen = 0;
+	rExec = 0;
+	cParams = NULL;
+	cExec = NULL;
+	cmd = NULL;
+	args.rval( ).setUndefined( );
+	thisObj = JS_THIS_OBJECT( cx, vpn );
+	javascript = (struct javascript_t *) JS_GetPrivate( thisObj );
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "SS", &jExec, &jParams ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cExec = JS_EncodeString( cx, jExec ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.exec = 1;
+		cleanUp.good = ( ( cParams = JS_EncodeString( cx, jParams ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.params = 1;
+		cleanUp.good = ( getuid( ) != 0 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( stat( cExec, &sb ) >= 0 && ( sb.st_mode & S_IXUSR ) );
+	}
+	if ( cleanUp.good ) {
+		paramLen = strlen( cParams );
+		execLen = strlen( cExec );
+		len = 1 + 1 + execLen + paramLen;
+		cleanUp.good = ( ( cmd = (char *) malloc( len ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.cmd = 1;
+		snprintf( cmd, len, "%s %s", cExec, cParams );
+		Core_Log( javascript->core, LOG_INFO, __FILE__, __LINE__, "Executing command" );
+		rExec = system( cmd );
+		if ( rExec == -1 ) {
+			args.rval( ).setBoolean( false );
+		} else {
+			args.rval( ).set( INT_TO_JSVAL( rExec ) );
+		}
+	}
+	if ( cleanUp.cmd ) {
+		free( cmd );
+	}
+	if ( cleanUp.params ) {
+		JS_free( cx, cParams );
+	}
+	if ( cleanUp.exec ) {
+		JS_free( cx, cExec );
+	}
+	return ( cleanUp.good ) ? true : false;
+}
+
+
 static const JSClass jscOs = {
 	"os",
 	JSCLASS_HAS_PRIVATE,
@@ -1898,6 +1990,7 @@ static const JSFunctionSpec jsmOs[ ] = {
 	JS_FS( "getEnv", 			JsnOs_GetEnv, 1, 0 ),
 	JS_FS( "readFile", 			JsnOs_ReadFile, 1, 0 ),
 	JS_FS( "writeFile",			JsnOs_WriteFile, 2, 0 ),
+	JS_FS( "system",			JsnOs_System, 1, 0 ),
 	JS_FS_END
 };
 
