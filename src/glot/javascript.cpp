@@ -13,6 +13,16 @@
 
 #define MAIN_OBJ_NAME "Hard"
 
+/* ============================================================================================================================================================== */
+/* Naming convention deviations for this file                                                                                                                     */
+/*                                                                                                                                                                */
+/* Jsn	Javascript Spidermonkey Native function   static bool Jsn"Classname"t_"Function"( JSContext * cx, unsigned argc, jsval * vpn )                            */
+/* jsc  javascript spidermonkey class             static const JSClass jsc"ClassName"                                                                             */
+/* jsp  javascript spidermonkey property          static const JSPropertySpec jsp"ClassName"                                                                      */
+/* jsm  javascript spidermonkey method            static const JSFunctionSpec jsm"Classname"[]                                                                    */
+/* ============================================================================================================================================================== */
+
+
 typedef void 					( * queryResultHandler_cb_t )		( const struct query_t * query );
 
 struct payload_t {
@@ -535,13 +545,13 @@ static bool JsnMysqlclient_Query( JSContext * cx, unsigned argc, jsval * vpn ) {
 	return SqlClientQuery( cx, argc, vpn, Mysqlclient_Query_ResultHandler_cb );
 }
 
-JSClass jscMysqlclient = {
+static const JSClass jscMysqlclient = {
 	"MysqlClient",
 	JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JsnMysqlclient_Finalizer, nullptr, nullptr, nullptr, nullptr, {nullptr}
 };
 
-static JSFunctionSpec jsmMysqlclient[ ] = {
+static const JSFunctionSpec jsmMysqlclient[ ] = {
 	JS_FS( "query", JsnMysqlclient_Query, 3, 0 ),
 	JS_FS_END
 };
@@ -751,13 +761,13 @@ static bool JsnPostgresqlclient_Query( JSContext * cx, unsigned argc, jsval * vp
 	return SqlClientQuery( cx, argc, vpn, Postgresqlclient_Query_ResultHandler_cb );
 }
 
-JSClass jscPostgresqlclient = {
+static const JSClass jscPostgresqlclient = {
 	"PostgresqlClient",
 	JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JsnPostgresqlclient_Finalizer, nullptr, nullptr, nullptr, nullptr, {nullptr}
 };
 
-static JSFunctionSpec jsmPostgresqlclient[ ] = {
+static const JSFunctionSpec jsmPostgresqlclient[ ] = {
 	JS_FS( "query", JsnPostgresqlclient_Query, 3, 0 ),
 	JS_FS_END
 };
@@ -1086,7 +1096,7 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
  * @see	Hard.webserverclient.response.setMime
  */
 
-JSClass jscWebserverclient = {
+static const JSClass jscWebserverclient = {
 	"Webserverclient",
 	JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
@@ -1122,7 +1132,7 @@ static const JSFunctionSpec jsmWebserverclient[ ] = {
  */
 
 
-JSClass jscWebserverclientresponse = {
+static const JSClass jscWebserverclientresponse = {
 	"Webserverclientresponse",
 	JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
