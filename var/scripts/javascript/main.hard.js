@@ -46,7 +46,7 @@ try {
 		
 		console.log(" env : " + env + ": " + os.getEnv( env ) );
 		console.log( "ready" );
-		var r = os.system( '/usr/bin/wget', 'http://www.verpeteren.nl -o /tmp/www.verpeteren.nl.html' );
+		var r = os.system( '/usr/bin/wget', 'http://www.verpeteren.nl -o /tmp/www.verpeteren.nl.dl -O /tmp/www.verpeteren.nl.html' );
 		console.log( r );
 		/*
 		setInterval( function( ) {
