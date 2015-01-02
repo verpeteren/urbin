@@ -12,7 +12,7 @@ ifdef DARWING_BUILD
 PICOEV_SOURCE = picoev_kqueue.c
 endif
 ifdef GENERIC_BUILD
-PICOEV_SOURCE = picoev_selectl.c
+PICOEV_SOURCE = picoev_select.c
 endif
 
 deps: $(DEPS)
