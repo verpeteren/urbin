@@ -21,7 +21,7 @@ static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient
 /*****************************************************************************/
 /* Query     .                                                               */
 /*****************************************************************************/
-void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args ) {
+void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFunc_cb ) {
 	struct query_t * query;
 	size_t i, j;
 	struct {unsigned char good:1;
@@ -40,6 +40,7 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 		cleanUp.query = 1;
 		query->paramCount = paramCount;
 		query->cbHandler = callback;
+		query->clearFunc_cb = clearFunc_cb;
 		query->cbArgs = args;
 		PR_INIT_CLIST( &query->mLink );
 		query->sqlclient = sqlclient;
@@ -95,42 +96,56 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 				free( (char *) query->paramValues[j] ); query->paramValues[j] = NULL;
 			}
 		}
+		if ( cleanUp.query ) {
+			if ( query->clearFunc_cb != NULL && query->cbArgs != NULL ) {
+				query->clearFunc_cb( query->cbArgs );
+			}
+			query->clearFunc_cb = NULL;
+			query->cbArgs = NULL;
+			free( query ); query = NULL;
+		}
 	}
 }
 
 void Query_Delete( struct query_t * query ) {
 	size_t i;
 
-	for ( i = 0; i < query->paramCount; i++ ) {
-		free( (char *) query->paramValues[i] ); query->paramValues[i] = NULL;
-	}
-	free( ( char * ) query->statement ); query->statement = NULL;
-	free( query->paramLengths ); query->paramLengths = NULL;
-	free( query->paramValues ); query->paramValues = NULL;
-	query->cbHandler = NULL;
-	query->cbArgs = NULL;
-	query->paramCount = 0;
-	switch ( query->sqlclient->adapter ) {
-	case SQLADAPTER_POSTGRESQL:
-		if ( query->result.pg.res != NULL ) {
-			PQclear( query->result.pg.res ); query->result.pg.res = NULL;
+	if ( query != NULL ) {
+		if ( query->clearFunc_cb != NULL && query->cbArgs != NULL ) {
+			query->clearFunc_cb( query->cbArgs );
 		}
-		break;
+		query->clearFunc_cb = NULL;
+		query->cbArgs = NULL;
+		query->cbHandler = NULL;
+		for ( i = 0; i < query->paramCount; i++ ) {
+			free( (char *) query->paramValues[i] ); query->paramValues[i] = NULL;
+		}
+		free( ( char * ) query->statement ); query->statement = NULL;
+		free( query->paramLengths ); query->paramLengths = NULL;
+		free( query->paramValues ); query->paramValues = NULL;
+		query->paramCount = 0;
+		switch ( query->sqlclient->adapter ) {
+		case SQLADAPTER_POSTGRESQL:
+			if ( query->result.pg.res != NULL ) {
+				PQclear( query->result.pg.res ); query->result.pg.res = NULL;
+			}
+			break;
 #if HAVE_MYSQL == 1
-	case SQLADAPTER_MYSQL:
-		free( query->result.my.resBuf ); query->result.my.resBuf = NULL;
-		free( query->result.my.vars ); query->result.my.vars = NULL;
-		if ( query->result.my.res != NULL ) {
-			mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
-		}
-		break;
+		case SQLADAPTER_MYSQL:
+			free( query->result.my.resBuf ); query->result.my.resBuf = NULL;
+			free( query->result.my.vars ); query->result.my.vars = NULL;
+			if ( query->result.my.res != NULL ) {
+				mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
+			}
+			break;
 #endif
-	default:
-		break;
+		default:
+			break;
+		}
+		Core_Log( query->sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "Delete query free-ed" );
+		query->sqlclient = NULL;
+		free( query ); query = NULL;
 	}
-	Core_Log( query->sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "Delete query free-ed" );
-	query->sqlclient = NULL;
-	free( query ); query = NULL;
 }
 
 /*****************************************************************************/
@@ -313,7 +328,7 @@ struct sqlclient_t * Postgresql_New( const struct core_t * core, const char * ho
 	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, ip, prt, loginName, password, dbName, timeSec );
 }
 
-#if HAVE_MYSQL == 1
+#if 1 || HAVE_MYSQL == 1
 /*****************************************************************************/
 /* MYSQL                                                                     */
 /*****************************************************************************/
@@ -347,6 +362,7 @@ static void	Mysql_HandleRead_cb	( picoev_loop * loop, const int fd, const int ev
 			}
 			//  We're done with this query, go back to start and collect 20k
 			Query_Delete( query ); query = NULL;
+			sqlclient->connection.my.conn->call_it = NULL;
 			sqlclient->currentQuery = NULL;
 			picoev_del( loop, fd );
 			picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Mysql_HandleWrite_cb, cbArgs );
@@ -360,7 +376,7 @@ static void	Mysql_HandleRead_cb	( picoev_loop * loop, const int fd, const int ev
 static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const int events, void * cbArgs ) {
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
-	int retCode;
+	int retCode, readyToSend;
 	size_t i;
 	struct { unsigned char good:1;
 			unsigned char vars:1;
@@ -369,71 +385,78 @@ static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const in
 			unsigned char resBuf:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	readyToSend = 0;
 	sqlclient = (struct sqlclient_t *) cbArgs;
 	query = sqlclient->currentQuery;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		retCode = mysac_io( sqlclient->connection.my.conn );
-		if ( retCode == MYERR_WANT_READ || retCode == MYERR_WANT_WRITE ) {
-			//  loop once more
-		} else if ( retCode == 0 ) {
-			if ( query->paramCount > 0 && query->result.my.statementId == 0 ) {
-				// pass once more
+		if ( sqlclient->connection.my.conn->call_it != NULL) {
+			retCode = mysac_io( sqlclient->connection.my.conn );
+			if ( retCode == MYERR_WANT_READ || retCode == MYERR_WANT_WRITE ) {
+				//  loop once more
+			} else if ( retCode == 0 ) {
+				readyToSend = 1;
 			} else {
-				cleanUp.good = ( ( query->result.my.resBuf = malloc( MYSQL_BUFS ) ) != NULL );
-				if ( cleanUp.good ) {
-					cleanUp.resBuf = 1;
-					cleanUp.good = ( ( query->result.my.res = ( void * ) mysac_init_res( query->result.my.resBuf, MYSQL_BUFS ) ) != NULL );
-				}
-				if ( cleanUp.good ) {
-					cleanUp.my = 1;
-					if ( query->paramCount > 0 ) {
-						cleanUp.good = ( ( query->result.my.vars = (MYSAC_BIND *) calloc( sizeof( MYSAC_BIND ), query->paramCount ) ) != NULL );
-					}
-				}
-				if ( cleanUp.good && query->paramCount > 0 ) {
-					cleanUp.vars = 1;
-					for ( i = 0; i < query->paramCount; i++ ) {
-						query->result.my.vars[i].type = MYSQL_TYPE_VAR_STRING;
-						query->result.my.vars[i].value = ( void * ) query->paramValues[i];
-						query->result.my.vars[i].value_len = (int) query->paramLengths[i];
-						query->result.my.vars[i].is_null = 0;
-					}
-				}
-				if ( cleanUp.good ) {
-					picoev_del( loop, fd );
-					picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleRead_cb, cbArgs );
-					if ( query->paramCount == 0 ) {
-						//  Send out the query to the database engine
-						mysac_b_set_query( sqlclient->connection.my.conn, query->result.my.res, query->statement, strlen( query->statement) );
-					} else {
-						//  Send out the parameters to the database engine for the prepared statement statementId
-						mysac_set_stmt_execute( sqlclient->connection.my.conn, ( MYSAC_RES * ) query->result.my.res, query->result.my.statementId, query->result.my.vars, (int) query->paramCount );
-					}
-				}
-				if ( cleanUp.good ) {
-					cleanUp.id = 1;
-				}
-				if ( ! cleanUp.good ) {
-					if ( cleanUp.my ) {
-						mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
-					}
-					if ( cleanUp.id ) {
-						query->result.my.statementId = 0;
-					}
-					if ( cleanUp.resBuf ) {
-						free( query->result.my.resBuf ); query->result.my.resBuf = NULL;
-					}
-					if ( cleanUp.vars ) {
-						free( query->result.my.vars ); query->result.my.vars = NULL;
-					}
+				Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, mysac_error( sqlclient->connection.my.conn ) );
+				Sqlclient_CloseConn( sqlclient );
+			}
+		}
+		if ( query->paramCount == 0 ) {
+			readyToSend = 1;
+		} else if ( query->paramCount >0 && query->result.my.statementId != 0 ) {
+			readyToSend = 1;
+		}
+		if ( readyToSend ) {
+			cleanUp.good = ( ( query->result.my.resBuf = malloc( MYSQL_BUFS ) ) != NULL );
+			if ( cleanUp.good ) {
+				cleanUp.resBuf = 1;
+				cleanUp.good = ( ( query->result.my.res = ( void * ) mysac_init_res( query->result.my.resBuf, MYSQL_BUFS ) ) != NULL );
+			}
+			if ( cleanUp.good ) {
+				cleanUp.my = 1;
+				if ( query->paramCount > 0 ) {
+					cleanUp.good = ( ( query->result.my.vars = (MYSAC_BIND *) calloc( sizeof( MYSAC_BIND ), query->paramCount ) ) != NULL );
 				}
 			}
-		} else {
-			Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, mysac_error( sqlclient->connection.my.conn ) );
-			Sqlclient_CloseConn( sqlclient );
+			if ( cleanUp.good && query->paramCount > 0 ) {
+				cleanUp.vars = 1;
+				for ( i = 0; i < query->paramCount; i++ ) {
+					query->result.my.vars[i].type = MYSQL_TYPE_VAR_STRING;
+					query->result.my.vars[i].value = ( void * ) query->paramValues[i];
+					query->result.my.vars[i].value_len = (int) query->paramLengths[i];
+					query->result.my.vars[i].is_null = 0;
+				}
+			}
+			if ( cleanUp.good ) {
+				picoev_del( loop, fd );
+				picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleRead_cb, cbArgs );
+				if ( query->paramCount == 0 ) {
+					//  Send out the query to the database engine
+					mysac_b_set_query( sqlclient->connection.my.conn, query->result.my.res, query->statement, strlen( query->statement) );
+				} else {
+					//  Send out the parameters to the database engine for the prepared statement statementId
+					mysac_set_stmt_execute( sqlclient->connection.my.conn, ( MYSAC_RES * ) query->result.my.res, query->result.my.statementId, query->result.my.vars, (int) query->paramCount );
+				}
+			}
+			if ( cleanUp.good ) {
+				cleanUp.id = 1;
+			}
+			if ( ! cleanUp.good ) {
+				if ( cleanUp.my ) {
+					mysac_free_res( query->result.my.res ); query->result.my.res = NULL;
+				}
+				if ( cleanUp.id ) {
+					query->result.my.statementId = 0;
+				}
+				if ( cleanUp.resBuf ) {
+					free( query->result.my.resBuf ); query->result.my.resBuf = NULL;
+				}
+				if ( cleanUp.vars ) {
+					free( query->result.my.vars ); query->result.my.vars = NULL;
+				}
+			}
 		}
 	}
 }
@@ -441,32 +464,40 @@ static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const in
 static void	Mysql_HandleWrite_cb( picoev_loop * loop, const int fd, const int events, void * cbArgs ) {
 	struct sqlclient_t * sqlclient;
 	struct query_t * query;
-	int retCode;
+	int retCode, readyToSend;
 	struct { unsigned char good:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	sqlclient = (struct sqlclient_t *) cbArgs;
+	readyToSend = 0;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_WRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		retCode = mysac_io( sqlclient->connection.my.conn );
-		if ( retCode == MYERR_WANT_READ || retCode == MYERR_WANT_WRITE ) {
-			//  loop once more
-		} else if ( retCode == 0 ) {
-			//  Let's get some work
-			query = Sqlclient_PopQuery( sqlclient );
-			if ( query != NULL ) {
-					picoev_del( loop, fd );
-					picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleSetParams_cb, cbArgs );
+		query = Sqlclient_PopQuery( sqlclient );
+		if ( query != NULL ) {
+			if ( sqlclient->connection.my.conn->call_it == NULL) {
+				readyToSend = 1;
+			} else {
+				retCode = mysac_io( sqlclient->connection.my.conn );
+				if ( retCode == MYERR_WANT_READ || retCode == MYERR_WANT_WRITE ) {
+					//  loop once more
+				} else if ( retCode == 0 ) {
+					readyToSend = 1;
+				} else {
+					Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, mysac_error( sqlclient->connection.my.conn ) );
+					Sqlclient_CloseConn( sqlclient );
+				}
+			}
+			if ( readyToSend ) {
+				//  Let's get some work
+				picoev_del( loop, fd );
+				picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleSetParams_cb, cbArgs );
 				if ( query->paramCount > 0 ) {
-					//  Mysac needs to perpare the statement
+					//  Mysac needs to prepare the statement
 					mysac_b_set_stmt_prepare( sqlclient->connection.my.conn, &query->result.my.statementId, query->statement, (int) strlen( query->statement ) );
 				}
 			}
-		} else {
-			Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, mysac_error( sqlclient->connection.my.conn ) );
-			Sqlclient_CloseConn( sqlclient );
 		}
 	}
 }
@@ -709,12 +740,13 @@ static void Sqlclient_Connect( struct sqlclient_t * sqlclient ) {
 		default:
 			break;
 	}
-	if ( ! cleanUp.good ) {
+	// allways cleanup
+	//if  ( ! cleanUp.good ) {
 		if ( cleanUp.connString ) {
 			memset( connString, 0, strlen( connString ) );  //  password is in the postgresql sqlclient string
 			free( connString ); connString = NULL;
 		}
-	}
+	//}
 }
 
 static void Sqlclient_CloseConn( struct sqlclient_t * sqlclient ) {

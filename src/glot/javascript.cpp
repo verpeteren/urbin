@@ -42,7 +42,7 @@ static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * objec
 static int 							Payload_Call					( const struct payload_t * payload );
 static int 							Payload_Timing_ResultHandler_cb	( void * cbArgs );
 static void 						Payload_Delete					( struct payload_t * payload );
-static void 						AnonPayload_Delete				( void * cbArgs );
+static void 						Payload_Delete_Anon				( void * cbArgs );
 static struct script_t * 			Javascript_AddScript			( struct javascript_t * javascript, const char * fileName );
 static int jsInterpretersAlive = 0;
 
@@ -283,6 +283,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vpn, con
 	JS_free( cx, cIp ); cIp = NULL;
 	JS_free( cx, cUserName ); cUserName = NULL;
 	JS_free( cx, cPassword ); cPassword = NULL;
+	JS_free( cx, cDbName ); cDbName = NULL;
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -412,7 +413,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 	}
 	if ( cleanUp.good ) {
 		cleanUp.statement = 1;
-		Query_New( sqlclient, cStatement, nParams, cParamValues, handler_cb, ( void * ) payload );
+		Query_New( sqlclient, cStatement, nParams, cParamValues, handler_cb, ( void * ) payload, Payload_Delete_Anon );
 	}
 	/*  always cleanup  */
 	for ( i = 0; i < nParams; i++ ) {
@@ -1394,7 +1395,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	JS::RootedValue 		fnValRoot( cx, fnVal );
 	JS::HandleValue 		fnValHandle( fnValRoot );
 	JS::MutableHandleValue 	fnValMut( &fnValRoot );
-	if (cleanUp.good ) {
+	if ( cleanUp.good ) {
 		cleanUp.good = ( JS_ConvertArguments( cx, args, "S*", &jPattern, &dummyVal ) == true );
 	}
 	if ( cleanUp.good ) {
@@ -1413,7 +1414,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 			}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload, AnonPayload_Delete );
+		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload, Payload_Delete_Anon );
 	} else {
 		if ( cleanUp.payload ) {
 			// this is the only thing that needs special care if something went wrong; we cleanup the rest any way,
@@ -2224,7 +2225,7 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	return Payload_Call( payload );
 }
 
-static void AnonPayload_Delete( void * cbArgs ) {
+static void Payload_Delete_Anon( void * cbArgs ) {
 	Payload_Delete( (struct payload_t *) cbArgs );
 }
 
@@ -2277,11 +2278,10 @@ static bool SetTimer( JSContext * cx, unsigned argc, jsval * vpn, const unsigned
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, repeat, Payload_Timing_ResultHandler_cb, (void * ) payload ) ) != NULL );
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, repeat, Payload_Timing_ResultHandler_cb, (void * ) payload, Payload_Delete_Anon ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.timer = 1;
-		timing->clearFunc_cb = (timerHandler_cb_t) Payload_Delete;
 		args.rval( ).setInt32( (int32_t) timing->identifier );
 	} else {
 		if ( cleanUp.timer ) { \

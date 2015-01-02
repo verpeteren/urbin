@@ -64,7 +64,6 @@ enum mimeType_t {
 struct webserverclient_t;
 
 typedef void 				(* dynamicHandler_cb_t)	( const struct webserverclient_t * webserverclient );
-typedef void				(* payloadClear_cb_t)	( void * );
 
 enum routeType_t {
 	ROUTETYPE_DOCUMENTROOT,
@@ -80,7 +79,7 @@ struct route_t {
 		dynamicHandler_cb_t			handlerCb;
 							}	details;
 	void *						cbArgs;
-	payloadClear_cb_t			clearFunc_cb;
+	clearFunc_cb_t				clearFunc_cb;
 	struct PRCListStr			mLink;
 };
 
@@ -133,7 +132,7 @@ const char *					Webserverclient_GetUrl				( const struct webserverclient_t * we
 const char *					Webserverclient_GetIp				( const struct webserverclient_t * webserverclient );
 
 int 							Webserver_DocumentRoot				( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
-int 							Webserver_DynamicHandler			( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs, payloadClear_cb_t clearFunc_cb );
+int 							Webserver_DynamicHandler			( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFunc_cb );
 
 struct webserver_t *			Webserver_New						( const struct core_t * core, const char * ip, const uint16_t port, const unsigned char timeoutSec );
 void 							Webserver_JoinCore					( struct webserver_t * webserver );

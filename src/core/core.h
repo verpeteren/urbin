@@ -21,6 +21,7 @@ struct module_t;
 
 typedef void 				( * signalAction_cb_t )		( const int signal );
 typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
+typedef void 				( * clearFunc_cb_t )		( void * cbArgs );
 typedef unsigned char		( * moduleHandler_cb_t )	( const struct core_t * core, struct module_t * module, void * cbArgs );
 
 #define FROM_NEXT_TO_ITEM( type ) ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
@@ -35,7 +36,7 @@ struct timing_t {
 	unsigned int				ms;
 	uint32_t					identifier;
 	timerHandler_cb_t 			timerHandler_cb;
-	timerHandler_cb_t			clearFunc_cb;
+	clearFunc_cb_t				clearFunc_cb;
 	void *						cbArgs;
 	PRUint32					due;
 	unsigned char				repeat:1;
@@ -49,6 +50,7 @@ struct module_t {
 	moduleHandler_cb_t			onUnload;
 	void *						cbArgs;
 	void *						instance;
+	clearFunc_cb_t				clearFunc_cb;
 	PRCList						mLink;
 };
 
@@ -71,7 +73,7 @@ struct core_t {
 void							Boot					( const int maxFds );
 void							Shutdown				( );
 void							SetupSocket				( const int fd,  const unsigned char tcp );
-struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data );
+struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data, const clearFunc_cb_t clearFunc );
 void 							Module_Delete			( struct module_t * module );
 struct core_t *					Core_New				( const cfg_t * config );
 void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message );
@@ -80,7 +82,8 @@ void 							Core_GetHostByName		( const struct core_t * core, const char * hostN
 int								Core_AddModule			( struct core_t * core, struct module_t * module );
 int								Core_Loop				( struct core_t * core );
 int								Core_DelModule			( struct core_t * core, struct module_t * module );
-struct timing_t *				Core_AddTiming 			( struct core_t * core, const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs );
+
+struct timing_t *				Core_AddTiming 			( struct core_t * core, const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb );
 void 							Core_DelTimingId		( struct core_t * core, uint32_t id );
 void 							Core_DelTiming 			( struct core_t * core, struct timing_t * timing );
 void							Core_Delete				( struct core_t * core );

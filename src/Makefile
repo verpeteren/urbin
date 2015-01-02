@@ -15,6 +15,7 @@ ifeq ($(CC),gcc)
 CC_DEBUG_FLAGS += -pg -fno-builtin-strlen --param ssp-buffer-size=4
 else
 endif
+CC_DEBUG_FLAGS += 
 endif
 
 ifeq ($(STAGING_RELEASE),yes)

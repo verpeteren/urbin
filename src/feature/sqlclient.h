@@ -79,6 +79,7 @@ struct query_t{
 						} 		result;
 	void *						cbArgs;
 	queryHandler_cb_t			cbHandler;
+	clearFunc_cb_t				clearFunc_cb;
 	struct PRCListStr			mLink;
 };
 
@@ -88,7 +89,7 @@ struct sqlclient_t *			Mysql_New					( const struct core_t * core, const char * 
 struct sqlclient_t *			Postgresql_New				( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
 void							Sqlclient_Delete			( struct sqlclient_t * sqlclient );
 
-void 							Query_New					( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args );
+void 							Query_New					( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFunc );
 void							Query_Delete				( struct query_t * query );
 
 #ifdef __cplusplus

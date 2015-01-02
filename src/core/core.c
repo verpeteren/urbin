@@ -102,7 +102,7 @@ void ShowLink( const PRCList * start, const char * label, const size_t count ) {
 /*****************************************************************************/
 /* Modules                                                                   */
 /*****************************************************************************/
-struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * cbArgs ) {
+struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
 	struct module_t * module;
 	struct {unsigned char good:1;
 			unsigned char name:1;
@@ -117,6 +117,7 @@ struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad
 		module->onUnload = onUnload;
 		module->cbArgs = cbArgs;
 		module->instance = NULL;
+		module->clearFunc_cb = clearFunc_cb;
 		PR_INIT_CLIST( &module->mLink );
 		cleanUp.name = ( ( module->name =  Xstrdup( name ) ) != NULL );
 	}
@@ -134,6 +135,11 @@ struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad
 		module->instance = NULL;
 		PR_INIT_CLIST( &module->mLink );
 		if ( cleanUp.module ) {
+			if ( module->clearFunc_cb != NULL && module->cbArgs != NULL ) {
+				module->clearFunc_cb( module->cbArgs );
+			}
+			module->clearFunc_cb = NULL;
+			module->cbArgs = NULL;
 			free( module ); module = NULL;
 		}
 	}
@@ -142,7 +148,11 @@ struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad
 
 void Module_Delete( struct module_t * module ) {
 	free( (char * ) module->name ); module->name = NULL;
-	module->cbArgs = NULL,
+	if ( module->clearFunc_cb != NULL && module->cbArgs != NULL ) {
+		module->clearFunc_cb( module->cbArgs );
+	}
+	module->clearFunc_cb = NULL;
+	module->cbArgs = NULL;
 	module->onLoad = NULL;
 	module->onReady = NULL;
 	module->onUnload = NULL;
@@ -154,11 +164,11 @@ void Module_Delete( struct module_t * module ) {
 /*****************************************************************************/
 /* Timings                                                                    */
 /*****************************************************************************/
-static struct timing_t *			Timing_New 					( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs );
+static struct timing_t *			Timing_New 					( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb );
 static void 						Timer_CalculateDue			( struct timing_t * timing, const PRUint32 nowOrHorizon );
 static void 						Timing_Delete				( struct timing_t * timing );
 
-static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs ) {
+static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
 	struct timing_t * timing;
 	PRUint32 horizon;
 	PRIntervalTime now;
@@ -177,12 +187,17 @@ static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t iden
 		now = PR_IntervalNow( );
 		horizon = PR_IntervalToMicroseconds( now );
 		Timer_CalculateDue( timing, horizon );
-		timing->clearFunc_cb = NULL;
+		timing->clearFunc_cb = clearFunc_cb;
 		PR_INIT_CLIST( &timing->mLink );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.timing ) {
-				free( timing ); timing = NULL;
+			if ( timing->clearFunc_cb != NULL && timing->cbArgs != NULL ) {
+				timing->clearFunc_cb( timing->cbArgs );
+			}
+			timing->clearFunc_cb = NULL;
+			timing->cbArgs = NULL;
+			free( timing ); timing = NULL;
 		}
 	}
 	return timing;
@@ -192,9 +207,11 @@ static void Timer_CalculateDue( struct timing_t * timing, const PRUint32 nowOrHo
 }
 
 static void Timing_Delete( struct timing_t * timing ) {
-	if ( timing->clearFunc_cb != NULL ) {
+	if ( timing->clearFunc_cb != NULL && timing->cbArgs != NULL ) {
 		timing->clearFunc_cb( timing->cbArgs );
 	}
+	timing->clearFunc_cb = NULL;
+	timing->cbArgs = NULL;
 	timing->ms = 0;
 	timing->repeat = 0;
 	timing->identifier = 0;
@@ -562,14 +579,14 @@ int Core_DelModule( struct core_t * core, struct module_t * module ) {
 	return ( cleanUp.good ) ? 1 : 0;
 }
 
-struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs ) {
+struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
 	struct timing_t * timing;
 	struct {unsigned char good:1;
 			unsigned char timing:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	core->maxIdentifier++;
-	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArgs ) ) != NULL );
+	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArgs, clearFunc_cb ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.timing = 1;
 		if ( core->timings == NULL ) {
