@@ -70,7 +70,7 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								strlen( PR_VERSION ) \
 								- ( 2 * 7 ) + 1 )
 
-static struct route_t * 		Route_New				( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs );
+static struct route_t * 		Route_New				( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, payloadClear_cb_t clearFunc_cb );
 static void						Route_Delete			( struct route_t * route );
 
 static void						Webserver_HandleRead_cb	( picoev_loop * loop, int fd, int events, void * wcArgs );
@@ -90,7 +90,7 @@ static void 					Webserverclient_Delete		( struct webserverclient_t * webserverc
 	/*****************************************************************************/
 	/* Route                                                                    */
 	/*****************************************************************************/
-	static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs ) {
+	static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, payloadClear_cb_t clearFunc_cb ) {
 		struct route_t * route;
 		OnigErrorInfo einfo;
 		UChar * pat;
@@ -107,6 +107,7 @@ static void 					Webserverclient_Delete		( struct webserverclient_t * webserverc
 		if ( cleanUp.good ) {
 			cleanUp.route = 1;
 			route->cbArgs = cbArgs;
+			route->clearFunc_cb = clearFunc_cb;
 			cleanUp.good = ( ( route->orgPattern = Xstrdup( pattern ) ) != NULL );
 		}
 		if ( cleanUp.good ) {
@@ -148,6 +149,7 @@ static void 					Webserverclient_Delete		( struct webserverclient_t * webserverc
 			}
 			if ( cleanUp.route ) {
 				route->cbArgs = NULL;
+				route->clearFunc_cb = NULL;
 				free( route ); route = NULL;
 			}
 		}
@@ -160,6 +162,10 @@ static void 					Webserverclient_Delete		( struct webserverclient_t * webserverc
 		}
 		onig_free( route->urlRegex ); route->urlRegex = NULL;
 		free( (char *) route->orgPattern ); route->orgPattern = NULL;
+		if ( route->clearFunc_cb != NULL ) {
+			route->clearFunc_cb( route->cbArgs );
+			route->clearFunc_cb = NULL;
+		}
 		route->cbArgs = NULL;
 		free( route ); route = NULL;
 	}
@@ -541,7 +547,7 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 			unsigned char route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DOCUMENTROOT, (void * ) documentRoot, webserver->regexOptions, NULL ) ) != NULL);
+	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DOCUMENTROOT, (void * ) documentRoot, webserver->regexOptions, NULL, NULL ) ) != NULL);
 	if ( cleanUp.good ) {
 		cleanUp.route = 1;
 		Webserver_AddRoute( webserver, route );
@@ -555,13 +561,13 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 	return ( cleanUp.good == 1 );
 }
 
-int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs ) {
+int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs, payloadClear_cb_t clearFunc_cb ) {
 	struct route_t * route;
 	struct { unsigned char good:1;
 			unsigned char route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions, cbArgs ) ) != NULL);
+	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions, cbArgs, clearFunc_cb ) ) != NULL);
 	if ( cleanUp.good ) {
 		cleanUp.route = 1;
 		Webserver_AddRoute( webserver, route );

@@ -42,6 +42,7 @@ static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * objec
 static int 							Payload_Call					( const struct payload_t * payload );
 static int 							Payload_Timing_ResultHandler_cb	( void * cbArgs );
 static void 						Payload_Delete					( struct payload_t * payload );
+static void 						AnonPayload_Delete				( void * cbArgs );
 static struct script_t * 			Javascript_AddScript			( struct javascript_t * javascript, const char * fileName );
 static int jsInterpretersAlive = 0;
 
@@ -1298,14 +1299,8 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		JS_SetPrivate( responseObj, ( void * ) &webserverclient->response );
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.ip ) {
-			free( (char *) ip ); ip = NULL;
-		}
 		if ( cleanUp.jip ) {
 			JS_free( cx, jIp ); jIp = NULL;
-		}
-		if ( cleanUp.url ) {
-			free( (char *) url ); url = NULL;
 		}
 		if ( cleanUp.jurl ) {
 			JS_free( cx, jUrl ); jUrl = NULL;
@@ -1319,6 +1314,13 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		if ( cleanUp.cli ) {
 			// clientObj
 		}
+	}
+	// always cleanup
+	if ( cleanUp.url ) {
+		free( (char *) url ); url = NULL;
+	}
+	if ( cleanUp.ip ) {
+		free( (char *) ip ); ip = NULL;
 	}
 	return webserverclientObj;
 }
@@ -1411,7 +1413,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 			}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload );
+		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload, AnonPayload_Delete );
 	} else {
 		if ( cleanUp.payload ) {
 			// this is the only thing that needs special care if something went wrong; we cleanup the rest any way,
@@ -2220,6 +2222,10 @@ static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	payload = ( struct payload_t * ) cbArgs;
 
 	return Payload_Call( payload );
+}
+
+static void AnonPayload_Delete( void * cbArgs ) {
+	Payload_Delete( (struct payload_t *) cbArgs );
 }
 
 static void Payload_Delete( struct payload_t * payload ) {
