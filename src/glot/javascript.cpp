@@ -403,7 +403,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 	}
 	if ( cleanUp.good ) {
 		jsval dummy;
-		cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, fnVal, dummy, false ) ) != NULL );
+		cleanUp.good = ( ( payload = Payload_New( cx, sqlObj, fnValMut.get( ), dummy, false ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
@@ -1383,6 +1383,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	args = CallArgsFromVp( argc, vpn );
 	dummyVal = JSVAL_NULL;
 	paramVal = JSVAL_NULL;
+	cleanUp.good = ( argc == 2 );
 	fnVal = args[1];
 	cPattern = NULL;
 	payload = NULL;
@@ -1391,7 +1392,9 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	JS::RootedValue 		fnValRoot( cx, fnVal );
 	JS::HandleValue 		fnValHandle( fnValRoot );
 	JS::MutableHandleValue 	fnValMut( &fnValRoot );
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*", &jPattern, &dummyVal ) == true );
+	if (cleanUp.good ) {
+		cleanUp.good = ( JS_ConvertArguments( cx, args, "S*", &jPattern, &dummyVal ) == true );
+	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( cPattern = JS_EncodeString( cx, jPattern ) ) != NULL );
 	}
@@ -1404,7 +1407,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	}
 	if ( cleanUp.good ) {
 		paramVal = JSVAL_NULL;
-		cleanUp.good = ( ( payload = Payload_New( cx, webserverObj, fnVal, paramVal, false ) ) != NULL );
+		cleanUp.good = ( ( payload = Payload_New( cx, webserverObj, fnValMut.get( ), paramVal, false ) ) != NULL );
 			}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
@@ -2261,9 +2264,9 @@ static bool SetTimer( JSContext * cx, unsigned argc, jsval * vpn, const unsigned
 	if ( cleanUp.good ) {
 		if ( args.length( ) > 2 ) {
 			argsAt2 = vpn + 2;
-			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnVal, *argsAt2, false ) ) != NULL );
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), *argsAt2, false ) ) != NULL );
 		} else {
-			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValRoot, JSVAL_NULL, false ) ) != NULL );
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), JSVAL_NULL, false ) ) != NULL );
 		}
 	}
 	if ( cleanUp.good ) {
