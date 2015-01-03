@@ -1322,12 +1322,6 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		if ( cleanUp.method ) {
 			JS_free( cx, jMethod ); jMethod = NULL;
 		}
-		if ( cleanUp.resp ) {
-			// resoponseObj
-		}
-		if ( cleanUp.cli ) {
-			// clientObj
-		}
 	}
 	// always cleanup
 	if ( cleanUp.url ) {
@@ -1840,13 +1834,13 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 		args.rval( ).setBoolean( false );
 	}
 	if ( cleanUp.tFileName ) {
-		free( cFileName );
+		free( cFileName ); cFileName = NULL;
 	}
 	if ( cleanUp.cFileName ) {
-		JS_free( cx, cFileName );
+		JS_free( cx, cFileName ); cFileName = NULL;
 	}
 	if ( cleanUp.content ) {
-		JS_free( cx, cContent );
+		JS_free( cx, cContent ); cContent = NULL;
 	}
 	return ( cleanUp.good ) ? true : false;
 }
@@ -1911,10 +1905,10 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 		args.rval( ).setString( jContent );
 	}
 	if ( cleanUp.contents ) {
-		free( content );
+		free( content ); content = NULL;
 	}
 	if ( cleanUp.fileName ) {
-		JS_free( cx, cFileName );
+		JS_free( cx, cFileName ); cFileName = NULL;
 	}
 	return ( cleanUp.good ) ? true : false;
 }
@@ -1997,13 +1991,13 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vpn ) {
 		}
 	}
 	if ( cleanUp.cmd ) {
-		free( cmd );
+		free( cmd ); cmd = NULL;
 	}
 	if ( cleanUp.params ) {
-		JS_free( cx, cParams );
+		JS_free( cx, cParams ); cParams = NULL;
 	}
 	if ( cleanUp.exec ) {
-		JS_free( cx, cExec );
+		JS_free( cx, cExec ); cExec = NULL;
 	}
 	return ( cleanUp.good ) ? true : false;
 }

@@ -225,7 +225,7 @@ unsigned char Webserverclientresponse_SetContent( struct webserverclientresponse
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	if ( response->content != NULL ) {
-		free( response->content );
+		free( response->content ); response->content = NULL;
 	}
 	cleanUp.good = ( ( response->content = Xstrdup( content ) ) != NULL );
 	if ( cleanUp.good ) {
