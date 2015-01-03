@@ -46,7 +46,7 @@ CODE prioritynames[] = {
 void Boot( const int fds ) {
 	int fdMax;
 
-	fdMax = ( fds == 0 ) ? PR_CFG_LOOP_MAX_FDS : fds;
+	fdMax = ( fds == 0 ) ? PR_CFG_CORE_MAX_FDS : fds;
 	fprintf( stdout, "Starting with %d slots\n", fdMax );
 	picoev_init( fdMax );
 }
@@ -250,11 +250,11 @@ struct core_t * Core_New( const cfg_t * config ) {
 		mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
 		timeoutSec = cfg_getint( mainSection, "loop_timeout_sec" );
 		if ( timeoutSec == 0 ) {
-			timeoutSec = PR_CFG_LOOP_TIMEOUT_SEC;
+			timeoutSec = PR_CFG_CORE_TIMEOUT_SEC;
 		}
 		core->processTicksMs = (unsigned char) cfg_getint( mainSection, "loop_ticks_ms" );
 		if ( core->processTicksMs == 0 ) {
-			core->processTicksMs = PR_CFG_LOOP_TICKS_MS;
+			core->processTicksMs = PR_CFG_CORE_TICKS_MS;
 		}
 		//  Set up the logging
 		if ( cfg_getbool( mainSection, "loop_daemon" ) == cfg_true ) {
@@ -391,7 +391,7 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
 	fds = cfg_getint( mainSection, "loop_max_fds" );
 	if ( fds == 0 ) {
-		fds = PR_CFG_LOOP_MAX_FDS;
+		fds = PR_CFG_CORE_MAX_FDS;
 	}
 	limit.rlim_cur = ( rlim_t ) fds;
 	limit.rlim_max = ( rlim_t ) fds;
@@ -507,7 +507,7 @@ int Core_Loop( struct core_t * core ) {
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	dnsSocketFd = dns_get_fd( core->dns );
-	maxWait = PR_CFG_LOOP_MAX_FDS;
+	maxWait = PR_CFG_CORE_MAX_FDS;
 	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
 	maxWait = cfg_getint( mainSection, "loop_max_wait" );
 	cleanUp.good = 1;

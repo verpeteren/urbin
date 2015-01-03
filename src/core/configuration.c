@@ -15,14 +15,14 @@ void Usage( const char * prog_name, const int code ) {
 }
 
 static const cfg_opt_t mainCfgOpts[] = {
-	CFG_INT( (char *) "loop_max_fds",					PR_CFG_LOOP_MAX_FDS, CFGF_NONE ),
-	CFG_STR( (char *) "loop_run_as_user", 	(char *)	PR_CFG_LOOP_RUN_AS_USER, CFGF_NONE ),
-	CFG_STR( (char *) "loop_run_as_group",	(char *)	PR_CFG_LOOP_RUN_AS_GROUP, CFGF_NONE ),
-	CFG_INT( (char *) "loop_timeout_sec", 				PR_CFG_LOOP_TIMEOUT_SEC, CFGF_NONE ),
-	CFG_INT( (char *) "loop_ticks_ms", 					PR_CFG_LOOP_TICKS_MS, CFGF_NONE ),
-	CFG_INT( (char *) "loop_max_wait", 					PR_CFG_LOOP_MAX_WAIT, CFGF_NONE ),
-	CFG_BOOL( (char *) "loop_daemon",					PR_CFG_LOOP_DAEMON, CFGF_NONE ),
-	CFG_STR( (char *) "loop_log_level",	(char *)		PR_CFG_LOOP_LOG_LEVEL_TEXT, CFGF_NONE ),
+	CFG_INT( (char *) "max_fds",						PR_CFG_CORE_MAX_FDS, CFGF_NONE ),
+	CFG_STR( (char *) "run_as_user", 	(char *)		PR_CFG_CORE_RUN_AS_USER, CFGF_NONE ),
+	CFG_STR( (char *) "run_as_group",	(char *)		PR_CFG_CORE_RUN_AS_GROUP, CFGF_NONE ),
+	CFG_INT( (char *) "timeout_sec", 					PR_CFG_CORE_TIMEOUT_SEC, CFGF_NONE ),
+	CFG_INT( (char *) "ticks_ms", 						PR_CFG_CORE_TICKS_MS, CFGF_NONE ),
+	CFG_INT( (char *) "max_wait", 						PR_CFG_CORE_MAX_WAIT, CFGF_NONE ),
+	CFG_BOOL( (char *) "daemon",						PR_CFG_CORE_DAEMON, CFGF_NONE ),
+	CFG_STR( (char *) "log_level",	(char *)			PR_CFG_CORE_LOG_LEVEL_TEXT, CFGF_NONE ),
 	CFG_END( )
 };
 
