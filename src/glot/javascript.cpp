@@ -12,19 +12,6 @@
 #include "../core/utils.h"
 
 #define MAIN_OBJ_NAME "Urbin"
-#ifdef DEBUG
-#define JSN_GC_STRESSTEST do { \
-	JS::CallArgs a = CallArgsFromVp( argc, vp ); \
-	JSObject * go = JS_GetGlobalForObject( cx, &a.callee( ) ); \
-	struct javascript_t * t = (struct javascript_t *) JS_GetPrivate( go ); \
-	JS_GC( t->runtime ); \
-	} while ( 0 );
-
-#else
-#define JSN_GC_STRESSTEST /* */
-#endif
-#define JSN_GC_STRESSTEST_ENTRY JSN_GC_STRESSTEST
-#define JSN_GC_STRESSTEST_EXIT  JSN_GC_STRESSTEST
 
 /* ============================================================================================================================================================== */
 /* Naming convention deviations for this file                                                                                                                     */
@@ -241,7 +228,6 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	cUserName = NULL;
 	cHostName = NULL;
@@ -297,7 +283,6 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	JS_free( cx, cUserName ); cUserName = NULL;
 	JS_free( cx, cPassword ); cPassword = NULL;
 	JS_free( cx, cDbName ); cDbName = NULL;
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -821,7 +806,6 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
 
 
 static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
-	JSN_GC_STRESSTEST_ENTRY
 	return SqlClassConstructor( cx, argc, vp, Postgresql_New, &jscPostgresqlclient, jsmPostgresqlclient );
 }
 
@@ -883,7 +867,6 @@ static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc
 			unsigned char cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	thisObj = JS_THIS_OBJECT( cx, vp );
 	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
@@ -903,7 +886,6 @@ static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -940,7 +922,6 @@ static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, j
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	thisObj = JS_THIS_OBJECT( cx, vp );
 	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
@@ -952,7 +933,6 @@ static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, j
 	if ( cleanUp.good ) {
 		cleanUp.good = ( Webserverclientresponse_SetCode( response, (unsigned int) code ) ) ? 1 : 0;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -992,7 +972,6 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
 			unsigned char cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	thisObj = JS_THIS_OBJECT( cx, vp );
 	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
@@ -1012,7 +991,6 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1085,7 +1063,6 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 	JSObject * thisObj, * matchObj;
 	JS::CallArgs args;
 
-	JSN_GC_STRESSTEST_ENTRY
 	matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) );
 	JS::RootedObject matchObjRoot( cx, matchObj );
 	JS::MutableHandleObject matchObjMut( &matchObjRoot );
@@ -1098,7 +1075,6 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 	namedRegex.matchObjMut = &matchObjMut;
 	onig_foreach_name( webserverclient->route->urlRegex, Webclient_NamedGroup_cb, (void * ) &namedRegex );
 	args.rval( ).set( OBJECT_TO_JSVAL( matchObjMut.get( ) ) );
-	JSN_GC_STRESSTEST_EXIT
 	return true;
 }
 
@@ -1410,7 +1386,6 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 		unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	dummyVal = JSVAL_NULL;
 	paramVal = JSVAL_NULL;
@@ -1457,7 +1432,6 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.pattern ) {
 		JS_free( cx, cPattern ); cPattern = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1491,7 +1465,6 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 		unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	webServerObj = JS_THIS_OBJECT( cx, vp );
 	args = CallArgsFromVp( argc, vp );
 	jPattern = NULL;
@@ -1525,7 +1498,6 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.pattern ) {
 		JS_free( cx, cPattern ); cPattern = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -1576,7 +1548,6 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	timeoutSec = 0;
 	port = 0;
@@ -1618,7 +1589,6 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 		args.rval( ).setUndefined( );
 	}
 	JS_free( cx, cServerIp ); cServerIp = NULL;
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -1663,7 +1633,6 @@ static bool JsnUrbin_Shutdown( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vp ) );
 	if ( argc == 0 ) {
@@ -1677,7 +1646,6 @@ static bool JsnUrbin_Shutdown( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.good ) {
 		javascript->core->keepOnRunning = 0;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1727,7 +1695,6 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vp ) {
 			unsigned char cString:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	cString = NULL;
@@ -1754,7 +1721,6 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.cString ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1796,7 +1762,6 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vp ) {
 			unsigned char content:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	temp = 0;
 	cContent = NULL;
 	cFileName = NULL;
@@ -1871,7 +1836,6 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.content ) {
 		JS_free( cx, cContent ); cContent = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1906,7 +1870,6 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vp ) {
 			unsigned char contents:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	cFileName = NULL;
@@ -1941,7 +1904,6 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.fileName ) {
 		JS_free( cx, cFileName ); cFileName = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1981,7 +1943,6 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vp ) {
 			unsigned char exec:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	len = 0;
 	execLen = 0;
 	rExec = 0;
@@ -2032,7 +1993,6 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.exec ) {
 		JS_free( cx, cExec ); cExec = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2089,7 +2049,6 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vp ) {
 			unsigned char cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	cString = NULL;
@@ -2125,7 +2084,6 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2185,7 +2143,6 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	cFile = NULL;
 	args = CallArgsFromVp( argc, vp );
 	cleanUp.good = ( argc == 1 );
@@ -2205,7 +2162,6 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vp ) {
 	}
 	success = ( cleanUp.good ) ? true : false;
 	args.rval( ).setBoolean( success );
-	JSN_GC_STRESSTEST_EXIT
 	return success;
 }
 
@@ -2368,7 +2324,6 @@ static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnM
 static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vp ) {
 	JS::RootedValue 		vpnRoot( cx, *vp );
 	JS::MutableHandleValue	vpnMut( &vpnRoot );
-	JSN_GC_STRESSTEST_ENTRY
 	return SetTimer( cx, argc, vpnMut, 0 );
 }
 
@@ -2398,7 +2353,6 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vp ) {
 static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vp ) {
 	JS::RootedValue 		vpnRoot( cx, *vp );
 	JS::MutableHandleValue	vpnMut( &vpnRoot );
-	JSN_GC_STRESSTEST_ENTRY
 	return SetTimer( cx, argc, vpnMut, 1 );
 }
 /**
@@ -2449,7 +2403,6 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vp ) 
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	JSN_GC_STRESSTEST_ENTRY
 	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
@@ -2458,7 +2411,6 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vp ) 
 		javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
 		Core_DelTimingId( javascript->core, identifier );
 	}
-	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true: false;
 }
 
