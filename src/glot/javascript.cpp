@@ -1015,7 +1015,7 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 	char * nameDup, * valDup;
 
 	namedRegex = (struct namedRegex_t *) cbArgs;
-	region = namedRegex->webserverclient->webserver->region;
+	region = namedRegex->webserverclient->region;
 	JS::RootedValue	jValueRoot( namedRegex->context, jValue );
 	for ( i = 0; i < ngroupNum; i++ ) {
 		gn = group_nums[i];

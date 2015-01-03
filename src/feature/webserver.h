@@ -92,7 +92,6 @@ struct mimeDetail_t {
 struct webserver_t {
 	const struct core_t *		core;
 	struct route_t *			routes;
-	OnigRegion *				region;
 	OnigOptionType				regexOptions;
 	uint16_t					port;
 	int							socketFd;
@@ -120,6 +119,7 @@ struct webserverclient_t{
 	enum connection_t					connection;
 	struct webserver_t *		 		webserver;
 	struct route_t *					route;
+	OnigRegion *						region;
 	RequestHeader *	 					header;
 	char								buffer[HTTP_BUFF_LENGTH];
 	struct webserverclientresponse_t	response;

@@ -179,6 +179,7 @@ static void 					Webserverclient_Delete		( struct webserverclient_t * webserverc
 	static struct webserverclient_t * Webserverclient_New( struct webserver_t * webserver, int socketFd) {
 	struct webserverclient_t * webserverclient;
 	struct {unsigned char good:1;
+			unsigned char onig:1;
 			unsigned char webserverclient:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -201,8 +202,15 @@ static void 					Webserverclient_Delete		( struct webserverclient_t * webserverc
 		memset( webserverclient->buffer, '\0', HTTP_BUFF_LENGTH );
 		webserverclient->response.contentLength = 0;
 		webserverclient->response.content = NULL;
+		cleanUp.good = ( ( webserverclient->region = onig_region_new( ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.onig = 1;
 	}
 	if ( ! cleanUp.good ) {
+		if ( cleanUp.onig ) {
+			onig_region_free( webserverclient->region, 1 ); webserverclient->region = NULL;
+		}
 		if ( cleanUp.webserverclient ) {
 			free( webserverclient ); webserverclient = NULL;
 		}
@@ -359,11 +367,11 @@ static void Webserverclient_RenderRoute( struct webserverclient_t * webservercli
 			fullPath = NULL;
 			webserverclient->response.contentType = CONTENTTYPE_FILE;
 			documentRoot = route->details.documentRoot;
-			pathLength = webserverclient->webserver->region->end[1] - webserverclient->webserver->region->beg[1] + 1;
+			pathLength = webserverclient->region->end[1] - webserverclient->region->beg[1] + 1;
 			cleanUp.good = ( ( requestedPath = malloc( pathLength + 1 ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.requestedPath = 1;
-				snprintf( requestedPath, pathLength, "%s", &webserverclient->header->RequestURI[webserverclient->webserver->region->beg[1]] );
+				snprintf( requestedPath, pathLength, "%s", &webserverclient->header->RequestURI[webserverclient->region->beg[1]] );
 			}
 			//  check that the file is not higher then the documentRoot. Such as  ../../../../etc/passwd
 			for ( j = 0; j < pathLength - 1; j++ ) {
@@ -507,7 +515,7 @@ static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) 
 		webserverclient->response.contentSent = 0;
 		webserverclient->connection = CONNECTION_CLOSE;
 		webserverclient->mode = MODE_GET;
-		onig_region_free( webserverclient->webserver->region, 0 );
+		onig_region_free( webserverclient->region, 0 );
 		if ( webserverclient->response.content != NULL ) {
 			free( webserverclient->response.content ); webserverclient->response.content = NULL;
 		}
@@ -534,6 +542,7 @@ static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) 
 	webserverclient->connection = CONNECTION_CLOSE;
 	webserverclient->response.contentType = CONTENTTYPE_BUFFER;
 	webserverclient->mode = MODE_GET;
+	onig_region_free( webserverclient->region, 1 ); webserverclient->region = NULL;
 	if ( webserverclient->response.content != NULL ) {
 		free( webserverclient->response.content ); webserverclient->response.content = NULL;
 	}
@@ -757,7 +766,6 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 	struct {unsigned char good:1;
 			unsigned char ip:1;
 			unsigned char socket:1;
-			unsigned char onig:1;
 			unsigned char webserver:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -797,11 +805,11 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 			listenBacklog = PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG;
 		}
 		cleanUp.good = ( ( webserver->ip = Xstrdup( ip ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.ip = 1;
-	}
-	if ( cleanUp.good ) {
+}
+if ( cleanUp.good ) {
+	cleanUp.ip = 1;
+}
+if ( cleanUp.good ) {
 		cleanUp.good = ( ( webserver->socketFd = socket( AF_INET, SOCK_STREAM, 0 ) ) != -1 );
 	}
 	if ( cleanUp.good ) {
@@ -819,16 +827,11 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 	}
 	if ( cleanUp.good ) {
 		SetupSocket( webserver->socketFd, 1 );
-		cleanUp.good = ( ( webserver->region = onig_region_new( ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.onig = 1;
 		Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "New Webserver allocated" );
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.onig ) {
-			onig_region_free( webserver->region, 1 ); webserver->region = NULL;
-		}
 		if ( cleanUp.socket ) {
 			shutdown( webserver->socketFd, SHUT_RDWR );
 			close( webserver->socketFd );
@@ -894,7 +897,7 @@ static void Webserver_FindRoute( const struct webserver_t * webserver, struct we
 		if ( firstRoute != NULL ) {
 			do {
 				next = PR_NEXT_LINK( &route->mLink );
-				r = onig_search( route->urlRegex, ( unsigned char * ) url, end, start, range, webserver->region, webserver->regexOptions );
+				r = onig_search( route->urlRegex, ( unsigned char * ) url, end, start, range, webserverclient->region, webserver->regexOptions );
 				found = ( r >= 0 );
 				if ( found ) {
 					webserverclient->route = route;
@@ -921,7 +924,6 @@ void Webserver_Delete( struct webserver_t * webserver ) {
 		firstRoute = webserver->routes;
 	}
 	//  clean the rest
-	onig_region_free( webserver->region, 1 ); webserver->region = NULL;
 	webserver->regexOptions = 0;
 	if ( picoev_is_active( webserver->core->loop, webserver->socketFd ) ) {
 		picoev_del( webserver->core->loop, webserver->socketFd );
