@@ -12,16 +12,28 @@
 #include "../core/utils.h"
 
 #define MAIN_OBJ_NAME "Urbin"
+#ifdef DEBUG
+#define JSN_GC_STRESSTEST do { \
+	JS::CallArgs a = CallArgsFromVp( argc, vp ); \
+	JSObject * go = JS_GetGlobalForObject( cx, &a.callee( ) ); \
+	struct javascript_t * t = (struct javascript_t *) JS_GetPrivate( go ); \
+	JS_GC( t->runtime ); \
+	} while ( 0 );
+
+#else
+#define JSN_GC_STRESSTEST /* */
+#endif
+#define JSN_GC_STRESSTEST_ENTRY JSN_GC_STRESSTEST
+#define JSN_GC_STRESSTEST_EXIT  JSN_GC_STRESSTEST
 
 /* ============================================================================================================================================================== */
 /* Naming convention deviations for this file                                                                                                                     */
 /*                                                                                                                                                                */
-/* Jsn	Javascript Spidermonkey Native function   static bool Jsn"Classname"t_"Function"( JSContext * cx, unsigned argc, jsval * vpn )                            */
+/* Jsn	Javascript Spidermonkey Native function   static bool Jsn"Classname"t_"Function"( JSContext * cx, unsigned argc, jsval * vp )                            */
 /* jsc  javascript spidermonkey class             static const JSClass jsc"ClassName"                                                                             */
 /* jsp  javascript spidermonkey property          static const JSPropertySpec jsp"ClassName"                                                                      */
 /* jsm  javascript spidermonkey method            static const JSFunctionSpec jsm"Classname"[]                                                                    */
 /* ============================================================================================================================================================== */
-
 
 typedef void 					( * queryResultHandler_cb_t )		( const struct query_t * query );
 
@@ -219,7 +231,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 } while ( 0 );
 
-static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vpn, const sqlNew_cb_t engine_new, const JSClass * jsnClass, const JSFunctionSpec jsms[] )  {
+static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, const sqlNew_cb_t engine_new, const JSClass * jsnClass, const JSFunctionSpec jsms[] )  {
 	struct sqlclient_t * sqlclient;
 	struct javascript_t * instance;
 	JSObject * globalObj, * sqlclientObj, * connObj, * thisObj;
@@ -229,7 +241,8 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vpn, con
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
 	cUserName = NULL;
 	cHostName = NULL;
 	cIp = NULL;
@@ -255,7 +268,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vpn, con
 		CONNOBJ_GET_PROP_STRING( "db", cDbName );
 		CONNOBJ_GET_PROP_NR( "port", port );
 	}
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( thisObj != NULL );
 	}
@@ -284,6 +297,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vpn, con
 	JS_free( cx, cUserName ); cUserName = NULL;
 	JS_free( cx, cPassword ); cPassword = NULL;
 	JS_free( cx, cDbName ); cDbName = NULL;
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -304,7 +318,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vpn, con
 	Payload_Call( payload ); \
 	} while ( 0 );
 
-static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryResultHandler_cb_t handler_cb ) {
+static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResultHandler_cb_t handler_cb ) {
 	struct payload_t * payload;
 	struct sqlclient_t * sqlclient;
 	jsval paramList, value, fnVal, dummyVal;
@@ -323,7 +337,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	value = JSVAL_NULL;
-	args = CallArgsFromVp( argc, vpn );
+	args = CallArgsFromVp( argc, vp );
 	i = 0;
 	sqlclient = NULL;
 	nParams = 0;
@@ -337,7 +351,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vpn, queryRes
 		paramList = args[1];
 		fnVal = args[2];
 	}
-	sqlObj = JS_THIS_OBJECT( cx, vpn );
+	sqlObj = JS_THIS_OBJECT( cx, vp );
 	JS::RootedObject        sqlObjRoot( cx, sqlObj );
 	JS::RootedValue 		paramListRoot( cx, paramList );
 	JS::HandleValue 		paramListHandle( paramListRoot );
@@ -543,8 +557,8 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * @see	Urbin.MysqlClient
  * @see	Urbin.PostgresqlClient.query
  */
-static bool JsnMysqlclient_Query( JSContext * cx, unsigned argc, jsval * vpn ) {
-	return SqlClientQuery( cx, argc, vpn, Mysqlclient_Query_ResultHandler_cb );
+static bool JsnMysqlclient_Query( JSContext * cx, unsigned argc, jsval * vp ) {
+	return SqlClientQuery( cx, argc, vp, Mysqlclient_Query_ResultHandler_cb );
 }
 
 static const JSClass jscMysqlclient = {
@@ -588,8 +602,8 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * @see	Urbin.MysqlClient.query
  * @see	Urbin.PostgreslClient
  */
-static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
-	return SqlClassConstructor( cx, argc, vpn, Mysql_New, &jscMysqlclient, jsmMysqlclient );
+static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
+	return SqlClassConstructor( cx, argc, vp, Mysql_New, &jscMysqlclient, jsmMysqlclient );
 }
 
 static void JsnMysqlclient_Finalizer( JSFreeOp * fop, JSObject * mysqlObj ) {
@@ -759,8 +773,8 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * @see	Urbin.PostgresqlClient
  * @see	Urbin.MysqlClient.query
  */
-static bool JsnPostgresqlclient_Query( JSContext * cx, unsigned argc, jsval * vpn ) {
-	return SqlClientQuery( cx, argc, vpn, Postgresqlclient_Query_ResultHandler_cb );
+static bool JsnPostgresqlclient_Query( JSContext * cx, unsigned argc, jsval * vp ) {
+	return SqlClientQuery( cx, argc, vp, Postgresqlclient_Query_ResultHandler_cb );
 }
 
 static const JSClass jscPostgresqlclient = {
@@ -806,8 +820,9 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
  */
 
 
-static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
-	return SqlClassConstructor( cx, argc, vpn, Postgresql_New, &jscPostgresqlclient, jsmPostgresqlclient );
+static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
+	JSN_GC_STRESSTEST_ENTRY
+	return SqlClassConstructor( cx, argc, vp, Postgresql_New, &jscPostgresqlclient, jsmPostgresqlclient );
 }
 
 static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresqlObj ) {
@@ -858,7 +873,7 @@ static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
  * @see	Urbin.webserverclient.response.setMime
  * @see	Urbin.webserverclient.response.setCode
  */
-static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserverclientresponse_t * response;
 	JS::CallArgs args;
 	JSString * jString;
@@ -868,8 +883,9 @@ static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc
 			unsigned char cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
 	cString = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
@@ -887,7 +903,7 @@ static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -916,7 +932,7 @@ static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc
  * @see	Urbin.webserverclient.response.setMime
  */
 
-static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserverclientresponse_t * response;
 	JS::CallArgs args;
 	JSObject * thisObj;
@@ -924,18 +940,19 @@ static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, j
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "i", &code ) == true );
 	if ( cleanUp.good ) {
-		thisObj = JS_THIS_OBJECT( cx, vpn );
+		thisObj = JS_THIS_OBJECT( cx, vp );
 		cleanUp.good = ( ( response = (struct webserverclientresponse_t *) JS_GetPrivate( thisObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( Webserverclientresponse_SetCode( response, (unsigned int) code ) ) ? 1 : 0;
 	}
-
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -965,7 +982,7 @@ static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, j
  * @see	Urbin.webserverclient.response.setContent
  * @see	Urbin.webserverclient.response.setCode
  */
-static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserverclientresponse_t * response;
 	JS::CallArgs args;
 	JSString * jString;
@@ -975,8 +992,9 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
 			unsigned char cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	args.rval( ).set( OBJECT_TO_JSVAL( thisObj ) );
 	cString = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
@@ -994,7 +1012,7 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1061,17 +1079,18 @@ printf( "%s\t%s\t%d\t%d\t%d\n", nameDup, valDup, startPos, endPos, len  );
  * @see	Urbin.webserverclient.response
  */
 
-static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserverclient_t * webserverclient;
 	struct namedRegex_t namedRegex;
 	JSObject * thisObj, * matchObj;
 	JS::CallArgs args;
 
+	JSN_GC_STRESSTEST_ENTRY
 	matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) );
 	JS::RootedObject matchObjRoot( cx, matchObj );
 	JS::MutableHandleObject matchObjMut( &matchObjRoot );
-	args = CallArgsFromVp( argc, vpn );
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	args = CallArgsFromVp( argc, vp );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	JS::RootedObject thisObjRoot( cx, thisObj );
 	webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
 	namedRegex.context = cx;
@@ -1079,6 +1098,7 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 	namedRegex.matchObjMut = &matchObjMut;
 	onig_foreach_name( webserverclient->route->urlRegex, Webclient_NamedGroup_cb, (void * ) &namedRegex );
 	args.rval( ).set( OBJECT_TO_JSVAL( matchObjMut.get( ) ) );
+	JSN_GC_STRESSTEST_EXIT
 	return true;
 }
 
@@ -1377,7 +1397,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * w
  * @see	Urbin.webserverclient.setMime
  * @see	Urbin.webserverclient.response
  */
-static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserver_t * webserver;
 	struct payload_t * payload;
 	JSObject * webserverObj;
@@ -1390,14 +1410,15 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 		unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
 	dummyVal = JSVAL_NULL;
 	paramVal = JSVAL_NULL;
 	cleanUp.good = ( argc == 2 );
 	fnVal = args[1];
 	cPattern = NULL;
 	payload = NULL;
-	webserverObj = JS_THIS_OBJECT( cx, vpn );
+	webserverObj = JS_THIS_OBJECT( cx, vp );
 	JS::RootedObject		webserverObjRoot( cx, webserverObj );
 	JS::RootedValue 		fnValRoot( cx, fnVal );
 	JS::HandleValue 		fnValHandle( fnValRoot );
@@ -1436,6 +1457,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.pattern ) {
 		JS_free( cx, cPattern ); cPattern = NULL;
 	}
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1458,7 +1480,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
  * @see	Urbin.Webserver.addRoute
  * @see	Urbin.webserverclient.get
  */
-static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserver_t * webserver;
 	JSObject * webServerObj;
 	JS::CallArgs args;
@@ -1469,8 +1491,9 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 		unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	webServerObj = JS_THIS_OBJECT( cx, vpn );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	webServerObj = JS_THIS_OBJECT( cx, vp );
+	args = CallArgsFromVp( argc, vp );
 	jPattern = NULL;
 	jDocumentRoot = NULL;
 	cDocumentRoot = NULL;
@@ -1502,6 +1525,7 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.pattern ) {
 		JS_free( cx, cPattern ); cPattern = NULL;
 	}
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -1542,7 +1566,7 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * @see	Urbin.Webserver.addDocumentRoot
  * @see	Urbin.Webserverclient
  */
-static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserver_t * webserver;
 	struct javascript_t * javascript;
 	JSObject * connObj, * webserverObj;
@@ -1552,7 +1576,8 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
 	timeoutSec = 0;
 	port = 0;
 	cServerIp = NULL;
@@ -1568,7 +1593,7 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 		CONNOBJ_GET_PROP_STRING( "ip", cServerIp );
 		CONNOBJ_GET_PROP_NR( "port", port );
 	}
-	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vpn ) );
+	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vp ) );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( thisObj != NULL );
 	}
@@ -1592,8 +1617,8 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn
 	} else {
 		args.rval( ).setUndefined( );
 	}
-
 	JS_free( cx, cServerIp ); cServerIp = NULL;
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -1611,8 +1636,8 @@ static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj ) {
  * @public
  * @namespace
  */
-static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn );
-static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vp );
+static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vp ) {
 	return true;
 }
 
@@ -1631,15 +1656,16 @@ static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @example
  *Urbin.shutdown( 10 );
  */
-static bool JsnUrbin_Shutdown( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnUrbin_Shutdown( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct javascript_t * javascript;
 	JS::CallArgs args;
 	int timeout;
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
-	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vpn ) );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
+	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vp ) );
 	if ( argc == 0 ) {
 		timeout = 1;
 	} else {
@@ -1651,6 +1677,7 @@ static bool JsnUrbin_Shutdown( JSContext * cx, unsigned argc, jsval * vpn ) {
 	if ( cleanUp.good ) {
 		javascript->core->keepOnRunning = 0;
 	}
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1691,7 +1718,7 @@ static const JSFunctionSpec jsmUrbin[ ] = {
  * @example
  * os.getEnv( 'SHELL' );
  */
-static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vp ) {
 	JSString * jString, *jValueString;
 	JS::CallArgs args;
 	const char * cValue;
@@ -1700,7 +1727,8 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
 			unsigned char cString:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	cString = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jString ) == true );
@@ -1726,7 +1754,7 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
 	if ( cleanUp.cString ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1749,7 +1777,7 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @example
  * var content = os.writefile( '/tmp/dummy.txt', 'blabla', true );
  */
-static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct javascript_t * javascript;
 	JSObject * thisObj;
 	JS::CallArgs args;
@@ -1768,13 +1796,14 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 			unsigned char content:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	JSN_GC_STRESSTEST_ENTRY
 	temp = 0;
 	cContent = NULL;
 	cFileName = NULL;
 	tFileName = NULL;
-	args = CallArgsFromVp( argc, vpn );
+	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	javascript = (struct javascript_t *) JS_GetPrivate( thisObj );
 	cleanUp.good = ( argc >= 2 );
 	if ( cleanUp.good ) {
@@ -1842,6 +1871,7 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 	if ( cleanUp.content ) {
 		JS_free( cx, cContent ); cContent = NULL;
 	}
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1864,7 +1894,7 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @example
  * var content = os.readfile( '/etc/hosts' );
  */
-static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct javascript_t * javascript;
 	JSObject * thisObj;
 	JSString *jFileName, * jContent;
@@ -1876,11 +1906,12 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 			unsigned char contents:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	cFileName = NULL;
 	content = NULL;
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	javascript = (struct javascript_t *) JS_GetPrivate( thisObj );
 	cleanUp.good = ( argc == 1 );
 	if ( cleanUp.good ) {
@@ -1910,6 +1941,7 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 	if ( cleanUp.fileName ) {
 		JS_free( cx, cFileName ); cFileName = NULL;
 	}
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1934,11 +1966,11 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @example:var r = os.exec( '/usr/bin/wget', 'http://www.verpeteren.nl -o /tmp/www.verpeteren.nl.html' );
  * console.log( r );
  */
-static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vpn ) {
+static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vp ) {
 	struct javascript_t * javascript;
 	JSObject * thisObj;
 	JSString * jParams, * jExec;
-	JS::CallArgs args = CallArgsFromVp( argc, vpn );
+	JS::CallArgs args = CallArgsFromVp( argc, vp );
 	char * cParams, * cExec, * cmd;
 	int rExec;
 	size_t execLen, paramLen, len;
@@ -1949,6 +1981,7 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vpn ) {
 			unsigned char exec:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	JSN_GC_STRESSTEST_ENTRY
 	len = 0;
 	execLen = 0;
 	rExec = 0;
@@ -1956,7 +1989,7 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vpn ) {
 	cExec = NULL;
 	cmd = NULL;
 	args.rval( ).setUndefined( );
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	thisObj = JS_THIS_OBJECT( cx, vp );
 	javascript = (struct javascript_t *) JS_GetPrivate( thisObj );
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "SS", &jExec, &jParams ) == true );
 	if ( cleanUp.good ) {
@@ -1999,6 +2032,7 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vpn ) {
 	if ( cleanUp.exec ) {
 		JS_free( cx, cExec ); cExec = NULL;
 	}
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2042,7 +2076,7 @@ static const JSFunctionSpec jsmOs[ ] = {
  * @example
  * console.log( 'hello world' );
  */
-static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct javascript_t * javascript;
 	JSObject * consoleObj;
 	JSString * jString;
@@ -2055,7 +2089,8 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 			unsigned char cstring:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	cString = NULL;
 	fileName = NULL;
@@ -2065,7 +2100,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	}
 	if ( cleanUp.good ) {
 		cleanUp.cstring = 1;
-		consoleObj = JS_THIS_OBJECT( cx, vpn );
+		consoleObj = JS_THIS_OBJECT( cx, vp );
 		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( consoleObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -2090,7 +2125,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vpn ) {
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
-
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2139,7 +2174,8 @@ static const JSFunctionSpec jsmConsole[ ] = {
  * 	console.log( 'loading failed: ' + e.getMessage( ) );
  * }
  */
-static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
+
+static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct javascript_t * javascript;
 	JSString * jFile;
 	JSObject * globalObj;
@@ -2149,8 +2185,9 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	JSN_GC_STRESSTEST_ENTRY
 	cFile = NULL;
-	args = CallArgsFromVp( argc, vpn );
+	args = CallArgsFromVp( argc, vp );
 	cleanUp.good = ( argc == 1 );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jFile ) == true );
@@ -2166,9 +2203,9 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vpn ) {
 		cleanUp.good = ( Javascript_AddScript( javascript, cFile ) != NULL );
 		JS_free( cx, cFile ); cFile = NULL;
 	}
-
 	success = ( cleanUp.good ) ? true : false;
 	args.rval( ).setBoolean( success );
+	JSN_GC_STRESSTEST_EXIT
 	return success;
 }
 
@@ -2252,14 +2289,14 @@ static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnM
 	JSObject * globalObj, * thisObj;
 	JS::CallArgs args;
 	jsval dummyVal, fnVal, * argsAt2;
-	const JS::Value * vpn;
+	const JS::Value * vp;
 	int ms;
 	struct {	unsigned char payload:1;
 				unsigned char timer:1;
 				unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	vpn = &vpnMut.get( );
+	vp = &vpnMut.get( );
 	fnVal = JSVAL_NULL;
 	dummyVal = JSVAL_NULL;
 	JS::RootedValue 		dummyValRoot( cx );
@@ -2269,8 +2306,8 @@ static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnM
 	JS::MutableHandleValue	fnValMut( &fnValRoot );
 	payload = NULL;
 	timing = NULL;
-	args = CallArgsFromVp( argc, (jsval *) vpn );
-	thisObj = JS_THIS_OBJECT( cx, (jsval *) vpn );
+	args = CallArgsFromVp( argc, (jsval *) vp );
+	thisObj = JS_THIS_OBJECT( cx, (jsval *) vp );
 	JS::RootedObject thisObjRoot( cx, thisObj );
 	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
 	javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
@@ -2280,7 +2317,7 @@ static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnM
 	}
 	if ( cleanUp.good ) {
 		if ( args.length( ) > 2 ) {
-			argsAt2 = ( (jsval *) vpn ) + 2;
+			argsAt2 = ( (jsval *) vp ) + 2;
 			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), *argsAt2, false ) ) != NULL );
 		} else {
 			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), JSVAL_NULL, false ) ) != NULL );
@@ -2328,9 +2365,10 @@ static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnM
  * @see	clearInterval
  */
 
-static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
-	JS::RootedValue 		vpnRoot( cx, *vpn );
+static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vp ) {
+	JS::RootedValue 		vpnRoot( cx, *vp );
 	JS::MutableHandleValue	vpnMut( &vpnRoot );
+	JSN_GC_STRESSTEST_ENTRY
 	return SetTimer( cx, argc, vpnMut, 0 );
 }
 
@@ -2357,9 +2395,10 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @see	clearInterval
  */
 
-static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) {
-	JS::RootedValue 		vpnRoot( cx, *vpn );
+static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vp ) {
+	JS::RootedValue 		vpnRoot( cx, *vp );
 	JS::MutableHandleValue	vpnMut( &vpnRoot );
+	JSN_GC_STRESSTEST_ENTRY
 	return SetTimer( cx, argc, vpnMut, 1 );
 }
 /**
@@ -2402,7 +2441,7 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
  * @see	setTimeout
  * @see	clearTimeout
  */
-static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct javascript_t * javascript;
 	unsigned int identifier;
 	JSObject * globalObj;
@@ -2410,7 +2449,8 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn )
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vpn );
+	JSN_GC_STRESSTEST_ENTRY
+	args = CallArgsFromVp( argc, vp );
 	args.rval( ).setUndefined( );
 	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "i", &identifier ) == true );
@@ -2418,7 +2458,7 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vpn )
 		javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
 		Core_DelTimingId( javascript->core, identifier );
 	}
-
+	JSN_GC_STRESSTEST_EXIT
 	return ( cleanUp.good ) ? true: false;
 }
 
