@@ -770,7 +770,8 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 		webserver->routes = NULL;
 		modulesSection = cfg_getnsec( (cfg_t *) core->config, "modules", 0 );
 		webserverSection = cfg_getnsec( modulesSection, "webserver", 0 );
-		webserver->regexOptions = ONIG_OPTION_SINGLELINE | ONIG_OPTION_FIND_LONGEST | ONIG_OPTION_CAPTURE_GROUP;  //  | ONIG_OPTION_IGNORECASE | ONIG_OPTION_DEFAULT;
+		//webserver->regexOptions = ONIG_OPTION_SINGLELINE | ONIG_OPTION_FIND_LONGEST | ONIG_OPTION_CAPTURE_GROUP;  //  | ONIG_OPTION_IGNORECASE | ONIG_OPTION_DEFAULT;
+		webserver->regexOptions = ONIG_OPTION_DEFAULT;
 		webserver->port = port;
 		if ( port == 0 ) {
 			webserver->port = (uint16_t) cfg_getint( webserverSection, "port" );

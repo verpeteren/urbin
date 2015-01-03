@@ -997,29 +997,43 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
 
 	return ( cleanUp.good ) ? true : false;
 }
+
 struct namedRegex_t{
-	JSContext * 			context;
-	JSObject * 				matchObj;
-	OnigRegion * 			region;
+	JSContext * 							context;
+	JS::MutableHandleObject	*				matchObjMut;
+	struct webserverclient_t *				webserverclient;
 };
 
 static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int ngroupNum, int* group_nums, regex_t* reg, void* cbArgs ) {
-	int i, gn;
 	struct namedRegex_t * namedRegex;
+	OnigRegion * region;
 	JSString * jString;
 	jsval jValue;
+	int i, gn, startPos, endPos;
+	const char * start;
+	int len;
+	char * nameDup, * valDup;
 
 	namedRegex = (struct namedRegex_t *) cbArgs;
+	region = namedRegex->webserverclient->webserver->region;
 	JS::RootedValue	jValueRoot( namedRegex->context, jValue );
-	JS::HandleValue	jValueHandle( jValueRoot );
-	JS::RootedObject matchObjRoot( namedRegex->context, namedRegex->matchObj );
 	for ( i = 0; i < ngroupNum; i++ ) {
 		gn = group_nums[i];
-		onig_name_to_backref_number( reg, name, nameEnd, namedRegex->region );
-		jString = JS_NewStringCopyN( namedRegex->context, (const char *) namedRegex->region->beg[gn], (size_t) ( namedRegex->region->end[gn] - namedRegex->region->beg[gn] ) );
+		onig_name_to_backref_number( reg, name, nameEnd, region );
+		startPos = region->beg[gn];
+		endPos = region->end[gn];
+		len = endPos - startPos;
+		start = namedRegex->webserverclient->header->RequestURI + startPos;
+		nameDup = Xstrdup( (const char *) name );
+		valDup = (char *) calloc( 1, len + 1 );
+		strncat( valDup, start, len );
+printf( "%s\t%s\t%d\t%d\t%d\n", nameDup, valDup, startPos, endPos, len  );
+		jString = JS_NewStringCopyZ( namedRegex->context, valDup );
 		jValue =  STRING_TO_JSVAL( jString );
-		JS::HandleObject matchObjHandle( matchObjRoot );
-		JS_SetProperty( namedRegex->context, matchObjHandle, (const char *) name, jValueHandle );
+		JS::HandleValue	jValueHandle( jValueRoot );
+		JS_SetProperty( namedRegex->context, *namedRegex->matchObjMut, nameDup, jValueHandle );
+		free( nameDup ); nameDup = NULL;
+		free( valDup ); valDup = NULL;
 	}
 	return 0;  /* 0: continue */
 }
@@ -1037,9 +1051,9 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
  *
  * @example
  * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
- * ws.addRoute( '^/blog/(?<year>\d{4})/(?<month>\d{1,2}/(?<day>\d{1,2}))', function( client ) {
+ * ws.addRoute( '^/blog/(?<year>\d{4})/(?<month>\d{1,2})/(?<day>\d{1,2})', function( client ) {
  * 	var params = client.getNamedGroups( );
- * 	console.log( params.year + '-' + params.month + '-' + params.day )
+ * 	console.log( params.year + '-' + params.month + '-' + params.day );
  * 	} );
  * @see	Hard.Webserver
  * @see	Hard.Webserver.addRoute
@@ -1050,23 +1064,22 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserverclient_t * webserverclient;
 	struct namedRegex_t namedRegex;
-	JSObject * thisObj;
+	JSObject * thisObj, * matchObj;
 	JS::CallArgs args;
-	struct {unsigned char good:1;
-			unsigned char cstring:1;} cleanUp;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) );
+	JS::RootedObject matchObjRoot( cx, matchObj );
+	JS::MutableHandleObject matchObjMut( &matchObjRoot );
 	args = CallArgsFromVp( argc, vpn );
 	thisObj = JS_THIS_OBJECT( cx, vpn );
-	webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
 	JS::RootedObject thisObjRoot( cx, thisObj );
+	webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
 	namedRegex.context = cx;
-	namedRegex.matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) );
-	namedRegex.region = webserverclient->webserver->region;
-	JS::RootedObject matchObjRoot( cx, namedRegex.matchObj );
+	namedRegex.webserverclient = webserverclient;
+	namedRegex.matchObjMut = &matchObjMut;
 	onig_foreach_name( webserverclient->route->urlRegex, Webclient_NamedGroup_cb, (void * ) &namedRegex );
-	args.rval( ).set( OBJECT_TO_JSVAL( namedRegex.matchObj ) );
-	return ( cleanUp.good ) ? true : false;
+	args.rval( ).set( OBJECT_TO_JSVAL( matchObjMut.get( ) ) );
+	return true;
 }
 
 /**
