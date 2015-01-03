@@ -525,6 +525,7 @@ int Core_Loop( struct core_t * core ) {
 		} while ( cleanUp.good && module != firstModule );
 	}
 	if ( cleanUp.good ) {
+		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Starting loop" );
 		core->keepOnRunning = 1;
 		while ( core->keepOnRunning == 1 )  {
 			Core_ProcessTick( core );
