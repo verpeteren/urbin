@@ -5,10 +5,8 @@
 
 #include "./platform.h"
 
-#define __RONJA_COMMON_H_
-
-#define PR_NAME										"ronja"
-#define PR_VERSION									"0.0.8a"
+#define PR_NAME										"urbin"
+#define PR_VERSION									"0.0.9"
 #define PR_MAINCONFIG_FILENAME						"./etc/" PR_NAME ".conf"
 #define PR_CFG_LOOP_MAX_FDS							1024						//  cfg:  main/loop_max_fds
 #define PR_CFG_LOOP_RUN_AS_USER						"daemon"					//  cfg:  main/loop_run_as_user

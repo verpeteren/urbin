@@ -1,4 +1,4 @@
-# RONJA
+# URBIN
 
 
 ## Introduction
@@ -59,15 +59,15 @@ Peter Reijnders <peter.reijnders@verpeteren.nl>
 
 >	`cd ../bin`
 
->	`vi ./etc/ronja.conf`
+>	`vi ./etc/urbin.conf`
 
 >	#then hack
 
->	`vi ../var/scripts/javascript/main.hard.js`
+>	`vi ../var/scripts/javascript/main.urbin.js`
 
 >	#Then run
 
->	`./ronja`
+>	`./urbin`
 
 ## Project organisation
 
@@ -137,6 +137,6 @@ E:	**`error while loading shared libraries: libXXX.so: cannot open shared object
 
 S: `export LD_LIBRARY_PATH=`pwd``
 
-E: **`./etc/ronja.conf:2:` "`no such option`" or "`missing title for section`" or "`invalid integer value for option`"**
+E: **`./etc/urbin.conf:2:` "`no such option`" or "`missing title for section`" or "`invalid integer value for option`"**
 
 S: check that config file, in line 2: there is a typo

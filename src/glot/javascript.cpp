@@ -11,7 +11,7 @@
 #include "../feature/webserver.h"
 #include "../core/utils.h"
 
-#define MAIN_OBJ_NAME "Hard"
+#define MAIN_OBJ_NAME "Urbin"
 
 /* ============================================================================================================================================================== */
 /* Naming convention deviations for this file                                                                                                                     */
@@ -47,44 +47,44 @@ static struct script_t * 			Javascript_AddScript			( struct javascript_t * javas
 static int jsInterpretersAlive = 0;
 
 inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, const char * action ) {
-	JSObject * hardObj;
-	jsval hardVal;
+	JSObject * urbinObj;
+	jsval urbinVal;
 
-	hardObj = NULL;
-	hardVal = JSVAL_NULL;
+	urbinObj = NULL;
+	urbinVal = JSVAL_NULL;
 	JSAutoRequest			ar( javascript->context );
 	JSAutoCompartment		ac( javascript->context, javascript->globalObj );
 	JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
 	JS::HandleObject		globalObjHandle( globalObjRoot );
 	JS::RootedValue			rValRoot( javascript->context );
 	JS::MutableHandleValue	rValMut( &rValRoot );
-	JS::RootedValue			hardValRoot( javascript->context, hardVal );
-	JS::HandleValue			hardValHandle( hardValRoot );
-	JS::MutableHandleValue	hardValMut( &hardValRoot );
-	JS::RootedObject		hardObjRoot( javascript->context, hardObj );
-	JS::HandleObject		hardObjHandle( hardObjRoot );
-	JS::MutableHandleObject	hardObjMut( &hardObjRoot );
-	JS_GetProperty( javascript->context, globalObjHandle, MAIN_OBJ_NAME, hardValMut );
-	JS_ValueToObject( javascript->context, hardValHandle, hardObjMut );
-	JS_CallFunctionName( javascript->context, hardObjHandle, action, JS::HandleValueArray::empty( ), rValMut );
+	JS::RootedValue			urbinValRoot( javascript->context, urbinVal );
+	JS::HandleValue			urbinValHandle( urbinValRoot );
+	JS::MutableHandleValue	urbinValMut( &urbinValRoot );
+	JS::RootedObject		urbinObjRoot( javascript->context, urbinObj );
+	JS::HandleObject		urbinObjHandle( urbinObjRoot );
+	JS::MutableHandleObject	urbinObjMut( &urbinObjRoot );
+	JS_GetProperty( javascript->context, globalObjHandle, MAIN_OBJ_NAME, urbinValMut );
+	JS_ValueToObject( javascript->context, urbinValHandle, urbinObjMut );
+	JS_CallFunctionName( javascript->context, urbinObjHandle, action, JS::HandleValueArray::empty( ), rValMut );
 }
 
 /**
  * The spidermonkey module is loaded.
  *
- * @name	Hard.onLoad
+ * @name	Urbin.onLoad
  * @event
  * @public
  * @since	0.0.8a
  * @returns	{null}
  *
  * @example
- * Hard.onLoad = function( ) {
+ * Urbin.onLoad = function( ) {
  * 	console.log( "loaded" );
  * };
  *
- * @see	Hard.onReady
- * @see	Hard.onUnload
+ * @see	Urbin.onReady
+ * @see	Urbin.onUnload
  */
 unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t * module, void * cbArgs ) {
 	struct javascript_t * javascript;
@@ -119,19 +119,19 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
 /**
  * The javascript module is loaded and ready to run.
  *
- * @name	Hard.onReady
+ * @name	Urbin.onReady
  * @event
  * @public
  * @since	0.0.8a
  * @returns	{null}
  *
  * @example
- * Hard.onReady = function( ) {
+ * Urbin.onReady = function( ) {
  * 	console.log( "loaded and ready" );
  * };
  *
- * @see	Hard.onLoad
- * @see	Hard.onUnload
+ * @see	Urbin.onLoad
+ * @see	Urbin.onUnload
  */
 unsigned char JavascriptModule_Ready( const struct core_t * core, struct module_t * module, void * args ) {
 	struct javascript_t * javascript;
@@ -148,20 +148,20 @@ unsigned char JavascriptModule_Ready( const struct core_t * core, struct module_
 /**
  * The javascript module is stopping.
  *
- * @name	Hard.onUnload
+ * @name	Urbin.onUnload
  * @event
  * @public
  * @since	0.0.8a
  * @returns	{null}
  *
  * @example
- * Hard.onUnload = function( ) {
+ * Urbin.onUnload = function( ) {
  * 	console.log( "unloading" );
  * };
  *
- * @see	Hard.onLoad
- * @see	Hard.onReady
- * @see	Hard.shutdown
+ * @see	Urbin.onLoad
+ * @see	Urbin.onReady
+ * @see	Urbin.shutdown
  */
 unsigned char JavascriptModule_Unload( const struct core_t * core, struct module_t * module, void * args ) {
 	struct javascript_t * javascript;
@@ -180,7 +180,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 /**
  * Sql client connection object.
  *
- * @name Hard.Sqlclient
+ * @name Urbin.Sqlclient
  * @private
  * @object
  */
@@ -520,7 +520,7 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  *
  * The results of the command handled by a javascript function.
  *
- * @name	Hard.MysqlClient.query
+ * @name	Urbin.MysqlClient.query
  * @function
  * @public
  * @since	0.0.5b
@@ -530,7 +530,7 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * @param	{function}	fn				The callback function {response}
  *
  * @example
- * var my = Hard.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 3306}, 60 );
+ * var my = Urbin.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 3306}, 60 );
  * my.query( "SELECT name, sales FROM sales WHERE customer = $1 );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( rows ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
@@ -540,8 +540,8 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * 		}
  * 	} );
  *
- * @see	Hard.MysqlClient
- * @see	Hard.PostgresqlClient.query
+ * @see	Urbin.MysqlClient
+ * @see	Urbin.PostgresqlClient.query
  */
 static bool JsnMysqlclient_Query( JSContext * cx, unsigned argc, jsval * vpn ) {
 	return SqlClientQuery( cx, argc, vpn, Mysqlclient_Query_ResultHandler_cb );
@@ -561,7 +561,7 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
 /**
  * Connect to a mysql server.
  *
- * @name	Hard.MysqlClient
+ * @name	Urbin.MysqlClient
  * @constructor
  * @public
  * @since	0.0.5b
@@ -576,7 +576,7 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
- * var my = Hard.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * var my = Urbin.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
  * my.query( "SELECT name, sales FROM sales WHERE customer = ? );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
@@ -585,8 +585,8 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * 			}
  * 		}
  * 	} );
- * @see	Hard.MysqlClient.query
- * @see	Hard.PostgreslClient
+ * @see	Urbin.MysqlClient.query
+ * @see	Urbin.PostgreslClient
  */
 static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
 	return SqlClassConstructor( cx, argc, vpn, Mysql_New, &jscMysqlclient, jsmMysqlclient );
@@ -736,7 +736,7 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  *
  * The results of the command handled by a javascript function.
  *
- * @name	Hard.PostgresqlClient.query
+ * @name	Urbin.PostgresqlClient.query
  * @function
  * @public
  * @since	0.0.5b
@@ -746,7 +746,7 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * @param	{function}	fn				The callback function {response}
  *
  * @example
- * var pg = Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * var pg = Urbin.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
  * pg.query( "SELECT name, sales FROM sales WHERE customer = $1 );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
@@ -756,8 +756,8 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * 		}
  * 	} );
  *
- * @see	Hard.PostgresqlClient
- * @see	Hard.MysqlClient.query
+ * @see	Urbin.PostgresqlClient
+ * @see	Urbin.MysqlClient.query
  */
 static bool JsnPostgresqlclient_Query( JSContext * cx, unsigned argc, jsval * vpn ) {
 	return SqlClientQuery( cx, argc, vpn, Postgresqlclient_Query_ResultHandler_cb );
@@ -777,7 +777,7 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
 /**
  * Connect to a postgresql server.
  *
- * @name	Hard.PostgresqlClient
+ * @name	Urbin.PostgresqlClient
  * @constructor
  * @public
  * @since	0.0.5b
@@ -792,7 +792,7 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
- * var pg = Hard.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * var pg = Urbin.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
  * pg.query( "SELECT name, sales FROM sales WHERE customer = $1 );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
@@ -801,8 +801,8 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
  * 			}
  * 		}
  * 	} );
- * @see	Hard.PostgresqlClient.query
- * @see	Hard.MysqlClient
+ * @see	Urbin.PostgresqlClient.query
+ * @see	Urbin.MysqlClient
  */
 
 
@@ -826,7 +826,7 @@ extern const char * MethodDefinitions[ ];
 /**
  * Webserver response object.
  *
- * @name Hard.Webserver.req
+ * @name Urbin.Webserver.req
  * @private
  * @object
  */
@@ -837,26 +837,26 @@ static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
  *
  * In a dynamic route, the body can be set manually
  *
- * @name	Hard.Webserverclient.setContent
+ * @name	Urbin.Webserverclient.setContent
  * @function
  * @public
  * @since	0.0.8a
- * @returns	{Hard.Webserverclient}
+ * @returns	{Urbin.Webserverclient}
  * @param	{string}		the content of the http response.
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
  * //  or as the longer form
  * 	client.response.setMime( 'text/html' );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.response
- * @see	Hard.webserverclient.response.setMime
- * @see	Hard.webserverclient.response.setCode
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.response.setMime
+ * @see	Urbin.webserverclient.response.setCode
  */
 static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserverclientresponse_t * response;
@@ -896,24 +896,24 @@ static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc
  *
  * In a dynamic route, the http code can be set manually
  *
- * @name	Hard.Webserverclient.setCode
+ * @name	Urbin.Webserverclient.setCode
  * @function
  * @public
  * @since	0.0.8a
- * @returns	{Hard.Webserverclient}
+ * @returns	{Urbin.Webserverclient}
  * @param	{integer}		the return code. e.g. 404 for 'Not Found'
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.response
- * @see	Hard.webserverclient.response.setContent
- * @see	Hard.webserverclient.response.setMime
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setMime
  */
 
 static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, jsval * vpn ) {
@@ -944,26 +944,26 @@ static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, j
  *
  * In a dynamic route, the mimetype can be set manually
  *
- * @name	Hard.Webserverclient.setMime
+ * @name	Urbin.Webserverclient.setMime
  * @function
  * @public
  * @since	0.0.8a
- * @returns	{Hard.Webserverclient}
+ * @returns	{Urbin.Webserverclient}
  * @param	{string}		the mimetype to set. Currently the list of mime types is limited as is the background a typedef is used
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
  * //  or as the longer form
  * 	client.response.setMime( 'text/html' );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.response
- * @see	Hard.webserverclient.response.setContent
- * @see	Hard.webserverclient.response.setCode
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setCode
  */
 static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserverclientresponse_t * response;
@@ -1043,22 +1043,22 @@ printf( "%s\t%s\t%d\t%d\t%d\n", nameDup, valDup, startPos, endPos, len  );
  *
  * In a dynamic route, the route can be defined with regexes with named groups. these will be set in an object
  *
- * @name	Hard.Webserverclient.getNamedGroups
+ * @name	Urbin.Webserverclient.getNamedGroups
  * @function
  * @public
  * @since	0.0.8a
  * @returns	{object}
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/blog/(?<year>\d{4})/(?<month>\d{1,2})/(?<day>\d{1,2})', function( client ) {
  * 	var params = client.getNamedGroups( );
  * 	console.log( params.year + '-' + params.month + '-' + params.day );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.response
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.response
  */
 
 static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, jsval * vpn ) {
@@ -1087,28 +1087,28 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
  *
  * In a dynamic route, this is variable is available in the callback function
  *
- * @name	Hard.Webserverclient
+ * @name	Urbin.Webserverclient
  * @object
  * @public
  * @since	0.0.8a
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.response
- * @see	Hard.webserverclient.getNamedGroups
- * @see	Hard.webserverclient.ip
- * @see	Hard.webserverclient.url
- * @see	Hard.webserverclient.method
- * @see	Hard.webserverclient.response
- * @see	Hard.webserverclient.response.setContent
- * @see	Hard.webserverclient.response.setCode
- * @see	Hard.webserverclient.response.setMime
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.getNamedGroups
+ * @see	Urbin.webserverclient.ip
+ * @see	Urbin.webserverclient.url
+ * @see	Urbin.webserverclient.method
+ * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setCode
+ * @see	Urbin.webserverclient.response.setMime
  */
 
 static const JSClass jscWebserverclient = {
@@ -1127,23 +1127,23 @@ static const JSFunctionSpec jsmWebserverclient[ ] = {
  *
  * In a dynamic route, this is variable is available in the callback function
  *
- * @name	Hard.Webserverclient.response
+ * @name	Urbin.Webserverclient.response
  * @object
  * @public
  * @since	0.0.8a
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	client.response.setCode( 404 ).setContent( 'Not found!' ).setMime( 'html' );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.response
- * @see	Hard.webserverclient.response.setContent
- * @see	Hard.webserverclient.response.setCode
- * @see	Hard.webserverclient.response.setMime
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setCode
+ * @see	Urbin.webserverclient.response.setMime
  */
 
 
@@ -1163,77 +1163,77 @@ static const JSFunctionSpec jsmWebserverclientresponse[ ] = {
 /**
  * The Ip address of the connected HTTP client
  *
- * @name	Hard.Webserverclient.ip
+ * @name	Urbin.Webserverclient.ip
  * @field
  * @public
  * @since	0.0.8a
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	console.log( "ip: " + client.response.ip );
  * 	console.log( "url: " + client.response.url );
  * 	console.log( "method: " + client.response.method );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.url
- * @see	Hard.webserverclient.method
- * @see	Hard.webserverclient.response.setContent
- * @see	Hard.webserverclient.response.setCode
- * @see	Hard.webserverclient.response.setMime
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.url
+ * @see	Urbin.webserverclient.method
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setCode
+ * @see	Urbin.webserverclient.response.setMime
  */
 
 
 /**
  * The url requested by of the connected HTTP client
  *
- * @name	Hard.Webserverclient.url
+ * @name	Urbin.Webserverclient.url
  * @field
  * @public
  * @since	0.0.8a
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	console.log( "ip: " + client.response.ip );
  * 	console.log( "url: " + client.response.url );
  * 	console.log( "method: " + client.response.method );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.ip
- * @see	Hard.webserverclient.method
- * @see	Hard.webserverclient.response.setContent
- * @see	Hard.webserverclient.response.setCode
- * @see	Hard.webserverclient.response.setMime
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.ip
+ * @see	Urbin.webserverclient.method
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setCode
+ * @see	Urbin.webserverclient.response.setMime
  */
 
 /**
  * The method [POST or GET ] that was requested by the connected HTTP client
  *
- * @name	Hard.Webserverclient.method
+ * @name	Urbin.Webserverclient.method
  * @field
  * @public
  * @since	0.0.8a
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	console.log( "ip: " + client.response.ip );
  * 	console.log( "url: " + client.response.url );
  * 	console.log( "method: " + client.response.method );
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.ip
- * @see	Hard.webserverclient.url
- * @see	Hard.webserverclient.response.setContent
- * @see	Hard.webserverclient.response.setCode
- * @see	Hard.webserverclient.response.setMime
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.ip
+ * @see	Urbin.webserverclient.url
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setCode
+ * @see	Urbin.webserverclient.response.setMime
  */
 
 
@@ -1361,7 +1361,7 @@ static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * w
  *
  * A javascript function will handle the request.
  *
- * @name	Hard.Webserver.addRoute
+ * @name	Urbin.Webserver.addRoute
  * @function
  * @public
  * @since	0.0.5b
@@ -1370,18 +1370,18 @@ static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * w
  * @param	{function}		fn		The callback function {response}
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	console.log( 'got ' + client.url );
  * 	client.response.setContent = '<html><h1>response</h1><html>';
  * 	} );
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addDocumentRoot
- * @see	Hard.webserverclient
- * @see	Hard.webserverclient.setContent
- * @see	Hard.webserverclient.setCode
- * @see	Hard.webserverclient.setMime
- * @see	Hard.webserverclient.response
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addDocumentRoot
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.setContent
+ * @see	Urbin.webserverclient.setCode
+ * @see	Urbin.webserverclient.setMime
+ * @see	Urbin.webserverclient.response
  */
 static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
@@ -1448,7 +1448,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 /**
  * Add a route to the webserver to serve static pages.
  *
- * @name	Hard.Webserver.addDocumentRoot
+ * @name	Urbin.Webserver.addDocumentRoot
  * @function
  * @public
  * @since	0.0.5b
@@ -1457,12 +1457,12 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
  * @param	{string}		documentRoot	The folder name that acts as the document root for this webserver.<p>default: The value for 'document_root' in the http section of the configurationFile</p>
  *
  * @example
- * var ws = Hard.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
+ * var ws = Urbin.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
  * ws.addDocumentRoot( '^/static/(.*)', '/var/www/static/' );
  *
- * @see	Hard.Webserver
- * @see	Hard.Webserver.addRoute
- * @see	Hard.webserverclient.get
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient.get
  */
 static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
@@ -1526,7 +1526,7 @@ static const JSFunctionSpec jsmWebserver[ ] = {
 /**
  * Start a webserver.
  *
- * @name	Hard.Webserver
+ * @name	Urbin.Webserver
  * @constructor
  * @public
  * @since	0.0.5b
@@ -1537,16 +1537,16 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the webserver section of the configurationFile.</p>
  *
  * @example
- * var ws = Hard.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
  * 	console.log( 'got ' + client.url );
  * 	client.response.setContent = '<html><h1>response</h1><html>';
  * 	} );
  * ws.addDocumentRoot( '^/static/(.*)', '/var/www/static/' );
  *
- * @see	Hard.Webserver.addRoute
- * @see	hard.Webserver.addDocumentRoot
- * @see	hard.Webserverclient
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.Webserver.addDocumentRoot
+ * @see	Urbin.Webserverclient
  */
 static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct webserver_t * webserver;
@@ -1611,9 +1611,9 @@ static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj ) {
 	}
 }
 /**
- * Hard javascript object.
+ * Urbin javascript object.
  *
- * @name Hard
+ * @name Urbin
  * @public
  * @namespace
  */
@@ -1627,7 +1627,7 @@ static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn ) {
  *:
  * This will stop the engine.
  *
- * @name	Hard.shutdown
+ * @name	Urbin.shutdown
  * @function
  * @public
  * @since	0.0.5b
@@ -1635,9 +1635,9 @@ static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @param	{integer}		[timeout]	Time to wait before the shut down should start. Defaults to 1 second.
  *
  * @example
- *Hard.shutdown( 10 );
+ *Urbin.shutdown( 10 );
  */
-static bool JsnHard_Shutdown( JSContext * cx, unsigned argc, jsval * vpn ) {
+static bool JsnUrbin_Shutdown( JSContext * cx, unsigned argc, jsval * vpn ) {
 	struct javascript_t * javascript;
 	JS::CallArgs args;
 	int timeout;
@@ -1660,14 +1660,14 @@ static bool JsnHard_Shutdown( JSContext * cx, unsigned argc, jsval * vpn ) {
 	return ( cleanUp.good ) ? true : false;
 }
 
-static const JSClass jscHard = {
+static const JSClass jscUrbin = {
 	MAIN_OBJ_NAME,
 	JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
 };
 
-static const JSFunctionSpec jsmHard[ ] = {
-	JS_FS( "shutdown", 			JsnHard_Shutdown, 1, 0 ),
+static const JSFunctionSpec jsmUrbin[ ] = {
+	JS_FS( "shutdown", 			JsnUrbin_Shutdown, 1, 0 ),
 	JS_FS( "onLoad", 			JsnFunction_Stub, 0, 0 ),
 	JS_FS( "onReady", 			JsnFunction_Stub, 0, 0 ),
 	JS_FS( "onUnload", 			JsnFunction_Stub, 0, 0 ),
@@ -1745,7 +1745,7 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vpn ) {
  * @function
  * @since	0.0.8a
  *
- * @param {string} 		filename 	Filename to write to. If the filename is null, then a temporary file will be created. e.g /tmp/hardXXXXXX
+ * @param {string} 		filename 	Filename to write to. If the filename is null, then a temporary file will be created. e.g /tmp/urbinXXXXX
  * @param {string} 		content 	The content that will be written to the file
  * @param {boolean} 	append 	Append to the file: False: create a new file. True: appends if the file exists, else it creates a new one:
  * @returns {string} 	The filename on success, false on failure, null on incorrect parameters
@@ -1807,7 +1807,7 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vpn ) {
 			cleanUp.good = ( ( tFileName = (char *) malloc( strlen( MAIN_OBJ_NAME ) + 5 + 1 + 6 ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.tFileName = 1;
-				snprintf( tFileName, 15, "/tmp/%-4s/XXXXXX", MAIN_OBJ_NAME );
+				snprintf( tFileName, 15, "/tmp/%-5s/XXXXX", MAIN_OBJ_NAME );
 				cFileName = tFileName;
 			}
 		}
@@ -2322,7 +2322,7 @@ static bool SetTimer( JSContext * cx, unsigned argc, jsval * vpn, const unsigned
  *
  * @example
  * var timeoutId = setInterval( function( a, b ) {
- * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * 	console.log( 'Foo : ' + a + ' Bar : ' + b );
  * }, 3000, 'foo', 'bar' );
  * ClearTimeout( timeoutId );
  *
@@ -2349,7 +2349,7 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
  *
  * @example
  * var timeoutId = setInterval( function( a, b ) {
- * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * 	console.log( 'Foo : ' + a + ' Bar : ' + b );
  * }, 3000, 'foo', 'bar' );
  * clearInterval( timeoutId );
  *
@@ -2373,7 +2373,7 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
  *
  * @example
  * var timeoutId = setInterval( function( a, b ) {
- * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * 	console.log( 'Foo : ' + a + ' Bar : ' + b );
  * }, 3000, 'foo', 'bar' );
  * ClearTimeout( timeoutId );
  *
@@ -2393,7 +2393,7 @@ static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) 
  *
  * @example
  * var timeoutId = setInterval( function( a, b ) {
- * 	Hard.log( 'Foo : ' + a + ' Bar : ' + b );
+ * 	console.log( 'Foo : ' + a + ' Bar : ' + b );
  * }, 3000, 'foo', 'bar' );
  * clearInterval( timeoutId );
  *
@@ -2530,22 +2530,22 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	JS_SetPrivate( osObj, (void * ) javascript );
 
 
-	JSObject * hardObj;
-	hardObj = 	JS_InitClass( javascript->context, globalObjHandle, JS::NullPtr( ), &jscHard, nullptr, 0, nullptr, jsmHard, nullptr, nullptr );
-	JS::RootedObject			hardObjRoot( javascript->context, hardObj );
-	JS::HandleObject			hardObjHandle( hardObjRoot );
-	JS_SetPrivate( hardObj, (void * ) javascript );
+	JSObject * urbinObj;
+	urbinObj = 	JS_InitClass( javascript->context, globalObjHandle, JS::NullPtr( ), &jscUrbin, nullptr, 0, nullptr, jsmUrbin, nullptr, nullptr );
+	JS::RootedObject			urbinObjRoot( javascript->context, urbinObj );
+	JS::HandleObject			urbinObjHandle( urbinObjRoot );
+	JS_SetPrivate( urbinObj, (void * ) javascript );
 
 	JSObject * webserverObj;
-	webserverObj = 	JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscWebserver, JsnWebserver_Constructor, 1, nullptr, jsmWebserver, nullptr, nullptr );
+	webserverObj = 	JS_InitClass( javascript->context, urbinObjHandle, JS::NullPtr( ), &jscWebserver, JsnWebserver_Constructor, 1, nullptr, jsmWebserver, nullptr, nullptr );
 	JS::RootedObject webserverObjRoot( javascript->context, webserverObj );
 #if HAVE_MYSQL == 1
 	JSObject * mysqlObj;
-	mysqlObj = JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 1, nullptr, jsmMysqlclient, nullptr, nullptr );
+	mysqlObj = JS_InitClass( javascript->context, urbinObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 1, nullptr, jsmMysqlclient, nullptr, nullptr );
 	JS::RootedObject mysqlObjRoot( javascript->context, mysqlObj );
 #endif
 	JSObject * postgresqlObj;
-	postgresqlObj =  JS_InitClass( javascript->context, hardObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 1, nullptr, jsmPostgresqlclient, nullptr, nullptr );
+	postgresqlObj =  JS_InitClass( javascript->context, urbinObjHandle, JS::NullPtr( ), &jscPostgresqlclient, JsnPostgresqlclient_Constructor, 1, nullptr, jsmPostgresqlclient, nullptr, nullptr );
 	JS::RootedObject pgsqlclientObj( javascript->context, postgresqlObj );
 
 	cleanUp.good = ( Javascript_AddScript( javascript, javascript->fileName ) != NULL );

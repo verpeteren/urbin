@@ -51,7 +51,7 @@ HTMLDOC_DIR = $(DOC_DIR)/html
 DOC_OBJECTS = $(DOC_API_OBJECT) $(HTMLDOC_DIR)
 CODE_OBJECTS = $(CORE_OBJECTS) $(FEAT_OBJECTS) $(GLOT_OBJECTS) $(MAIN_OBJECTS)
 
-THE_EXECUTABLE = $(BIN_DIR)/ronja
+THE_EXECUTABLE = $(BIN_DIR)/urbin
 
 all: 	$(THE_EXECUTABLE) 
 deps:	$(DEPS)
@@ -137,7 +137,7 @@ $(OBJ_DIR)/%.o:						$(GLOT_DIR)/%.cpp
 $(DOC_API_OBJECT): tags
 	@echo $@
 	@echo 'PUBLIC\n' */* > $@ && \
-	grep "^RONJA_" tags|cut -f1|sort >> $@ 
+	grep "^URBIN_" tags|cut -f1|sort >> $@ 
 
 include ./Makefile_documentation.mk
 

@@ -66,11 +66,11 @@ fi
 		make all
 		#Then configure
 		cd ../bin
-		vi ./etc/ronja.conf
+		vi ./etc/urbin.conf
 		#then hack
 		vi ../var/scripts/javascript/main.hard.js
 		#Then run
-		./ronja
+		./urbin
 		
 ENDING
 
