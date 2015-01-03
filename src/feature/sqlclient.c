@@ -328,7 +328,7 @@ struct sqlclient_t * Postgresql_New( const struct core_t * core, const char * ho
 	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, ip, prt, loginName, password, dbName, timeSec );
 }
 
-#if 1 || HAVE_MYSQL == 1
+#if HAVE_MYSQL == 1
 /*****************************************************************************/
 /* MYSQL                                                                     */
 /*****************************************************************************/
@@ -392,7 +392,7 @@ static void	Mysql_HandleSetParams_cb( picoev_loop * loop, const int fd, const in
 		Sqlclient_CloseConn( sqlclient );
 	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
-		if ( sqlclient->connection.my.conn->call_it != NULL) {
+		if ( sqlclient->connection.my.conn->call_it != NULL ) {
 			retCode = mysac_io( sqlclient->connection.my.conn );
 			if ( retCode == MYERR_WANT_READ || retCode == MYERR_WANT_WRITE ) {
 				//  loop once more
@@ -476,7 +476,7 @@ static void	Mysql_HandleWrite_cb( picoev_loop * loop, const int fd, const int ev
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
 		query = Sqlclient_PopQuery( sqlclient );
 		if ( query != NULL ) {
-			if ( sqlclient->connection.my.conn->call_it == NULL) {
+			if ( sqlclient->connection.my.conn->call_it == NULL ) {
 				readyToSend = 1;
 			} else {
 				retCode = mysac_io( sqlclient->connection.my.conn );
