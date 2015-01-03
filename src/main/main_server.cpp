@@ -44,7 +44,7 @@ int main( int argc, const char ** argv ) {
 	fds = PR_CFG_CORE_MAX_FDS;
 	if ( cleanUp.good ) {
 		mainSection = cfg_getnsec( config, "main", 0 );
-		fds = cfg_getint( mainSection, "loop_max_fds" );
+		fds = cfg_getint( mainSection, "max_fds" );
 	}
 	Boot( fds );
 	if ( cleanUp.good ) {
