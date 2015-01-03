@@ -80,3 +80,92 @@
 	...
 	fun:_dl_init
 }
+{
+   JSVAL FUNCTION ON Jsheap 1
+   Memcheck:Cond
+   fun:_ZN2js9GCMethodsIP8JSObjectE16needsPostBarrierES2_
+   fun:_ZN2JS4HeapIP8JSObjectE3setES2_
+   fun:_ZN2JS4HeapIP8JSObjectEaSERKS3_
+   fun:_ZL11Payload_NewP9JSContextP8JSObjectN2JS5ValueES4_b
+   fun:_ZL28JsnWebserver_AddDynamicRouteP9JSContextjPN2JS5ValueE
+   fun:_ZN2js6InvokeEP9JSContextN2JS8CallArgsENS_14MaybeConstructE
+   fun:_ZL9InterpretP9JSContextRN2js8RunStateE
+   fun:_ZN2js9RunScriptEP9JSContextRNS_8RunStateE.part.399
+   obj:*
+}
+{
+   JSVAL FUNCTION ON Jsheap 2
+   Memcheck:Cond
+   fun:_ZN2js9GCMethodsIN2JS5ValueEE16needsPostBarrierERKS2_
+   fun:_ZN2JS4HeapINS_5ValueEE3setES1_
+   fun:_ZN2JS4HeapINS_5ValueEEaSERKS2_
+   fun:_ZL11Payload_NewP9JSContextP8JSObjectN2JS5ValueES4_b
+   fun:_ZL28JsnWebserver_AddDynamicRouteP9JSContextjPN2JS5ValueE
+   fun:_ZN2js6InvokeEP9JSContextN2JS8CallArgsENS_14MaybeConstructE
+   fun:_ZL9InterpretP9JSContextRN2js8RunStateE
+   fun:_ZN2js9RunScriptEP9JSContextRNS_8RunStateE.part.399
+   obj:*
+}
+{
+   JSVAL FUNCTION ON Jsheap 3
+   Memcheck:Cond
+   fun:_ZN2js9GCMethodsIN2JS5ValueEE16needsPostBarrierERKS2_
+   fun:_ZN2JS4HeapINS_5ValueEE3setES1_
+   fun:_ZN2JS4HeapINS_5ValueEEaSERKS2_
+   fun:_ZL11Payload_NewP9JSContextP8JSObjectN2JS5ValueES4_b
+   fun:_ZL28JsnWebserver_AddDynamicRouteP9JSContextjPN2JS5ValueE
+   fun:_ZN2js6InvokeEP9JSContextN2JS8CallArgsENS_14MaybeConstructE
+   fun:_ZL9InterpretP9JSContextRN2js8RunStateE
+   fun:_ZN2js9RunScriptEP9JSContextRNS_8RunStateE.part.399
+   obj:*
+}
+{
+   JSVAL FUNCTION ON Jsheap 4
+   Memcheck:Cond
+   fun:_ZN2js9GCMethodsIP8JSObjectE16needsPostBarrierES2_
+   fun:_ZN2JS4HeapIP8JSObjectE3setES2_
+   fun:_ZN2JS4HeapIP8JSObjectEaSERKS3_
+   fun:_ZL11Payload_NewP9JSContextP8JSObjectN2JS5ValueES4_b
+   fun:_ZL8SetTimerP9JSContextjPN2JS5ValueEj
+   fun:_ZL20JsnGlobal_SetTimeoutP9JSContextjPN2JS5ValueE
+   fun:_ZN2js6InvokeEP9JSContextN2JS8CallArgsENS_14MaybeConstructE
+   fun:_ZL9InterpretP9JSContextRN2js8RunStateE
+   fun:_ZN2js9RunScriptEP9JSContextRNS_8RunStateE.part.399
+   obj:*
+}
+{
+   JSVAL FUNCTION ON Jsheap 5
+   Memcheck:Cond
+   fun:_ZN2js9GCMethodsIN2JS5ValueEE16needsPostBarrierERKS2_
+   fun:_ZN2JS4HeapINS_5ValueEE3setES1_
+   fun:_ZN2JS4HeapINS_5ValueEEaSERKS2_
+   fun:_ZL11Payload_NewP9JSContextP8JSObjectN2JS5ValueES4_b
+   fun:_ZL8SetTimerP9JSContextjPN2JS5ValueEj
+   fun:_ZL20JsnGlobal_SetTimeoutP9JSContextjPN2JS5ValueE
+   fun:_ZN2js6InvokeEP9JSContextN2JS8CallArgsENS_14MaybeConstructE
+   fun:_ZL9InterpretP9JSContextRN2js8RunStateE
+   fun:_ZN2js9RunScriptEP9JSContextRNS_8RunStateE.part.399
+   obj:*
+}
+{
+   JSVAL FUNCTION ON Jsheap 6
+   Memcheck:Cond
+   fun:_ZN2js9GCMethodsIN2JS5ValueEE16needsPostBarrierERKS2_
+   fun:_ZN2JS4HeapINS_5ValueEE3setES1_
+   fun:_ZN2JS4HeapINS_5ValueEEaSERKS2_
+   fun:_ZL11Payload_NewP9JSContextP8JSObjectN2JS5ValueES4_b
+   fun:_ZL8SetTimerP9JSContextjPN2JS5ValueEj
+   fun:_ZL20JsnGlobal_SetTimeoutP9JSContextjPN2JS5ValueE
+   fun:_ZN2js6InvokeEP9JSContextN2JS8CallArgsENS_14MaybeConstructE
+   fun:_ZL9InterpretP9JSContextRN2js8RunStateE
+   fun:_ZN2js9RunScriptEP9JSContextRNS_8RunStateE.part.399
+   obj:*
+}
+{
+   Spidermonkey cleanup
+   Memcheck:Addr4
+   fun:_ZL14FinalizeArenasPN2js6FreeOpEPPNS_2gc11ArenaHeaderERNS2_15SortedArenaListENS2_9AllocKindERNS_11SliceBudgetE
+   fun:_ZN2js2gc10ArenaLists18backgroundFinalizeEPNS_6FreeOpEPNS0_11ArenaHeaderE
+   obj:*
+}
+

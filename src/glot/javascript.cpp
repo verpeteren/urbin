@@ -2245,18 +2245,21 @@ static void Payload_Delete( struct payload_t * payload ) {
 	free( payload ); payload = NULL;
 }
 
-static bool SetTimer( JSContext * cx, unsigned argc, jsval * vpn, const unsigned int repeat ) {
+static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnMut, const unsigned int repeat ) {
 	struct javascript_t * javascript;
 	struct payload_t * payload;
 	struct timing_t * timing;
-	JSObject * globalObj, *thisObj;
+	JSObject * globalObj, * thisObj;
 	JS::CallArgs args;
-	jsval dummyVal, fnVal, *argsAt2;
+	jsval dummyVal, fnVal, * argsAt2;
+	const JS::Value * vpn;
 	int ms;
 	struct {	unsigned char payload:1;
 				unsigned char timer:1;
 				unsigned char good:1;} cleanUp;
+
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	vpn = &vpnMut.get( );
 	fnVal = JSVAL_NULL;
 	dummyVal = JSVAL_NULL;
 	JS::RootedValue 		dummyValRoot( cx );
@@ -2266,8 +2269,8 @@ static bool SetTimer( JSContext * cx, unsigned argc, jsval * vpn, const unsigned
 	JS::MutableHandleValue	fnValMut( &fnValRoot );
 	payload = NULL;
 	timing = NULL;
-	args = CallArgsFromVp( argc, vpn );
-	thisObj = JS_THIS_OBJECT( cx, vpn );
+	args = CallArgsFromVp( argc, (jsval *) vpn );
+	thisObj = JS_THIS_OBJECT( cx, (jsval *) vpn );
 	JS::RootedObject thisObjRoot( cx, thisObj );
 	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
 	javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
@@ -2277,7 +2280,7 @@ static bool SetTimer( JSContext * cx, unsigned argc, jsval * vpn, const unsigned
 	}
 	if ( cleanUp.good ) {
 		if ( args.length( ) > 2 ) {
-			argsAt2 = vpn + 2;
+			argsAt2 = ( (jsval *) vpn ) + 2;
 			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), *argsAt2, false ) ) != NULL );
 		} else {
 			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), JSVAL_NULL, false ) ) != NULL );
@@ -2326,7 +2329,9 @@ static bool SetTimer( JSContext * cx, unsigned argc, jsval * vpn, const unsigned
  */
 
 static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
-	return SetTimer( cx, argc, vpn, 0 );
+	JS::RootedValue 		vpnRoot( cx, *vpn );
+	JS::MutableHandleValue	vpnMut( &vpnRoot );
+	return SetTimer( cx, argc, vpnMut, 0 );
 }
 
 /**
@@ -2353,7 +2358,9 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vpn ) {
  */
 
 static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vpn ) {
-	return SetTimer( cx, argc, vpn, 1 );
+	JS::RootedValue 		vpnRoot( cx, *vpn );
+	JS::MutableHandleValue	vpnMut( &vpnRoot );
+	return SetTimer( cx, argc, vpnMut, 1 );
 }
 /**
  * Cancel a timeout created by setTimeout.
