@@ -2238,65 +2238,61 @@ static void Payload_Delete( struct payload_t * payload ) {
 	free( payload ); payload = NULL;
 }
 
-static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnMut, const unsigned int repeat ) {
-	struct javascript_t * javascript;
-	struct payload_t * payload;
-	struct timing_t * timing;
-	JSObject * globalObj, * thisObj;
-	JS::CallArgs args;
-	jsval dummyVal, fnVal, * argsAt2;
-	const JS::Value * vp;
-	int ms;
-	struct {	unsigned char payload:1;
-				unsigned char timer:1;
-				unsigned char good:1;} cleanUp;
-
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	vp = &vpnMut.get( );
-	fnVal = JSVAL_NULL;
-	dummyVal = JSVAL_NULL;
-	JS::RootedValue 		dummyValRoot( cx );
-	JS::HandleValue 		dummyValHandle( dummyValRoot );
-	JS::RootedValue 		fnValRoot( cx, fnVal );
-	JS::HandleValue 		fnValHandle( fnValRoot );
-	JS::MutableHandleValue	fnValMut( &fnValRoot );
-	payload = NULL;
-	timing = NULL;
-	args = CallArgsFromVp( argc, (jsval *) vp );
-	thisObj = JS_THIS_OBJECT( cx, (jsval *) vp );
-	JS::RootedObject thisObjRoot( cx, thisObj );
-	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
-	javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "*i", &dummyVal, &ms ) == true );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( JS_ConvertValue( cx, args[0], JSTYPE_FUNCTION, fnValMut ) == true );
-	}
-	if ( cleanUp.good ) {
-		if ( args.length( ) > 2 ) {
-			argsAt2 = ( (jsval *) vp ) + 2;
-			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), *argsAt2, false ) ) != NULL );
-		} else {
-			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), JSVAL_NULL, false ) ) != NULL );
-		}
-	}
-	if ( cleanUp.good ) {
-		cleanUp.payload = 1;
-		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, repeat, Payload_Timing_ResultHandler_cb, (void * ) payload, Payload_Delete_Anon ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.timer = 1;
-		args.rval( ).setInt32( (int32_t) timing->identifier );
-	} else {
+#define SET_TIMER( repeat ) do { \
+	struct javascript_t * javascript; \
+	struct payload_t * payload; \
+	struct timing_t * timing; \
+	JSObject * globalObj, * thisObj; \
+	JS::CallArgs args; \
+	jsval fnVal, * argsAt2, dummyVal; \
+	int ms; \
+	struct {	unsigned char payload:1; \
+				unsigned char timer:1; \
+				unsigned char good:1;} cleanUp; \
+	 \
+	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
+	args = CallArgsFromVp( argc, (jsval *) vp ); \
+	dummyVal = JSVAL_NULL; \
+	fnVal = args[0]; \
+	JS::RootedValue 		fnValRoot( cx, fnVal ); \
+	JS::HandleValue 		fnValHandle( fnValRoot ); \
+	JS::MutableHandleValue	fnValMut( &fnValRoot ); \
+	payload = NULL; \
+	timing = NULL; \
+	thisObj = JS_THIS_OBJECT( cx, (jsval *) vp ); \
+	JS::RootedObject thisObjRoot( cx, thisObj ); \
+	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) ); \
+	javascript = (struct javascript_t *) JS_GetPrivate( globalObj ); \
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "fi", &dummyVal, &ms ) == true ); \
+	if ( cleanUp.good ) { \
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true ); \
+	} \
+	if ( cleanUp.good ) { \
+		if ( args.length( ) > 2 ) { \
+			argsAt2 = ( (jsval *) vp ) + 2; \
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), *argsAt2, false ) ) != NULL ); \
+		} else { \
+			cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), JSVAL_NULL, false ) ) != NULL ); \
+		} \
+	} \
+	if ( cleanUp.good ) { \
+		cleanUp.payload = 1; \
+		cleanUp.good = ( ( timing = Core_AddTiming( javascript->core, (unsigned int) ms, repeat, Payload_Timing_ResultHandler_cb, (void * ) payload, Payload_Delete_Anon ) ) != NULL ); \
+	} \
+	if ( cleanUp.good ) { \
+		cleanUp.timer = 1; \
+		args.rval( ).setInt32( (int32_t) timing->identifier ); \
+	} else { \
 		if ( cleanUp.timer ) { \
-			Core_DelTiming( javascript->core, timing );
-		}
-		if ( cleanUp.payload ) {
-			Payload_Delete( payload ); payload = NULL;
-		}
-		args.rval( ).setUndefined( );
-	}
-	return ( cleanUp.good ) ? true : false;
-}
+			Core_DelTiming( javascript->core, timing ); \
+		} \
+		if ( cleanUp.payload ) { \
+			Payload_Delete( payload ); payload = NULL; \
+		} \
+		args.rval( ).setUndefined( ); \
+	} \
+	return ( cleanUp.good ) ? true : false; \
+} while ( 0 );
 
 /**
  * Calls a function after a certain delay.
@@ -2322,9 +2318,7 @@ static bool SetTimer( JSContext * cx, unsigned argc, JS::MutableHandleValue vpnM
  */
 
 static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vp ) {
-	JS::RootedValue 		vpnRoot( cx, *vp );
-	JS::MutableHandleValue	vpnMut( &vpnRoot );
-	return SetTimer( cx, argc, vpnMut, 0 );
+	SET_TIMER( 0 );
 }
 
 /**
@@ -2351,9 +2345,7 @@ static bool JsnGlobal_SetTimeout( JSContext * cx, unsigned argc, jsval * vp ) {
  */
 
 static bool JsnGlobal_SetInterval( JSContext * cx, unsigned argc, jsval * vp ) {
-	JS::RootedValue 		vpnRoot( cx, *vp );
-	JS::MutableHandleValue	vpnMut( &vpnRoot );
-	return SetTimer( cx, argc, vpnMut, 1 );
+	SET_TIMER( 1 );
 }
 /**
  * Cancel a timeout created by setTimeout.

@@ -203,7 +203,7 @@ static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t iden
 	return timing;
 }
 static void Timer_CalculateDue( struct timing_t * timing, const PRUint32 nowOrHorizon ) {
-	timing->due = ( nowOrHorizon + timing->ms );  //  @FIXME, this might overflow if ms is in the far future ( +6 hours )
+	timing->due = ( nowOrHorizon + ( 1000 * timing->ms ) - 1 );  //  @FIXME, this might overflow if ms is in the far future ( +6 hours )
 }
 
 static void Timing_Delete( struct timing_t * timing ) {
@@ -586,20 +586,23 @@ struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, 
 			unsigned char timing:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	core->maxIdentifier++;
-	cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArgs, clearFunc_cb ) ) != NULL );
-	if ( cleanUp.good ) {
-		cleanUp.timing = 1;
-		if ( core->timings == NULL ) {
-			core->timings = timing;
-		} else {
-			PR_INSERT_BEFORE( &timing->mLink, &core->timings->mLink );
+	timing = NULL;
+	if ( ms > 0 ) {
+		core->maxIdentifier++;
+		cleanUp.good = ( (  timing = Timing_New( ms, core->maxIdentifier, repeat, timerHandler_cb, cbArgs, clearFunc_cb ) ) != NULL );
+		if ( cleanUp.good ) {
+			cleanUp.timing = 1;
+			if ( core->timings == NULL ) {
+				core->timings = timing;
+			} else {
+				PR_INSERT_BEFORE( &timing->mLink, &core->timings->mLink );
+			}
+			Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "New Timing allocated" );
 		}
-		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "New Timing allocated" );
-	}
-	if ( ! cleanUp.good ) {
-		if ( cleanUp.timing ) {
-				Timing_Delete( timing ); timing = NULL;
+		if ( ! cleanUp.good ) {
+			if ( cleanUp.timing ) {
+					Timing_Delete( timing ); timing = NULL;
+			}
 		}
 	}
 

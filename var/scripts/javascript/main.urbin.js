@@ -23,14 +23,15 @@ try {
 	}
 	Urbin.onReady = function( ) {
 		var test = { webserver: 	true,
-					os: {	file: 	true,
-							env:	true,
-							system:	true
+					os: {	file: 	false,
+							env:	false,
+							system:	false
 						},
 					sql: { 	pg: 	false,
-							my: 	true
+							my: 	false
 						},
-					timeout: 		false
+					timeout: 		false,
+					interval: 		false
 					};
 		if ( test.webserver ) {
 			var ws = Urbin.Webserver( {ip: '127.0.0.1', port: 8888}, 60 );
@@ -73,11 +74,23 @@ try {
 			var r = os.system( '/usr/bin/wget', 'http://www.verpeteren.nl -o /tmp/www.verpeteren.nl.dl -O /tmp/www.verpeteren.nl.html' );
 			console.log( r );
 		}
-		if ( test.timeout ) {
-			/* This is buggy rigth now*/
+		if ( test.interval ) {
 			setTimeout( function( ) {
-				console.log( "tttt" );
+				console.log( "timeout" );
 			}, 1000 );
+		}
+		if ( test.timeout ) {
+			var delta = 333;
+			var db = new Date ();
+			var b = db.getTime( );
+			console.log( "before " + db + " " + b );
+			setTimeout( function( ) {
+				var da = new Date ();
+				var a = da.getTime( );
+				var dif = a - b;
+				console.log( "after  " + da + " " + b );
+				console.log( "diff   " + dif  + " " + dif % delta );
+			}, delta );
 		}
 		if ( test.sql.pg ) {
 			var sql = Urbin.PostgresqlClient( pgsqlDetective , 60 );
