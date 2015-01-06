@@ -27,7 +27,7 @@ Building upon the good ideas from others, glue it together.
 
 	stability:	compile with full warnings / valgrind all the way
 	Fast:		non blocking, async, zero copy
-	Meme:		KEYMAKER: But like all systems, it has a weakness. The system is based on the rules of a building, one system built on another.
+	Meme:		KEYMAKER: But like all systems, it has a weakness. The system is based on the rules of a building, one system built on another
 
 
 
@@ -115,7 +115,7 @@ MySql can be excluded from the linking
 
 ## FAQ
 
-Q:	**What is your thing with Makefiles?**
+Q:	**Why does this project use Makefiles?**
 
 A:	They help with 'once-and-only-once' definitions
 
@@ -125,11 +125,15 @@ A:	As this is cutting edge, the dependencies have not landed in your distro yet,
 
 Q:	**What is with the name?**
 
-A:	That is just a placeholder, It is likeley to change before version 0.10.0
+A:	Cool domain names are hard to get.
 
 Q:	**What is the relationship with APE-Project?**
 
 A:	Ajax-Push-Engine and libapenetwork are focussed on async sockets; This project strives to be less advanced (KISS) then APE. However some ideas appear to be simular.
+
+Q:	**What is the relationship with H2O?**
+
+A:	H2O is focussed on writing a very fast and complete HTTP1 and HTTP2 server. This project strives to be less advanced (KISS) then H2O. The project lead of H2O is the same genius that wrote the picoev event loop.
 
 ## Common errors
 

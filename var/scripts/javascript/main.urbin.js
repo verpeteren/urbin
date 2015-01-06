@@ -22,15 +22,15 @@ try {
 		console.log( "load" );
 	}
 	Urbin.onReady = function( ) {
-		var test = { webserver: 	false,
-					os: {	file: 	false,
-							env:	false,
-							system:	false
+		var test = { webserver: 	true,
+					os: {	file: 	true,
+							env:	true,
+							system:	true
 						},
 					sql: { 	pg: 	false,
-							my: 	false
+							my: 	true
 						},
-					timeout: 		true
+					timeout: 		false
 					};
 		if ( test.webserver ) {
 			var ws = Urbin.Webserver( {ip: '127.0.0.1', port: 8888}, 60 );
@@ -42,6 +42,7 @@ try {
 				}
 			);
 			ws.addRoute( '^/blog/(?<year>[0-9]{4})/(?<month>[0-9]{1,2})/(?<day>[0-9]{1,2})', function( client ) {
+				/* this is buggy right now */
 				var params = client.getNamedGroups( );
 				console.log( 'year:\t' + params.year );
 				console.log( 'month:\t' + params.month );
@@ -73,6 +74,7 @@ try {
 			console.log( r );
 		}
 		if ( test.timeout ) {
+			/* This is buggy rigth now*/
 			setTimeout( function( ) {
 				console.log( "tttt" );
 			}, 1000 );

@@ -6,13 +6,13 @@ NSPR_PATH = $(shell pwd)/$(DIR_NSPR)
 ZLIB_PATH = $(shell pwd)/$(DIR_Z)
 
 ifdef LINUX_BUILD
-PICOEV_SOURCE = picoev_epoll.c
+BUILD = LINUX_BUILD
 endif
-ifdef DARWING_BUILD
-PICOEV_SOURCE = picoev_kqueue.c
+ifdef DARWIN_BUILD
+BUILD = DARWING_BUILD
 endif
 ifdef GENERIC_BUILD
-PICOEV_SOURCE = picoev_select.c
+BUILD = GENERIC_BUILD
 endif
 
 deps: $(DEPS)
@@ -39,29 +39,17 @@ $(DIR_Z):
 # picoev: a tiny event loop for network applications, faster than libevent or libev
 ###############################################################################
 $(LIB_PICOEV_STATIC): $(DIR_PICOEV)
-	@echo $@
-	@cd $(DIR_PICOEV) && \
-	$(CC) $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS) -c -o picoev_static.o $(PICOEV_SOURCE) && \
-	$(AR) cr libpicoev.a picoev_static.o && \
-	$(RANLIB) libpicoev.a
-	@touch $@
-
 $(LIB_PICOEV_SHARED): $(DIR_PICOEV)
 	@echo $@
 	@cd $(DIR_PICOEV) && \
-	$(CC) $(CC_RELEASE_FLAGS) $(CC_DEBUG_FLAGS) -fPIC -c -o picoev_shared.o $(PICOEV_SOURCE) && \
-	$(CC) $(LD_DEBUG_FLAGS) $(LD_RELEASE_FLAGS) -shared -Wl,-soname,libpicoev.so -o libpicoev.so picoev_shared.o
-	@touch $@
+	make  CC=$(CC) $(BUILD)=1 CC_RELEASE_FLAGS="$(CC_RELEASE_FLAGS)" CC_DEBUG_FLAGS="$(CC_DEBUG_FLAGS)" 
 
 $(DIR_PICOEV):
 	@echo $@
 	@cd $(DEP_DIR) && \
 	wget -q https://github.com/kazuho/picoev/archive/master.zip -O picoev.zip && \
 	unzip -qq picoev.zip && \
-	mv picoev-master picoev && \
-	cd ./picoev && \
-	cp picoev_epoll.c picoev_epoll.c.org && \
-	sed -e"s/^  assert(PICOEV_FD_BELONGS_TO_LOOP/  memset( \&ev, 0, sizeof( ev ) );\n  assert(PICOEV_FD_BELONGS_TO_LOOP/" picoev_epoll.c.org > picoev_epoll.c
+	mv picoev-master picoev 
 
 ###############################################################################
 # clog: A syslog-compatible stderr logging mechanism

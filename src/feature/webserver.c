@@ -472,7 +472,7 @@ static void Webserverclient_PrepareRequest( struct webserverclient_t * webserver
 		}
 		for ( i = 0; i < webserverclient->header->HeaderSize; i++ ) {
 			field = &webserverclient->header->Fields[i];
-			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada...
+			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada... http://i.stack.imgur.com/whhD1.png
 				if ( strncmp( field->Value, "Keep-Alive", field->ValueLen ) == 0 ) {
 					webserverclient->connection = CONNECTION_KEEPALIVE;
 				} else 	if ( strncmp( field->Value, "close", field->ValueLen ) == 0 ) {
