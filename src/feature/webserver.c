@@ -86,8 +86,100 @@ static void						Webserverclient_RenderRoute	( struct webserverclient_t * webser
 static void 					Webserverclient_CloseConn	( struct webserverclient_t * webserverclient );
 static void 					Webserverclient_Delete		( struct webserverclient_t * webserverclient );
 
+static struct namedRegex_t * NamedRegex_New( const struct webserverclient_t * 	webserverclient, const int numGroups ) {
+	struct namedRegex_t * namedRegex;
+	struct { unsigned char good:1;
+			unsigned char ng:1;
+			unsigned char kv:1; }cleanUp;
 
-	/*****************************************************************************/
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( namedRegex = malloc( sizeof( *namedRegex ) ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.ng = 1;
+		namedRegex->numGroups = numGroups;
+		namedRegex->webserverclient = webserverclient;
+		cleanUp.good = ( ( namedRegex->kvPairs = calloc( 2 * namedRegex->numGroups, sizeof( *namedRegex->kvPairs ) ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.kv = 1;
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.kv ) {
+			free( namedRegex->kvPairs ); namedRegex->kvPairs = NULL;
+		}
+		if ( cleanUp.good ) {
+			free( namedRegex ); namedRegex = NULL;
+		}
+	}
+	return namedRegex;
+}
+
+static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int ngroupNum, int* group_nums, regex_t* reg, void* cbArgs ) {
+	struct namedRegex_t * namedRegex;
+	OnigRegion * region;
+	int i, gn, startPos, endPos;
+	const char * start;
+	size_t slot, j;
+	int len;
+	struct { unsigned char good:1; }cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	namedRegex = (struct namedRegex_t *) cbArgs;
+	region = namedRegex->webserverclient->region;
+	//  printf( "once %d %d\n", ngroupNum, *group_nums );
+	slot = 0;
+	for ( i = 0; i < ngroupNum; i++ ) {
+		gn = group_nums[i];
+		onig_name_to_backref_number( reg, name, nameEnd, region );
+		slot = ( gn -1 ) * 2;
+		startPos = region->beg[gn];
+		endPos = region->end[gn];
+		len = endPos - startPos;
+		start = namedRegex->webserverclient->header->RequestURI + startPos;
+		cleanUp.good = ( ( namedRegex->kvPairs[slot] = Xstrdup( (const char *) name ) ) != NULL );
+		if ( cleanUp.good ) {
+			cleanUp.good = ( ( namedRegex->kvPairs[slot + 1] = calloc( 1, len + 1 ) ) != NULL );
+		}
+		if ( cleanUp.good ) {
+			strncat( namedRegex->kvPairs[ slot+ 1], start, len );
+		} else {
+			break;
+		}
+		//  printf( "%d   %s\t%s\t%d\t%d\t%d\n", gn, namedRegex->kvPairs[slot], namedRegex->kvPairs[ slot + 1 ], startPos, endPos, len  );
+	}
+	if ( ! cleanUp.good ) {
+		for ( j = 0; j < slot; j++ ) {
+			free( namedRegex->kvPairs[slot] ); namedRegex->kvPairs[slot] = NULL;
+		}
+		namedRegex->numGroups = 0;
+	}
+	return ( cleanUp.good ) ? 0 : 1;  /* 0: continue */
+}
+
+struct namedRegex_t * Webserverclient_GetNamedGroups( struct webserverclient_t * webserverclient ) {
+	struct namedRegex_t * namedRegex;
+	struct { unsigned char good:1; }cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( namedRegex = NamedRegex_New( webserverclient, onig_number_of_names( webserverclient->route->urlRegex ) ) ) != NULL );
+	if ( cleanUp.good ) {
+		onig_foreach_name( webserverclient->route->urlRegex, Webclient_NamedGroup_cb, (void * ) namedRegex );
+	}
+	return namedRegex;
+}
+
+void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
+	size_t j;
+
+	for ( j = 0; j < namedRegex->numGroups * 2; j++ ) {
+		free( namedRegex->kvPairs[j] ); namedRegex->kvPairs[j] = NULL;
+	}
+	namedRegex->numGroups = 0;
+	free( namedRegex->kvPairs ); namedRegex->kvPairs = NULL;
+	free( namedRegex ); namedRegex = NULL;
+}
+
+/*****************************************************************************/
 	/* Route                                                                    */
 	/*****************************************************************************/
 	static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {

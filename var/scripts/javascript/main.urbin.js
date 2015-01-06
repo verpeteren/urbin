@@ -43,15 +43,11 @@ try {
 				}
 			);
 			ws.addRoute( '^/blog/(?<year>[0-9]{4})/(?<month>[0-9]{1,2})/(?<day>[0-9]{1,2})', function( client ) {
-				/* this is buggy right now */
 				var params = client.getNamedGroups( );
-				console.log( 'year:\t' + params.year );
-				console.log( 'month:\t' + params.month );
-				console.log( 'day:\t' + params.day );
-				client.response.setContent( "ok" ).setMime( 'html' ).setCode( 200 );
+				var blog = "Well,  on " + params.year + "-" + params.month + "-" + params.day + " nothing happened";
+				client.response.setContent( blog ).setMime( 'html' ).setCode( 200 );
 				console.log( "eee" );
 			 } );
-
 		}
 		if ( test.os.env ) {
 			var env = 'SHELL';

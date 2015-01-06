@@ -994,46 +994,6 @@ static bool JsnWebserverclientresponse_SetMime( JSContext * cx, unsigned argc, j
 	return ( cleanUp.good ) ? true : false;
 }
 
-struct namedRegex_t{
-	JSContext * 							context;
-	JS::MutableHandleObject	*				matchObjMut;
-	struct webserverclient_t *				webserverclient;
-};
-
-static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int ngroupNum, int* group_nums, regex_t* reg, void* cbArgs ) {
-	struct namedRegex_t * namedRegex;
-	OnigRegion * region;
-	JSString * jString;
-	jsval jValue;
-	int i, gn, startPos, endPos;
-	const char * start;
-	int len;
-	char * nameDup, * valDup;
-
-	namedRegex = (struct namedRegex_t *) cbArgs;
-	region = namedRegex->webserverclient->region;
-	JS::RootedValue	jValueRoot( namedRegex->context, jValue );
-	for ( i = 0; i < ngroupNum; i++ ) {
-		gn = group_nums[i];
-		onig_name_to_backref_number( reg, name, nameEnd, region );
-		startPos = region->beg[gn];
-		endPos = region->end[gn];
-		len = endPos - startPos;
-		start = namedRegex->webserverclient->header->RequestURI + startPos;
-		nameDup = Xstrdup( (const char *) name );
-		valDup = (char *) calloc( 1, len + 1 );
-		strncat( valDup, start, len );
-printf( "%s\t%s\t%d\t%d\t%d\n", nameDup, valDup, startPos, endPos, len  );
-		jString = JS_NewStringCopyZ( namedRegex->context, valDup );
-		jValue =  STRING_TO_JSVAL( jString );
-		JS::HandleValue	jValueHandle( jValueRoot );
-		JS_SetProperty( namedRegex->context, *namedRegex->matchObjMut, nameDup, jValueHandle );
-		free( nameDup ); nameDup = NULL;
-		free( valDup ); valDup = NULL;
-	}
-	return 0;  /* 0: continue */
-}
-
 /**
  * Get the named groups that matched the routing regex
  *
@@ -1059,9 +1019,12 @@ printf( "%s\t%s\t%d\t%d\t%d\n", nameDup, valDup, startPos, endPos, len  );
 
 static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct webserverclient_t * webserverclient;
-	struct namedRegex_t namedRegex;
+	struct namedRegex_t * namedRegex;
 	JSObject * thisObj, * matchObj;
 	JS::CallArgs args;
+	jsval jValue;
+	JSString * jString;
+	size_t i;
 
 	matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) );
 	JS::RootedObject matchObjRoot( cx, matchObj );
@@ -1070,10 +1033,18 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 	thisObj = JS_THIS_OBJECT( cx, vp );
 	JS::RootedObject thisObjRoot( cx, thisObj );
 	webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
-	namedRegex.context = cx;
-	namedRegex.webserverclient = webserverclient;
-	namedRegex.matchObjMut = &matchObjMut;
-	onig_foreach_name( webserverclient->route->urlRegex, Webclient_NamedGroup_cb, (void * ) &namedRegex );
+	namedRegex = Webserverclient_GetNamedGroups( webserverclient );
+	if ( namedRegex != NULL ) {
+		for ( i = 0; i < namedRegex->numGroups * 2; i += 2 ) {
+			jString = JS_NewStringCopyZ( cx, namedRegex->kvPairs[i + 1] );
+			jValue =  STRING_TO_JSVAL( jString );
+			JS::RootedValue	jValueRoot( cx, jValue );
+			JS::HandleValue	jValueHandle( jValueRoot );
+			JS::RootedString jStringRoot( cx, jString );
+			JS_SetProperty( cx, matchObjMut, namedRegex->kvPairs[i], jValueHandle );
+			//	printf( "%d %s %s\n", i, namedRegex->kvPairs[i], namedRegex->kvPairs[i + 1] );
+		}
+	}
 	args.rval( ).set( OBJECT_TO_JSVAL( matchObjMut.get( ) ) );
 	return true;
 }
