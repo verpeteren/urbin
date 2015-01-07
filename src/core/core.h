@@ -57,7 +57,10 @@ struct module_t {
 struct core_t {
 	picoev_loop *				loop;
 	const cfg_t *				config;
-	struct dns *				dns;
+	struct {
+		struct dns *				dns;
+		unsigned int				actives;
+							}	dns;
 	struct module_t *			modules;
 	struct timing_t *			timings;
 	struct {
@@ -78,7 +81,7 @@ void 							Module_Delete			( struct module_t * module );
 struct core_t *					Core_New				( const cfg_t * config );
 void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message );
 int 							Core_PrepareDaemon		( const struct core_t * core, const signalAction_cb_t signalHandler );
-void 							Core_GetHostByName		( const struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb );
+void 							Core_GetHostByName		( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb );
 int								Core_AddModule			( struct core_t * core, struct module_t * module );
 int								Core_Loop				( struct core_t * core );
 int								Core_DelModule			( struct core_t * core, struct module_t * module );

@@ -245,7 +245,8 @@ struct core_t * Core_New( const cfg_t * config ) {
 		core->config =  config;
 		core->timings = NULL;
 		core->modules = NULL;
-		core->dns = NULL;
+		core->dns.dns = NULL;
+		core->dns.actives = 0;
 		core->logger.logLevel = PR_LOG_LEVEL_VALUE;
 		mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
 		timeoutSec = cfg_getint( mainSection, "timeout_sec" );
@@ -269,15 +270,16 @@ struct core_t * Core_New( const cfg_t * config ) {
 	}
 	if ( cleanUp.good ) {
 		cleanUp.loop = 1;
-		cleanUp.good = ( ( core->dns = dns_init( ) ) != NULL );
+		cleanUp.good = ( ( core->dns.dns = dns_init( ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.dns = 1;
-		SetupSocket( dns_get_fd( core->dns ), 0 );
+		SetupSocket( dns_get_fd( core->dns.dns ), 0 );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.dns ) {
-			dns_fini( core->dns ); core->dns = NULL;
+			dns_fini( core->dns.dns ); core->dns.dns = NULL;
+			core->dns.actives = 0;
 		}
 		if ( cleanUp.loop ) {
 			picoev_destroy_loop( core->loop );
@@ -446,6 +448,7 @@ static void Core_ProcessTick( struct core_t * core ) {
 		} while ( timing != firstTiming );
 	}
 }
+
 #if 0
 static void Dns_Found_cb( struct dns_cb_data * dnsData ) {
 	if ( dnsData->addr_len == 0 ) {
@@ -462,16 +465,18 @@ static void Dns_ReadWrite_cb( picoev_loop * loop, int fd, int events, void * cbA
 	core = ( struct core_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout, stop and retry again..... */
-		picoev_del( loop, fd );
-		picoev_add( loop, fd, PICOEV_READWRITE, DNS_QUERY_TIMEOUT, Dns_ReadWrite_cb, cbArgs );
+		core->dns.actives--;
+		if ( core->dns.actives < 1 ) {
+			picoev_del( loop, fd );
+		}
 	} else {
 		//  sending and receiving shit
 		picoev_set_timeout( loop, fd, DNS_QUERY_TIMEOUT );
-		dns_poll( core->dns );
+		dns_poll( core->dns.dns );
 	}
 }
 
-void Core_GetHostByName( const struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb ) {
+void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb ) {
 	struct {unsigned char good:1; } cleanUp;
 	enum dns_query_type queryType;
 	int dnsSocketFd;
@@ -479,13 +484,14 @@ void Core_GetHostByName( const struct core_t * core, const char * hostName, dns_
 
 	cbArgs = NULL;
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	dnsSocketFd = dns_get_fd( core->dns );
+	dnsSocketFd = dns_get_fd( core->dns.dns );
 	queryType = DNS_A_RECORD;
 	if ( ! picoev_is_active( core->loop, dnsSocketFd ) ) {
 		picoev_add( core->loop, dnsSocketFd, PICOEV_READWRITE, DNS_QUERY_TIMEOUT, Dns_ReadWrite_cb, (void *) core );
 	}
 	if ( INADDR_NONE == inet_addr( hostName ) ) {
-		dns_queue( core->dns, cbArgs, hostName, queryType, onSuccess_cb );
+		core->dns.actives++;
+		dns_queue( core->dns.dns, cbArgs, hostName, queryType, onSuccess_cb );
 	} else {
 		// it is a valid ip address
 		struct dns_cb_data data;
@@ -506,14 +512,11 @@ int Core_Loop( struct core_t * core ) {
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	dnsSocketFd = dns_get_fd( core->dns );
+	dnsSocketFd = dns_get_fd( core->dns.dns );
 	maxWait = PR_CFG_CORE_MAX_FDS;
 	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
 	maxWait = cfg_getint( mainSection, "max_wait" );
 	cleanUp.good = 1;
-	if ( ! picoev_is_active( core->loop, dnsSocketFd ) ) {
-		picoev_add( core->loop, dnsSocketFd, PICOEV_READWRITE, DNS_QUERY_TIMEOUT, Dns_ReadWrite_cb, (void *) core );
-	}
 	firstModule = module = core->modules;
 	if ( firstModule != NULL ) {
 		do {
@@ -529,6 +532,7 @@ int Core_Loop( struct core_t * core ) {
 		core->keepOnRunning = 1;
 		while ( core->keepOnRunning == 1 )  {
 			Core_ProcessTick( core );
+			//printf( "%d\n", maxWait );
 			picoev_loop_once( core->loop, maxWait );
 		}
 	}
@@ -658,11 +662,12 @@ void Core_Delete( struct core_t * core ) {
 		firstTiming = core->timings;
 	}
 	//  cleanup dns
-	dnsSocketFd = dns_get_fd( core->dns );
+	dnsSocketFd = dns_get_fd( core->dns.dns );
 	if ( picoev_is_active( core->loop, dnsSocketFd ) ) {
 		picoev_del( core->loop, dnsSocketFd );
 	}
-	dns_fini( core->dns ); core->dns = NULL;
+	dns_fini( core->dns.dns ); core->dns.dns = NULL;
+	core->dns.actives = 0;
 	//  cleanup the rest
 	core->processTicksMs = 0;
 	picoev_destroy_loop( core->loop );
