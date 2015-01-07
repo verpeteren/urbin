@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <math.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
@@ -51,7 +50,6 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 };
 
 //  http://stackoverflow.com/questions/4143000/find-the-string-length-of-an-int
-#define STRING_LENGTH_OF_INT( value ) (ssize_t) ( value == 0 ? 1 : ( log10( value ) + 1 ) )
 #define HTTP_SERVER_TEMPLATE "HTTP/1.1 %d OK\r\nContent-Length: %d\r\nConnection: %s\r\nContent-Type: %s\r\nDate: %s\r\nServer: %s/%s\r\n\r\n"
 #define HTTP_SERVER_TEMPLATE_ARGS webserverclient->response.httpCode, \
 								webserverclient->response.contentLength, \

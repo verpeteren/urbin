@@ -1967,6 +1967,148 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vp ) {
 	return ( cleanUp.good ) ? true : false;
 }
 
+static void Payload_Dns_ResultHandler_cb( struct dns_cb_data * dnsData ) {
+	struct javascript_t * javascript;
+	struct payload_t * payload;
+	jsval ipValue;
+	JSString * jIp;
+	char * cIp;
+	char pos[4];
+	size_t i, len;
+	struct {unsigned char good:1;
+			unsigned char ip:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	payload = ( struct payload_t * ) dnsData->context;
+	cIp = NULL;
+	i = 0;
+	len = dnsData->addr_len;
+	if ( dnsData->addr_len != 0 ) {
+		for ( i = 0; i < dnsData->addr_len; i++ ) {
+			len += STRING_LENGTH_OF_INT( dnsData->addr[i] );
+		}
+	 	cleanUp.good = ( ( cIp = (char *) calloc( len, 1 ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		if ( dnsData->addr_len == 4 ) {
+			snprintf( cIp, len, "%u.%u.%u.%u", dnsData->addr[0], dnsData->addr[1], dnsData->addr[2], dnsData->addr[3] );
+		} else {
+			//  @TODO:  ipv6
+			for ( i = 0; i < dnsData->addr_len; i++ ) {
+				snprintf( &pos[0], 4, "%u", (unsigned int ) dnsData->addr[i] );
+				strcat( cIp, &pos[0] );
+				strcat( cIp, "." );
+			};
+			cIp[len] = '\0';
+		}
+	}
+	JSAutoRequest 			ar( payload->context );
+	JSAutoCompartment 		ac( payload->context, payload->scopeObj );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( jIp = JS_NewStringCopyZ( payload->context, cIp ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		ipValue = STRING_TO_JSVAL( jIp );
+	} else {
+		ipValue = JSVAL_VOID;
+	}
+	JS::RootedValue ipRoot( payload->context, ipValue );
+	payload->fnVal_cbArg = JS::Heap<JS::Value>( ipValue );
+	Payload_Call( payload );
+	// Now that we're done me must stop the callback loop also
+	javascript = (struct javascript_t *) JS_GetPrivate( payload->scopeObj );
+	javascript->core->dns.actives--;
+	//  always cleanup
+	Payload_Delete( payload ); payload = NULL;
+	free( cIp ); cIp = NULL;
+}
+
+/**
+ * Get the ip address of a host.
+ *
+ * @name os.getHostByName
+ * @function
+ * @public
+ * @since 0.0.9
+ * @static
+ *
+ * @param {string} hostname 		The hostname
+ * @param	{function}	fn			A Javascript function that will be called after a delay.
+ * @param	{string}	fn.ip		The found ip address or null.
+ * @returns {null|boolean} 			undefined: if the parameters were incorrect, true if the dns lookup started
+ *
+ * @example
+ * os.getHostByName( 'www.urbin.info', function( ip ) {
+ * if ( ip ) {
+ * 	console.log( 'Resolved: ' + ip );
+ * } else {
+ * 	console.log( 'Could not resolve host' );
+ * 	}
+ * } );
+ *
+ * @see os
+ */
+static bool JsnOs_GetHostByName( JSContext *cx, unsigned argc, jsval * vp ) {
+	struct javascript_t * javascript;
+	struct payload_t * payload;
+	JSString * jHostName;
+	JSObject * globalObj, * thisObj;
+	JS::CallArgs args;
+	jsval fnVal, dummyVal;
+	char * cHostName;
+	struct {	unsigned char payload:1;
+				unsigned char dns:1;
+				unsigned char hostName:1;
+				unsigned char good:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, (jsval *) vp );
+	dummyVal = JSVAL_NULL;
+	fnVal = JSVAL_NULL;
+	payload = NULL;
+	cHostName = NULL;
+	cleanUp.good = ( argc == 2 );
+	if ( cleanUp.good ) {
+		fnVal = args[1];
+	}
+	JS::RootedValue 		fnValRoot( cx, fnVal );
+	JS::HandleValue 		fnValHandle( fnValRoot );
+	JS::MutableHandleValue	fnValMut( &fnValRoot );
+	thisObj = JS_THIS_OBJECT( cx, (jsval *) vp );
+	JS::RootedObject thisObjRoot( cx, thisObj );
+	globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
+	javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( JS_ConvertArguments( cx, args, "Sf", &jHostName, &dummyVal ) == true );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cHostName = JS_EncodeString( cx, jHostName ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.hostName = 1;
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( payload = Payload_New( cx, thisObj, fnValMut.get( ), JSVAL_NULL, false ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.payload = 1;
+		Core_GetHostByName( javascript->core, cHostName, Payload_Dns_ResultHandler_cb, (void *) payload );
+	}
+	if ( cleanUp.good ) {
+		args.rval( ).setBoolean( true );
+	} else {
+		if ( cleanUp.payload ) {
+			Payload_Delete( payload ); payload = NULL;
+		}
+		args.rval( ).setUndefined( );
+	}
+	//  always cleanup
+	js_free( cHostName ); cHostName = NULL;
+	return ( cleanUp.good ) ? true : false;
+
+}
+
 
 static const JSClass jscOs = {
 	"os",
@@ -1979,6 +2121,7 @@ static const JSFunctionSpec jsmOs[ ] = {
 	JS_FS( "readFile", 			JsnOs_ReadFile, 1, 0 ),
 	JS_FS( "writeFile",			JsnOs_WriteFile, 2, 0 ),
 	JS_FS( "system",			JsnOs_System, 1, 0 ),
+	JS_FS( "getHostByName",		JsnOs_GetHostByName, 2, 0 ),
 	JS_FS_END
 };
 

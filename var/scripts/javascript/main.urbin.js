@@ -22,16 +22,17 @@ try {
 		console.log( 'load' );
 	}
 	Urbin.onReady = function( ) {
-		var test = { webserver: 	true,
-					os: {	file: 	false,
-							env:	false,
-							system:	false
+		var test = { webserver: 		false,
+					os: {	file: 		false,
+							env:		false,
+							system:		false,
+							hostName:	true
 						},
-					sql: { 	pg: 	false,
-							my: 	false
+					sql: { 	pg: 		false,
+							my: 		false
 						},
-					timeout: 		false,
-					interval: 		false
+					timeout: 			false,
+					interval: 			false
 					};
 		if ( test.webserver ) {
 			var ws = Urbin.Webserver( {ip: '127.0.0.1', port: 8888}, 60 );
@@ -47,6 +48,23 @@ try {
 				var blog = 'Well,  on ' + params.year + '-' + params.month + '-' + params.day + ' nothing happened';
 				client.response.setContent( blog ).setMime( 'html' ).setCode( 200 );
 			 } );
+		}
+		if ( test.os.hostName ) {
+			os.getHostByName('www.urbin.info', function( ip ) {
+				if ( ip ) {
+					console.log( 'Resolved: ' + ip );
+				} else {
+					console.log( 'Could not resolve host' );
+				}
+			});
+			os.getHostByName('www.google.com', function( ip ) {
+				if ( ip ) {
+					console.log( 'Resolved: ' + ip );
+				} else {
+					console.log( 'Could not resolve host' );
+				}
+			});
+
 		}
 		if ( test.os.env ) {
 			var env = 'SHELL';

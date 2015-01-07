@@ -449,16 +449,6 @@ static void Core_ProcessTick( struct core_t * core ) {
 	}
 }
 
-#if 0
-static void Dns_Found_cb( struct dns_cb_data * dnsData ) {
-	if ( dnsData->addr_len == 0 ) {
-		fprintf(stderr, "No idea about [%s]\n", dnsData->name);
-	} else {
-		printf("%u.%u.%u.%u\n", dnsData->addr[0], dnsData->addr[1], dnsData->addr[2], dnsData->addr[3]);
-	}
-}
-#endif
-
 static void Dns_ReadWrite_cb( picoev_loop * loop, int fd, int events, void * cbArgs ) {
 	struct core_t * core;
 
@@ -473,35 +463,22 @@ static void Dns_ReadWrite_cb( picoev_loop * loop, int fd, int events, void * cbA
 		//  sending and receiving shit
 		picoev_set_timeout( loop, fd, DNS_QUERY_TIMEOUT );
 		dns_poll( core->dns.dns );
+		//  @TODO:  somehow every callbackHandler must decrement core->dns.actives, else the cpu load will rise through the roof.
 	}
 }
 
-void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb ) {
-	struct {unsigned char good:1; } cleanUp;
+void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb, void * queryCbArgs ) {
 	enum dns_query_type queryType;
 	int dnsSocketFd;
-	void * cbArgs;
 
-	cbArgs = NULL;
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	dnsSocketFd = dns_get_fd( core->dns.dns );
 	queryType = DNS_A_RECORD;
 	if ( ! picoev_is_active( core->loop, dnsSocketFd ) ) {
 		picoev_add( core->loop, dnsSocketFd, PICOEV_READWRITE, DNS_QUERY_TIMEOUT, Dns_ReadWrite_cb, (void *) core );
 	}
-	if ( INADDR_NONE == inet_addr( hostName ) ) {
-		core->dns.actives++;
-		dns_queue( core->dns.dns, cbArgs, hostName, queryType, onSuccess_cb );
-	} else {
-		// it is a valid ip address
-		struct dns_cb_data data;
-		data.context = cbArgs;
-		data.query_type = queryType;
-		data.name = hostName;
-		data.addr = (unsigned char *) hostName;
-		data.addr_len = sizeof( hostName );
-		onSuccess_cb( &data );
-	}
+	core->dns.actives++;
+	// even if it is a valid address, we still will give it to tadns
+	dns_queue( core->dns.dns, queryCbArgs, hostName, queryType, onSuccess_cb );
 }
 
 int Core_Loop( struct core_t * core ) {
