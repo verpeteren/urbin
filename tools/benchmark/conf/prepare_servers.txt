@@ -1,0 +1,20 @@
+#h2o
+cd /usr/src/h2o
+./h2o -c h2o.conf
+
+#nginx
+cd /usr/src/nginx-1.7.9
+./objs/nginx -p `pwd`
+
+#apache
+service apache2 start
+
+#urbin
+cd ~/Development/urbin/bin
+export LD_LIBRARY_PATH=`pwd`
+.urbin
+
+#vertx
+cd /usr/src/vertx-2.1.5
+./bin/vertx run http_server.js
+

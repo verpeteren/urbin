@@ -1,0 +1,23 @@
+<VirtualHost www-local.urbin.info:80>
+	ServerAdmin webmaster@urbin.info
+
+	DocumentRoot /var/www/www.urbin.info
+	<Directory />
+		Options FollowSymLinks
+		AllowOverride AlL
+	</Directory>
+	<Directory /var/www/www.urbin.info>
+		Options Indexes FollowSymLinks MultiViews
+		AllowOverride None
+		Order allow,deny
+		allow from all
+	</Directory>
+
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+
+	# Possible values include: debug, info, notice, warn, error, crit,
+	# alert, emerg.
+	LogLevel warn
+
+	CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
