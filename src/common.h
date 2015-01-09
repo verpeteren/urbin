@@ -6,7 +6,7 @@
 #include "./platform.h"
 
 #define PR_NAME										"urbin"
-#define PR_VERSION									"0.0.9"
+#define PR_VERSION									"0.0.10"
 #define PR_MAINCONFIG_FILENAME						"./etc/" PR_NAME ".conf"
 #define PR_CFG_CORE_MAX_FDS							1024						//  cfg:  main/max_fds
 #define PR_CFG_CORE_RUN_AS_USER						"daemon"					//  cfg:  main/run_as_user
