@@ -4,7 +4,6 @@
 #include "../core/utils.h"
 #include "sqlclient.h"
 
-
 /*****************************************************************************/
 /* Module                                                                    */
 /*****************************************************************************/
@@ -21,7 +20,7 @@ static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient
 /*****************************************************************************/
 /* Query     .                                                               */
 /*****************************************************************************/
-void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFunc_cb ) {
+void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFuncCb ) {
 	struct query_t * query;
 	size_t i, j;
 	struct {unsigned char good:1;
@@ -40,7 +39,7 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 		cleanUp.query = 1;
 		query->paramCount = paramCount;
 		query->cbHandler = callback;
-		query->clearFunc_cb = clearFunc_cb;
+		query->clearFuncCb = clearFuncCb;
 		query->cbArgs = args;
 		PR_INIT_CLIST( &query->mLink );
 		query->sqlclient = sqlclient;
@@ -76,11 +75,11 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 	if ( cleanUp.good ) {
 		Sqlclient_PushQuery( sqlclient, query );
 		//  Let's see if we can submit this immediately to the server
-			if ( sqlclient->socketFd < 1 ) {
-				Sqlclient_Connect( sqlclient );
-			}
 			Sqlclient_PopQuery( sqlclient );
+		if ( sqlclient->socketFd < 1 ) {
+			Sqlclient_Connect( sqlclient );
 		}
+	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.statement ) {
 			free( ( char * ) query->statement );	query->statement = NULL;
@@ -97,10 +96,10 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 			}
 		}
 		if ( cleanUp.query ) {
-			if ( query->clearFunc_cb != NULL && query->cbArgs != NULL ) {
-				query->clearFunc_cb( query->cbArgs );
+			if ( query->clearFuncCb != NULL && query->cbArgs != NULL ) {
+				query->clearFuncCb( query->cbArgs );
 			}
-			query->clearFunc_cb = NULL;
+			query->clearFuncCb = NULL;
 			query->cbArgs = NULL;
 			free( query ); query = NULL;
 		}
@@ -111,10 +110,10 @@ void Query_Delete( struct query_t * query ) {
 	size_t i;
 
 	if ( query != NULL ) {
-		if ( query->clearFunc_cb != NULL && query->cbArgs != NULL ) {
-			query->clearFunc_cb( query->cbArgs );
+		if ( query->clearFuncCb != NULL && query->cbArgs != NULL ) {
+			query->clearFuncCb( query->cbArgs );
 		}
-		query->clearFunc_cb = NULL;
+		query->clearFuncCb = NULL;
 		query->cbArgs = NULL;
 		query->cbHandler = NULL;
 		for ( i = 0; i < query->paramCount; i++ ) {

@@ -98,6 +98,130 @@ void ShowLink( const PRCList * start, const char * label, const size_t count ) {
 	}
 }
 #endif
+/*****************************************************************************/
+/* Buffer                                                                   */
+/*****************************************************************************/
+struct buffer_t * Buffer_New( size_t initialSize ) {
+	struct buffer_t * buffer;
+	struct {unsigned char good:1;
+			unsigned char buffer:1;
+			unsigned char bytes:1;} cleanUp;
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( buffer = malloc( sizeof( *buffer ) ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.bytes = 1;
+		buffer->used = 0;
+		buffer->size = initialSize;
+		cleanUp.good = ( ( buffer->bytes = calloc( initialSize, 1 ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.bytes = 1;
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.bytes ) {
+			free( buffer->bytes ); buffer->bytes = NULL;
+		}
+		if ( cleanUp.buffer ) {
+			buffer->used = 0;
+			buffer->size = 0;
+			free( buffer ); buffer = NULL;
+		}
+	}
+
+	return buffer;
+}
+
+struct buffer_t * Buffer_NewText( const char * text ) {
+	struct buffer_t * buffer;
+	size_t initialSize = strlen( text );
+	struct {unsigned char good:1;
+			unsigned char buffer:1;
+			unsigned char bytes:1;} cleanUp;
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( buffer = malloc( sizeof( *buffer ) ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.bytes = 1;
+		buffer->used = 0;
+		buffer->size = initialSize;
+		cleanUp.good = ( ( buffer->bytes = Xstrdup( text ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.bytes = 1;
+		buffer->used = strlen( text );
+	}
+	if ( ! cleanUp.good ) {
+		if ( cleanUp.bytes ) {
+			free( buffer->bytes ); buffer->bytes = NULL;
+		}
+		if ( cleanUp.buffer ) {
+			buffer->used = 0;
+			buffer->size = 0;
+			free( buffer ); buffer = NULL;
+		}
+	}
+
+	return buffer;
+}
+
+unsigned char Buffer_Append( struct buffer_t * buffer, const char * bytes, size_t bytesLen ) {
+	size_t i, newSize;
+	char * pos, *newBytes;
+	int fits;
+	struct {unsigned char good:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	newSize = buffer->used + bytesLen;
+	fits = ( buffer->size >= newSize + 1 );
+	if ( fits ) {
+		pos = &buffer->bytes[buffer->used];
+		for ( i = buffer->used; i < newSize; i++ ) {
+			*pos = *bytes;
+			pos++;
+			bytes++;
+		}
+		buffer->used = newSize;
+		cleanUp.good = 1;
+	} else {
+		cleanUp.good = ( ( newBytes = realloc( buffer->bytes, newSize + 1 ) ) != NULL );
+		if ( cleanUp.good ) {
+			memcpy( newBytes + buffer->used, bytes, bytesLen );
+			buffer->size = newSize;
+			buffer->used += bytesLen;
+			buffer->bytes = newBytes;
+		} else {
+			Buffer_Delete( buffer ); buffer = NULL;
+		}
+	}
+
+	return ( cleanUp.good ) ? 1: 0;
+}
+
+unsigned char Buffer_Reset( struct buffer_t * buffer, size_t minLen ) {
+	struct {unsigned char good:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	if ( buffer->size <= minLen ) {
+		memset( buffer->bytes, '\0', buffer->used );
+		buffer->used = 0;
+		cleanUp.good = 1;
+	} else {
+		free( buffer->bytes ); buffer->bytes = NULL;
+		cleanUp.good = ( ( buffer->bytes = calloc( minLen, 1 ) ) != NULL );
+	}
+	if ( ! cleanUp.good ) {
+		Buffer_Delete( buffer ); buffer = NULL;
+	}
+	return ( cleanUp.good ) ? 1: 0;
+}
+
+void Buffer_Delete( struct buffer_t * buffer ) {
+	if ( buffer->bytes != NULL ) {
+		free( buffer->bytes ); buffer->bytes = NULL;
+	}
+	buffer->used = 0;
+	buffer->size = 0;
+	free( buffer ); buffer = NULL;
+}
 
 /*****************************************************************************/
 /* Modules                                                                   */

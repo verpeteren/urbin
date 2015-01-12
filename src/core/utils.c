@@ -17,7 +17,13 @@ char * Xstrdup( const char* str ) {
 	//  http://stackoverflow.com/questions/482375/strdup-function
 	return strdup( str );
 #else
-	return strcpy( malloc( strlen( str ) + 1 ), str );
+	char * tmp;
+
+	tmp = malloc( strlen( str ) + 1 );
+	if ( tmp == NULL )  {
+		return NULL;
+	}
+	return strcpy( tmp, str );
 #endif
 }
 

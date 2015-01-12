@@ -28,6 +28,11 @@ const char * MethodDefinitions[ ] = {
 	"POST"
 };
 
+const char * ConnectionDefinitions[] = {
+	"close"
+	"Keep-Alive"
+};
+
 struct mimeDetail_t MimeTypeDefinitions[] = {
 	{ MIMETYPE_HTML,			"html",	"text/html" },
 	{ MIMETYPE_TXT,				"txt",	"text/plain" },
@@ -52,7 +57,7 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 //  http://stackoverflow.com/questions/4143000/find-the-string-length-of-an-int
 #define HTTP_SERVER_TEMPLATE "HTTP/1.1 %d OK\r\nContent-Length: %d\r\nConnection: %s\r\nContent-Type: %s\r\nDate: %s\r\nServer: %s/%s\r\n\r\n"
 #define HTTP_SERVER_TEMPLATE_ARGS webserverclient->response.httpCode, \
-								webserverclient->response.contentLength, \
+								contentLength, \
 								connectionString, \
 								contentTypeString, \
 								dateString, \
@@ -60,7 +65,7 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								PR_VERSION
 #define HTTP_SERVER_TEMPLATE_SIZE	(ssize_t) ( strlen( HTTP_SERVER_TEMPLATE ) + \
 								( STRING_LENGTH_OF_INT( webserverclient->response.httpCode ) ) + \
-								( STRING_LENGTH_OF_INT( webserverclient->response.contentLength ) ) + \
+								( STRING_LENGTH_OF_INT( contentLength ) ) + \
 								strlen( connectionString ) + \
 								strlen( contentTypeString ) + \
 								strlen( dateString ) + \
@@ -68,7 +73,7 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 								strlen( PR_VERSION ) \
 								- ( 2 * 7 ) + 1 )
 
-static struct route_t * 		Route_New				( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFunc_cb );
+static struct route_t * 		Route_New				( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFuncCb );
 static void						Route_Delete			( struct route_t * route );
 
 static void						Webserver_HandleRead_cb	( picoev_loop * loop, int fd, int events, void * wcArgs );
@@ -180,7 +185,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 /*****************************************************************************/
 	/* Route                                                                    */
 	/*****************************************************************************/
-	static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
+	static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
 		struct route_t * route;
 		OnigErrorInfo einfo;
 		UChar * pat;
@@ -197,7 +202,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 		if ( cleanUp.good ) {
 			cleanUp.route = 1;
 			route->cbArgs = cbArgs;
-			route->clearFunc_cb = clearFunc_cb;
+			route->clearFuncCb = clearFuncCb;
 			cleanUp.good = ( ( route->orgPattern = Xstrdup( pattern ) ) != NULL );
 		}
 		if ( cleanUp.good ) {
@@ -221,7 +226,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 					}
 					break;
 				case ROUTETYPE_DYNAMIC:
-					route->details.handlerCb = (dynamicHandler_cb_t) details;
+					route->details.handlerCb = (webserverHandler_cb_t) details;
 					break;
 				default:
 					break;
@@ -238,10 +243,10 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 				free( (char * ) route->orgPattern ); route->orgPattern = NULL;
 			}
 			if ( cleanUp.route ) {
-				if ( route->clearFunc_cb != NULL && route->cbArgs != NULL ) {
-					route->clearFunc_cb( route->cbArgs );
+				if ( route->clearFuncCb != NULL && route->cbArgs != NULL ) {
+					route->clearFuncCb( route->cbArgs );
 				}
-				route->clearFunc_cb = NULL;
+				route->clearFuncCb = NULL;
 				route->cbArgs = NULL;
 				free( route ); route = NULL;
 			}
@@ -255,10 +260,10 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 		}
 		onig_free( route->urlRegex ); route->urlRegex = NULL;
 		free( (char *) route->orgPattern ); route->orgPattern = NULL;
-		if ( route->clearFunc_cb != NULL && route->cbArgs != NULL ) {
-			route->clearFunc_cb( route->cbArgs );
+		if ( route->clearFuncCb != NULL && route->cbArgs != NULL ) {
+			route->clearFuncCb( route->cbArgs );
 		}
-		route->clearFunc_cb = NULL;
+		route->clearFuncCb = NULL;
 		route->cbArgs = NULL;
 		free( route ); route = NULL;
 	}
@@ -290,8 +295,12 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 		webserverclient->connection = CONNECTION_CLOSE;
 		webserverclient->mode = MODE_GET;
 		memset( webserverclient->buffer, '\0', HTTP_BUFF_LENGTH );
-		webserverclient->response.contentLength = 0;
-		webserverclient->response.content = NULL;
+		if ( webserverclient == CONTENTTYPE_BUFFER ) {
+			webserverclient->response.content.dynamic.buffer = NULL;
+		} else {
+			webserverclient->response.content.file.contentLength = 0;
+			webserverclient->response.content.file.fileName = NULL;
+		}
 		cleanUp.good = ( ( webserverclient->region = onig_region_new( ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -310,24 +319,27 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 }
 
 unsigned char Webserverclientresponse_SetContent( struct webserverclientresponse_t * response, const char * content ) {
+	size_t contentLen;
 	struct { unsigned char good:1;
 			unsigned char content:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	if ( response->content != NULL ) {
-		free( response->content ); response->content = NULL;
+	assert( response->contentType == CONTENTTYPE_BUFFER );
+	if ( response->content.dynamic.buffer != NULL ) {
+		contentLen = strlen( content );
+		cleanUp.good = ( Buffer_Reset( response->content.dynamic.buffer, contentLen ) == 1 );
+	} else {
+		cleanUp.good = ( ( response->content.dynamic.buffer = Buffer_NewText( content ) ) != NULL );
 	}
-	cleanUp.good = ( ( response->content = Xstrdup( content ) ) != NULL );
 	if ( cleanUp.good ) {
 		response->contentType = CONTENTTYPE_BUFFER;
 		cleanUp.content = 1;
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.content )  {
-			free( response->content ); response->content = NULL;
+			Buffer_Delete( response->content.dynamic.buffer ); response->content.dynamic.buffer = NULL;
 		}
 	}
-	response->contentLength = strlen( response->content );
 
 	return ( cleanUp.good ) ? 1 : 0;
 }
@@ -415,29 +427,67 @@ const char * Webserverclient_GetIp( const struct webserverclient_t * webservercl
 }
 
 #define WEBSERVERCLIENT_RENDER( name, webpage ) \
-static void Webserverclient_Render##name( struct webserverclient_t * webserverclient) { \
+static void Webserverclient_Render_##name( struct webserverclient_t * webserverclient) { \
 	struct {unsigned char good:1; \
 			unsigned char content:1; } cleanUp; \
 	\
 	memset( &cleanUp, 0, sizeof( cleanUp ) ); \
-	if ( webserverclient->response.contentType == CONTENTTYPE_FILE && webserverclient->response.content ) { \
-		/* In this case, the content field holds the file name */ \
-		free( webserverclient->response.content ); webserverclient->response.content = NULL; \
+	if ( webserverclient->response.contentType == CONTENTTYPE_FILE && webserverclient->response.content.file.fileName ) { \
+		free( (char *) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL; \
+		webserverclient->response.content.file.contentLength = 0; \
+		webserverclient->response.contentType = CONTENTTYPE_BUFFER; \
 	} \
 	webserverclient->response.mimeType = MIMETYPE_HTML; \
 	Webserverclientresponse_SetContent( &webserverclient->response, webpage ); \
 }
 
+//WEBSERVERCLIENT_RENDER( Ok, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>OK</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Created, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Created</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Accepted, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Accepted</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Non_authoritative_information, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Non-Authoritative Information</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( No_content, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>No Content</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Reset_content, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Reset Content</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Partial_content, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Partial Content</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Bad_request, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Bad Request</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Unauthorized, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Unauthorized</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Payment_required, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Payment Required</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
 WEBSERVERCLIENT_RENDER( Forbidden, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Forbidden</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
-WEBSERVERCLIENT_RENDER( NotFound, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Not found</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
-WEBSERVERCLIENT_RENDER( Error, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Internal server error</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Not_found, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Not Found</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Method_not_allowed, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Method Not Allowed</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Not_acceptable, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Not Acceptable</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Proxy_authentication_required, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Proxy Authentication Required</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Request_timeout, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Request Timeout</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Conflict, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Conflict</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Gone, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Gone</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Length_required, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Length Required</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Precondition_failed, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Precondition Failed</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Request_entity_too_large, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Request Entity Too Large</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Request_uri_too_long, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Request-URI Too Long</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Unsupported_media_type, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Unsupported Media Type</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Requested_range_not_satisfiable, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Requested Range Not Satisfiable</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Expectation_failed, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Expectation Failed</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Continue, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Continue</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Switching_protocols, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Switching Protocols</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Multiple_choices, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Multiple Choices</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Moved_permanently, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Moved Permanently</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Found, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Found</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( See_other, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>See Other</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Not_modified, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Not Modified</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Use_proxy, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Use Proxy</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Temporary_redirect, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Temporary Redirect</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Internal_server_error, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Internal Server Error</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Not_implemented, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Not Implemented</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Bad_gateway, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Bad Gateway</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Service_unavailable, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Service Unavailable</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Gateway_timeout, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Gateway Timeout</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
+WEBSERVERCLIENT_RENDER( Http_version_not_supported, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>HTTP Version Not Supported</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
 
 static void Webserverclient_RenderRoute( struct webserverclient_t * webserverclient ) {
 	struct route_t * route;
-
+	//  @TODO:  urgently refractor  this routine, 280 lines is too much!
 	route = webserverclient->route;
 	if ( route == NULL ) {
-		Webserverclient_RenderNotFound( webserverclient );
+		Webserverclient_Render_Not_found( webserverclient );
 	} else {
 		if ( route->routeType == ROUTETYPE_DYNAMIC ) {
 			route->details.handlerCb( webserverclient );
@@ -489,13 +539,13 @@ static void Webserverclient_RenderRoute( struct webserverclient_t * webservercli
 						if ( exists != 0 ) {
 							//  this is the place where a directory index handler can step into the arena;
 							//  but we will not do that, because: https://github.com/monkey/monkey/blob/master/plugins/dirlisting/dirlisting.c#L153
-							webserverclient->response.httpCode = HTTPCODE_NOTFOUND;
+							webserverclient->response.httpCode = HTTPCODE_NOT_FOUND;
 						}
 					}
 					//  all looks ok, we have access to a file
 					if ( webserverclient->response.httpCode == HTTPCODE_OK ) {
-						webserverclient->response.contentLength = fileStat.st_size;
-						webserverclient->response.content = fullPath;
+						webserverclient->response.content.file.contentLength = fileStat.st_size;
+						webserverclient->response.content.file.fileName = fullPath;
 						fullPathLength = strlen( fullPath );
 						//  determine mimetype
 						for ( j = 0; j < __MIMETYPE_LAST; j++ ) {
@@ -509,24 +559,135 @@ static void Webserverclient_RenderRoute( struct webserverclient_t * webservercli
 						//  but we will not do this for spidermonkey, because we load that upon startup only once
 					}
 				} else {
-					webserverclient->response.httpCode = HTTPCODE_NOTFOUND;
+					webserverclient->response.httpCode = HTTPCODE_NOT_FOUND;
 				}
 			}
 			switch ( webserverclient->response.httpCode ) {
-			case HTTPCODE_ERROR:
-				Webserverclient_RenderError( webserverclient );
+			//  most common
+			case HTTPCODE_OK:
+				// WebserverRenderOk( webserverclient );
+				break;
+			case HTTPCODE_INTERNAL_SERVER_ERROR:
+				Webserverclient_Render_Internal_server_error( webserverclient );
+				break;
+			case HTTPCODE_UNAUTHORIZED:
+				Webserverclient_Render_Unauthorized( webserverclient );
 				break;
 			case HTTPCODE_FORBIDDEN:
-				Webserverclient_RenderForbidden( webserverclient );
+				Webserverclient_Render_Forbidden( webserverclient );
 				break;
-			case HTTPCODE_NOTFOUND:
-				Webserverclient_RenderNotFound( webserverclient );
+			case HTTPCODE_NOT_FOUND:
+				Webserverclient_Render_Not_found( webserverclient );
 				break;
-			case HTTPCODE_OK:  //  ft
-				//  break;
+			//  other
+			case HTTPCODE_CREATED:
+				Webserverclient_Render_Created( webserverclient );
+				break;
+			case HTTPCODE_ACCEPTED:
+				Webserverclient_Render_Accepted( webserverclient );
+				break;
+			case HTTPCODE_NON_AUTHORITATIVE_INFORMATION:
+				Webserverclient_Render_Non_authoritative_information( webserverclient );
+				break;
+			case HTTPCODE_NO_CONTENT:
+				Webserverclient_Render_No_content( webserverclient );
+				break;
+			case HTTPCODE_RESET_CONTENT:
+				Webserverclient_Render_Reset_content( webserverclient );
+				break;
+			case HTTPCODE_PARTIAL_CONTENT:
+				Webserverclient_Render_Partial_content( webserverclient );
+				break;
+			case HTTPCODE_BAD_REQUEST:
+				Webserverclient_Render_Bad_request( webserverclient );
+				break;
+			case HTTPCODE_PAYMENT_REQUIRED:
+				Webserverclient_Render_Payment_required( webserverclient );
+				break;
+			case HTTPCODE_METHOD_NOT_ALLOWED:
+				Webserverclient_Render_Method_not_allowed( webserverclient );
+				break;
+			case HTTPCODE_NOT_ACCEPTABLE:
+				Webserverclient_Render_Not_acceptable( webserverclient );
+				break;
+			case HTTPCODE_PROXY_AUTHENTICATION_REQUIRED:
+				Webserverclient_Render_Proxy_authentication_required( webserverclient );
+				break;
+			case HTTPCODE_REQUEST_TIMEOUT:
+				Webserverclient_Render_Request_timeout( webserverclient );
+				break;
+			case HTTPCODE_CONFLICT:
+				Webserverclient_Render_Conflict( webserverclient );
+				break;
+			case HTTPCODE_GONE:
+				Webserverclient_Render_Gone( webserverclient );
+				break;
+			case HTTPCODE_LENGTH_REQUIRED:
+				Webserverclient_Render_Length_required( webserverclient );
+				break;
+			case HTTPCODE_PRECONDITION_FAILED:
+				Webserverclient_Render_Precondition_failed( webserverclient );
+				break;
+			case HTTPCODE_REQUEST_ENTITY_TOO_LARGE:
+				Webserverclient_Render_Request_entity_too_large( webserverclient );
+				break;
+			case HTTPCODE_REQUEST_URI_TOO_LONG:
+				Webserverclient_Render_Request_uri_too_long( webserverclient );
+				break;
+			case HTTPCODE_UNSUPPORTED_MEDIA_TYPE:
+				Webserverclient_Render_Unsupported_media_type( webserverclient );
+				break;
+			case HTTPCODE_REQUESTED_RANGE_NOT_SATISFIABLE:
+				Webserverclient_Render_Requested_range_not_satisfiable( webserverclient );
+				break;
+			case HTTPCODE_EXPECTATION_FAILED:
+				Webserverclient_Render_Expectation_failed( webserverclient );
+				break;
+			case HTTPCODE_CONTINUE:
+				Webserverclient_Render_Continue( webserverclient );
+				break;
+			case HTTPCODE_SWITCHING_PROTOCOLS:
+				Webserverclient_Render_Switching_protocols( webserverclient );
+				break;
+			case HTTPCODE_MULTIPLE_CHOICES:
+				Webserverclient_Render_Multiple_choices( webserverclient );
+				break;
+			case HTTPCODE_MOVED_PERMANENTLY:
+				Webserverclient_Render_Moved_permanently( webserverclient );
+				break;
+			case HTTPCODE_FOUND:
+				Webserverclient_Render_Found( webserverclient );
+				break;
+			case HTTPCODE_SEE_OTHER:
+				Webserverclient_Render_See_other( webserverclient );
+				break;
+			case HTTPCODE_NOT_MODIFIED:
+				Webserverclient_Render_Not_modified( webserverclient );
+				break;
+			case HTTPCODE_USE_PROXY:
+				Webserverclient_Render_Use_proxy( webserverclient );
+				break;
+			case HTTPCODE_TEMPORARY_REDIRECT:
+				Webserverclient_Render_Temporary_redirect( webserverclient );
+				break;
+			case HTTPCODE_NOT_IMPLEMENTED:
+				Webserverclient_Render_Not_implemented( webserverclient );
+				break;
+			case HTTPCODE_BAD_GATEWAY:
+				Webserverclient_Render_Bad_gateway( webserverclient );
+				break;
+			case HTTPCODE_SERVICE_UNAVAILABLE:
+				Webserverclient_Render_Service_unavailable( webserverclient );
+				break;
+			case HTTPCODE_GATEWAY_TIMEOUT:
+				Webserverclient_Render_Gateway_timeout( webserverclient );
+				break;
+			case HTTPCODE_HTTP_VERSION_NOT_SUPPORTED:
+				Webserverclient_Render_Http_version_not_supported( webserverclient );
+				break;
+			//  cruft
 			case HTTPCODE_NONE:  //  ft
 			case __HTTPCODE_LAST:  //  ft
-				//  break;
 			default:
 				break;
 			}
@@ -546,6 +707,7 @@ static void Webserverclient_RenderRoute( struct webserverclient_t * webservercli
 static void Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient ) {
 	HeaderField * field;
 	size_t i;
+	const char * close, * keepAlive;
 	struct {unsigned char good:1;
 			unsigned char h3:1;
 			unsigned char content:1;} cleanUp;
@@ -563,9 +725,11 @@ static void Webserverclient_PrepareRequest( struct webserverclient_t * webserver
 		for ( i = 0; i < webserverclient->header->HeaderSize; i++ ) {
 			field = &webserverclient->header->Fields[i];
 			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada... http://i.stack.imgur.com/whhD1.png
-				if ( strncmp( field->Value, "Keep-Alive", field->ValueLen ) == 0 ) {
+				close = ConnectionDefinitions[CONNECTION_CLOSE];
+				keepAlive = ConnectionDefinitions[CONNECTION_KEEPALIVE];
+				if ( strncmp( field->Value, close, field->ValueLen ) == 0 ) {
 					webserverclient->connection = CONNECTION_KEEPALIVE;
-				} else 	if ( strncmp( field->Value, "close", field->ValueLen ) == 0 ) {
+				} else 	if ( strncmp( field->Value, keepAlive, field->ValueLen ) == 0 ) {
 					webserverclient->connection = CONNECTION_CLOSE;
 				}
 			}
@@ -576,12 +740,20 @@ static void Webserverclient_PrepareRequest( struct webserverclient_t * webserver
 		Webserverclient_RenderRoute( webserverclient );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.content = ( webserverclient->response.contentLength > 0 );
+		if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
+			cleanUp.content = ( webserverclient->response.content.file.contentLength > 0 );
+		} else {
+			cleanUp.content = ( webserverclient->response.content.dynamic.buffer != NULL );
+		}
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.content ) {
-			free( webserverclient->response.content ); webserverclient->response.content = NULL;
-			webserverclient->response.contentLength = 0;
+			if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
+				free( (char * ) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL;
+				webserverclient->response.content.file.contentLength = 0;
+			} else {
+				Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
+			}
 		}
 		if ( cleanUp.h3 ) {
 			h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
@@ -595,47 +767,52 @@ static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) 
 		}
 		memset( webserverclient->buffer, '\0', strlen( webserverclient->buffer ) );
 		webserverclient->route = NULL;
-		webserverclient->response.contentLength = 0;
 		webserverclient->response.start = time( 0 );
 		webserverclient->response.end = 0;
 		webserverclient->response.httpCode = HTTPCODE_OK;
 		webserverclient->response.mimeType = MIMETYPE_HTML;
-		webserverclient->response.contentType = CONTENTTYPE_BUFFER;
 		webserverclient->response.headersSent = 0;
 		webserverclient->response.contentSent = 0;
 		webserverclient->connection = CONNECTION_CLOSE;
 		webserverclient->mode = MODE_GET;
-		onig_region_free( webserverclient->region, 0 );
-		if ( webserverclient->response.content != NULL ) {
-			free( webserverclient->response.content ); webserverclient->response.content = NULL;
+		if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
+			free( (char * ) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL;
+			webserverclient->response.content.file.contentLength = 0;
+		} else {
+			Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
 		}
+		webserverclient->response.contentType = CONTENTTYPE_BUFFER;
+		onig_region_free( webserverclient->region, 0 );
 	}
 
-	static void Webserverclient_CloseConn( struct webserverclient_t * webserverclient ) {
+static void Webserverclient_CloseConn( struct webserverclient_t * webserverclient ) {
 		picoev_del( webserverclient->webserver->core->loop, webserverclient->socketFd );
 		close( webserverclient->socketFd );
 		Webserverclient_Delete( webserverclient );
 	}
 
-	static void Webserverclient_Delete( struct webserverclient_t * webserverclient ) {
+static void Webserverclient_Delete( struct webserverclient_t * webserverclient ) {
 		if ( webserverclient->header != NULL ) {
 		h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
 	}
 	webserverclient->route = NULL;
 	webserverclient->response.httpCode = HTTPCODE_NONE;
-	webserverclient->response.contentLength = 0;
 	webserverclient->response.start = 0;
 	webserverclient->response.end = 0;
 	webserverclient->response.headersSent = 0;
 	webserverclient->response.contentSent = 0;
 	webserverclient->response.mimeType = MIMETYPE_HTML;
 	webserverclient->connection = CONNECTION_CLOSE;
-	webserverclient->response.contentType = CONTENTTYPE_BUFFER;
 	webserverclient->mode = MODE_GET;
 	onig_region_free( webserverclient->region, 1 ); webserverclient->region = NULL;
-	if ( webserverclient->response.content != NULL ) {
-		free( webserverclient->response.content ); webserverclient->response.content = NULL;
+	if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
+		free( (char * ) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL;
+		webserverclient->response.content.file.contentLength = 0;
+	} else {
+		Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
 	}
+	webserverclient->response.contentType = CONTENTTYPE_BUFFER;
+
 
 	free( webserverclient ); webserverclient = NULL;
 }
@@ -663,13 +840,13 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 	return ( cleanUp.good == 1 );
 }
 
-int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const dynamicHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
+int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
 	struct route_t * route;
 	struct { unsigned char good:1;
 			unsigned char route:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions, cbArgs, clearFunc_cb ) ) != NULL);
+	cleanUp.good = ( ( route = Route_New( pattern, ROUTETYPE_DYNAMIC, (void * ) handlerCb, webserver->regexOptions, cbArgs, clearFuncCb ) ) != NULL);
 	if ( cleanUp.good ) {
 		cleanUp.route = 1;
 		Webserver_AddRoute( webserver, route );
@@ -733,9 +910,11 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webserverclient_t * webserverclient;
 	int connClosed;
-
+	size_t contentLength;
+	//  @TODO:  /refractor this long routine
 	webserverclient = (struct webserverclient_t *) wcArg;
 	connClosed = 0;
+	contentLength = 0;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
 		Webserverclient_CloseConn( webserverclient );
@@ -759,6 +938,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 			time( &webserverclient->response.end );
 			tm_info = localtime( &webserverclient->response.end );
 			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", tm_info );
+			contentLength = ( webserverclient->response.contentType == CONTENTTYPE_FILE ) ? webserverclient->response.content.file.contentLength: webserverclient->response.content.dynamic.buffer->used;
 			headerLength = HTTP_SERVER_TEMPLATE_SIZE;
 			headerLength = (ssize_t) snprintf( headerBuffer, headerLength, HTTP_SERVER_TEMPLATE, HTTP_SERVER_TEMPLATE_ARGS );
 			wroteHeader = write( fd, headerBuffer, headerLength /*  , flags | MSG_MORE  */ );
@@ -784,7 +964,9 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 			}
 		}
 		if ( ! connClosed && webserverclient->response.headersSent ) {
-			if ( webserverclient->response.contentLength == 0 ) {
+			if ( webserverclient->response.contentType == CONTENTTYPE_FILE && webserverclient->response.content.file.contentLength == 0 ) {
+				webserverclient->response.contentSent = 1;
+			} else if ( webserverclient->response.contentType == CONTENTTYPE_BUFFER && webserverclient->response.content.dynamic.buffer->used == 0 ) {
 				webserverclient->response.contentSent = 1;
 			} else {
 				int fileHandle;
@@ -797,10 +979,10 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 				wroteContent = 0;
 				switch ( webserverclient->response.contentType ) {
 				case CONTENTTYPE_FILE:
-					cleanUp.good = ( ( fileHandle = open( webserverclient->response.content, O_RDONLY | O_NONBLOCK ) ) > 0 );
+					cleanUp.good = ( ( fileHandle = open( webserverclient->response.content.file.fileName, O_RDONLY | O_NONBLOCK ) ) > 0 );
 					if ( cleanUp.good ) {
 						cleanUp.fileHandle = 1;
-						wroteContent = sendfile( fd, fileHandle, 0, webserverclient->response.contentLength );
+						wroteContent = sendfile( fd, fileHandle, 0, webserverclient->response.content.file.contentLength );
 					}
 					if ( cleanUp.fileHandle ) {
 						close( fileHandle );
@@ -808,7 +990,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 					break;
 				default: //  FT
 				case CONTENTTYPE_BUFFER:
-					wroteContent = write( fd, webserverclient->response.content, webserverclient->response.contentLength /* , flags  */ );
+					wroteContent = write( fd, webserverclient->response.content.dynamic.buffer->bytes, webserverclient->response.content.dynamic.buffer->used /* , flags  */ );
 				break;
 				}
 				switch ( wroteContent ) {
@@ -823,7 +1005,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 					}
 					break;
 				default: /*  got some data, send back  */
-					if ( webserverclient->response.contentLength != wroteContent ) {
+					if ( contentLength != (size_t) wroteContent ) {
 						Webserverclient_CloseConn( webserverclient ); /*  failed to send all data at once, close  */
 						connClosed = 1;
 					} else {
@@ -895,11 +1077,11 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * ip,
 			listenBacklog = PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG;
 		}
 		cleanUp.good = ( ( webserver->ip = Xstrdup( ip ) ) != NULL );
-}
-if ( cleanUp.good ) {
-	cleanUp.ip = 1;
-}
-if ( cleanUp.good ) {
+	}
+	if ( cleanUp.good ) {
+		cleanUp.ip = 1;
+	}
+	if ( cleanUp.good ) {
 		cleanUp.good = ( ( webserver->socketFd = socket( AF_INET, SOCK_STREAM, 0 ) ) != -1 );
 	}
 	if ( cleanUp.good ) {

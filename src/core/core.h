@@ -30,6 +30,11 @@ typedef unsigned char		( * moduleHandler_cb_t )	( const struct core_t * core, st
 void Feat##_JoinCore( struct feature##_t * feature ) { \
 	picoev_add( feature->core->loop, feature->socketFd, PICOEV_READ, 0, Feat##_HandleAccept_cb, (void * ) feature ); \
 }
+struct buffer_t{
+	char * 								bytes;
+	size_t								used;
+	size_t								size;
+};
 
 struct timing_t;
 struct timing_t {
@@ -73,6 +78,12 @@ struct core_t {
 	unsigned char				keepOnRunning:1;
 };
 
+
+struct buffer_t *				Buffer_New				( size_t initialSize );
+struct buffer_t * 				Buffer_NewText			( const char * text );
+unsigned char 					Buffer_Append			( struct buffer_t * buffer, const char * bytes, size_t bytesLen );
+unsigned char 					Buffer_Reset			( struct buffer_t * buffer, size_t minLen );
+void 							Buffer_Delete			( struct buffer_t * buffer );
 void							Boot					( const int maxFds );
 void							Shutdown				( );
 void							SetupSocket				( const int fd,  const unsigned char tcp );
