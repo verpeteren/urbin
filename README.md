@@ -96,6 +96,7 @@ These tools are needed to compile the dependencies to build, but after that, the
 |	Http Parser	|	H3				|	MIT				|	   481	|	https://github.com/c9s/h3	|
 |	Logging		|	c-logging		|	Public Domain	|	   230	|	https://github.com/dhess/c-logging	|
 |	Dns			|	TADNS			|	Beer-ware		|	   570	|	http://adns.sourceforge.net/	|
+|	Url			|	urlparser		|	BSD				|	  5050	|	http://uriparser.sourceforge.net/	|
 |	Regex		|	oniguruma		|	BSD				|	 19458	|	http://www.geocities.jp/kosako3/oniguruma/	|
 |	Postgresql	|	pq				|	Postgresql		|	 53205	|	http://www.postgresql.org/docs/9.4/static/libpq.html	|
 |	Portabilty	|	nspr			|	MPL2.0			|	112077	|	https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSPR	|

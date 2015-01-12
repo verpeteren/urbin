@@ -35,6 +35,7 @@ $(DIR_Z):
 	@cd $(DEP_DIR) && \
 	wget -q http://zlib.net/zlib-$(VER_Z).tar.gz && \
 	tar -xaf zlib-$(VER_Z).tar.gz
+
 ###############################################################################
 # picoev: a tiny event loop for network applications, faster than libevent or libev
 ###############################################################################
@@ -75,6 +76,23 @@ $(DIR_CLOG):
 	wget -q https://github.com/dhess/c-logging/archive/master.zip -O clog.zip && \
 	unzip -qq clog.zip && \
 	mv c-logging-master clog 
+
+###############################################################################
+# uriparser: uriparser is a strictly RFC 3986 compliant URI parsing and handling library written in C.
+###############################################################################
+$(LIB_URL_STATIC): $(DIR_URL)
+$(LIB_URL_SHARED): $(DIR_URL)
+	@echo $@
+	@cd $(DIR_URL) && \
+	./configure --enable-shared --enable-static --disable-doc --disable-test && \
+	make 
+	@touch $@
+
+$(DIR_URL):
+	@echo $@
+	@cd $(DEP_DIR) && \
+	wget -q http://downloads.sourceforge.net/project/uriparser/Sources/0.8.1/uriparser-$(VER_URL).tar.bz2 -O uriparser-$(VER_URL).tar.bz2 && \
+	tar -xaf uriparser-$(VER_URL).tar.bz2
 
 ###############################################################################
 # H3 - The Fast HTTP header parser library  

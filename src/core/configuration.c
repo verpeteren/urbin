@@ -36,6 +36,12 @@ static const cfg_opt_t webserverCfgOpts[] = {
 	CFG_END( )
 };
 
+static const cfg_opt_t webclientCfgOpts[] = {
+	CFG_INT( (char *) "timeout_sec", 					PR_CFG_MODULES_WEBCLIENT_TIMEOUT_SEC, CFGF_NONE ),
+	CFG_END( )
+};
+
+
 static const cfg_opt_t mysqlclientCfgOpts[] = {
 	CFG_STR( (char *) "database",	 		(char *)	PR_CFG_MODULES_MYSQLCLIENT_DATABASE, CFGF_NONE ),
 	CFG_STR( (char *) "ip", 				(char *)	PR_CFG_MODULES_MYSQLCLIENT_IP, CFGF_NONE ),
@@ -59,7 +65,8 @@ static const cfg_opt_t javascriptCfgOpts[] = {
 };
 
 static const cfg_opt_t modulesCfgOpts[] = {
-	CFG_SEC( (char *) "webserver", 		(cfg_opt_t *) webserverCfgOpts, CFGF_MULTI | CFGF_TITLE),
+	CFG_SEC( (char *) "webserver", 			(cfg_opt_t *) webserverCfgOpts, CFGF_MULTI | CFGF_TITLE),
+	CFG_SEC( (char *) "webclient", 			(cfg_opt_t *) webclientCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char *) "mysqlclient", 		(cfg_opt_t *) mysqlclientCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_SEC( (char *) "postgresqlclient",	(cfg_opt_t *) pgsqlclientCfgOpts, CFGF_MULTI | CFGF_TITLE),
 	CFG_END( )

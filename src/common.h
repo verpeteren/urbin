@@ -25,6 +25,7 @@
 #define PR_CFG_MODULES_WEBSERVER_PORT				8080						//  cfg:  modules/WEBSERVER/port
 #define PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC		10 							//  cfg:  modules/WEBSERVER/timeout_sec
 #define PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG		( PR_CFG_CORE_MAX_FDS / 10 )//  cfg:  modules/WEBSERVER/listen_backlog
+#define PR_CFG_MODULES_WEBCLIENT_TIMEOUT_SEC		10 							//  cfg:  modules/WEBCLIENT/timeout_sec
 #define PR_CFG_MODULES_MYSQLCLIENT_DATABASE			"mysql"						//  cfg:  modules/MYSQLCLIENT/database
 #define PR_CFG_MODULES_MYSQLCLIENT_IP				"127.0.0.1"					//  cfg:  modules/MYSQLCLIENT/ip
 #define PR_CFG_MODULES_MYSQLCLIENT_PORT				3306						//  cfg:  modules/MYSQLCLIENT/port

@@ -38,11 +38,11 @@ BIN_DIR = ../bin
 DOC_DIR = ../doc
 
 COMMON_HEADERS = common.h platform.h $(DIRS) 
-FEATURE_HEADERS = $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h
+FEATURE_HEADERS = $(FEAT_DIR)/webcommon.h $(FEAT_DIR)/webserver.h  $(FEAT_DIR)/webclient.h  $(FEAT_DIR)/sqlclient.h
 GLOT_HEADERS = $(GLOT_DIR)/javascript.h
 
 CORE_OBJECTS = $(OBJ_DIR)/utils.o $(OBJ_DIR)/configuration.o $(OBJ_DIR)/core.o
-FEAT_OBJECTS = $(OBJ_DIR)/webserver.o $(OBJ_DIR)/sqlclient.o
+FEAT_OBJECTS = $(OBJ_DIR)/webserver.o $(OBJ_DIR)/webclient.o $(OBJ_DIR)/sqlclient.o
 GLOT_OBJECTS = $(OBJ_DIR)/javascript.o
 MAIN_OBJECTS = $(OBJ_DIR)/main_server.o
 DOC_API_OBJECT = $(DOC_DIR)/Api.txt
@@ -58,18 +58,27 @@ deps:	$(DEPS)
 docs:   $(DOC_OBJECTS)
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
+$(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion -Wno-array-bounds
+$(OBJ_DIR)/webclient.o	:			EXCEPTION = -Wno-strict-aliasing
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION = 
-$(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion
 $(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return
 $(OBJ_DIR)/core.o:					EXCEPTION = -Wno-unused-result
 $(OBJ_DIR)/utils.o:					EXCEPTION = -Wno-unused-result
+$(OBJ_DIR)/configuration.o:			EXCEPTION = 
 ifeq ($(CC),gcc)
-$(OBJ_DIR)/core.o:					EXCEPTION += -Wno-suggest-attribute=pure
+$(OBJ_DIR)/main_server.o:			EXCEPTION +=
+$(OBJ_DIR)/webserver.o:				EXCEPTION += 
+$(OBJ_DIR)/webclient.o:				EXCEPTION +=
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-suggest-attribute=noreturn
+$(OBJ_DIR)/javascript.o:			EXCEPTION +=
+$(OBJ_DIR)/core.o:					EXCEPTION += -Wno-suggest-attribute=pure
+$(OBJ_DIR)/utils.o:					EXCEPTION += 
+$(OBJ_DIR)/configuration.o:			EXCEPTION += 
 else 
 $(OBJ_DIR)/main_server.o:			EXCEPTION +=
-$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
+$(OBJ_DIR)/webclient.o:				EXCEPTION += -Wno-cast-align
+$(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/javascript.o:			EXCEPTION += -Wno-cast-align
 $(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code -Wno-cast-align -Wno-format-nonliteral
 $(OBJ_DIR)/utils.o:					EXCEPTION += 
@@ -82,10 +91,11 @@ endif
 $(OBJ_DIR)/utils.o:					$(CORE_DIR)/utils.c  $(CORE_DIR)/utils.h $(COMMON_HEADERS)
 $(OBJ_DIR)/configuration.o:			$(CORE_DIR)/configuration.c $(CORE_DIR)/configuration.h $(COMMON_HEADERS)
 $(OBJ_DIR)/core.o:					$(CORE_DIR)/core.c $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(COMMON_HEADERS)
+$(OBJ_DIR)/webserver.o:				$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(FEAT_DIR)/webcommon.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(COMMON_HEADERS)
+$(OBJ_DIR)/webclient.o:				$(FEAT_DIR)/webclient.c $(FEAT_DIR)/webclient.h $(FEAT_DIR)/webcommon.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(COMMON_HEADERS)
 $(OBJ_DIR)/sqlclient.o:				$(FEAT_DIR)/sqlclient.c $(FEAT_DIR)/sqlclient.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(COMMON_HEADERS) 
-$(OBJ_DIR)/webserver.o:				$(FEAT_DIR)/webserver.c $(FEAT_DIR)/webserver.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(COMMON_HEADERS)
-$(OBJ_DIR)/javascript.o:			$(GLOT_DIR)/javascript.cpp $(GLOT_DIR)/javascript.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS) 
-$(OBJ_DIR)/main_server.o:			$(MAIN_DIR)/main_server.cpp $(CORE_DIR)/core.h $(FEATURE_HEADERS) $(GLOT_HEADERS) $(COMMON_HEADERS)
+$(OBJ_DIR)/javascript.o:			$(GLOT_DIR)/javascript.cpp $(GLOT_DIR)/javascript.h $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(CORE_DIR)/utils.h $(FEAT_DIR)/webserver.h $(FEAT_DIR)/webclient.h $(FEAT_DIR)/sqlclient.h $(COMMON_HEADERS) 
+$(OBJ_DIR)/main_server.o:			$(MAIN_DIR)/main_server.cpp $(CORE_DIR)/core.h $(CORE_DIR)/configuration.h $(FEATURE_HEADERS) $(GLOT_HEADERS) $(COMMON_HEADERS)
 
 ###############################################################################
 # LINKING
@@ -102,6 +112,7 @@ endif
 	@$(CC) -o $@ $(CODE_OBJECTS) $(LIBS) $(LD_FLAGS) && \
 	cd $(BIN_DIR) && \
 	ln -fs $(DEPS) -t . && \
+	ln -fs $(LIB_URL_SHARED) $(BIN_DIR)/liburiparser.so.1 && \
 	chmod  +x $@ lib* && \
 	export LD_LIBRARY_PATH=$(BIN_DIR)
 ifeq ($(STAGING_RELEASE),yes)
