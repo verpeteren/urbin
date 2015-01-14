@@ -553,9 +553,41 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  *
  * @see	Urbin.MysqlClient
  * @see	Urbin.PostgresqlClient.query
+ * @name Urbin.MysqlClient.getInsertId
  */
 static bool JsnMysqlclient_Query( JSContext * cx, unsigned argc, jsval * vp ) {
 	return SqlClientQuery( cx, argc, vp, Mysqlclient_Query_ResultHandler_cb );
+}
+
+/**
+ * Get the last id insert with auto-increment.
+ * <p>Beware: This is the last id insert for the current connection object.</p>
+ *
+ * @name Urbin.MysqlClient.getInsertId
+ * @function
+ * @public
+ * @since	0.0.10
+ *
+ * @returns {integer} Used to get the last insert id with auto-increment for this connection.
+ *
+ * @example
+ * sql.query( 'INSERT INTO table VALUES( "a", "b", "c" )', [],  function( res ) {
+ * 	console.log( 'Inserted: ' + sql.getInsertId( ) );
+ * } );
+ * @see	Urbin.MysqlClient
+ * @see	Urbin.MysqlClient.query
+ */
+static bool JsnMysqlclient_GetInsertId( JSContext * cx, unsigned argc, jsval * vp ) {
+	struct sqlclient_t * sqlclient;
+	JS::CallArgs args;
+	JSObject * sqlObj;
+
+	args = CallArgsFromVp( argc, vp );
+	sqlObj = JS_THIS_OBJECT( cx, vp );
+	JS::RootedObject sqlObjRoot( cx, sqlObj );
+	sqlclient = (struct sqlclient_t *) JS_GetPrivate( sqlObj );
+	args.rval( ).set( INT_TO_JSVAL( mysac_insert_id( sqlclient->connection.my.conn ) ) );
+	return true;
 }
 
 static const JSClass jscMysqlclient = {
@@ -566,6 +598,7 @@ static const JSClass jscMysqlclient = {
 
 static const JSFunctionSpec jsmMysqlclient[ ] = {
 	JS_FS( "query", JsnMysqlclient_Query, 3, 0 ),
+	JS_FS( "getInsertId", JsnMysqlclient_GetInsertId, 0, 0 ),
 	JS_FS_END
 };
 
@@ -597,6 +630,7 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * 		}
  * 	} );
  * @see	Urbin.MysqlClient.query
+ * @name Urbin.MysqlClient.getInsertId
  * @see	Urbin.PostgreslClient
  */
 static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
