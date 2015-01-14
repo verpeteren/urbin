@@ -255,7 +255,7 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 	}
 	if ( cleanUp.good ) {
 		cleanUp.content = 1;
-		if ( webclient->currentWebpage != NULL || webclient->webpages != NULL) {
+		if ( webclient->currentWebpage != NULL || webclient->webpages != NULL ) {
 			webclient->connection = CONNECTION_KEEPALIVE;
 		}
 		Webclient_PushWebpage( webclient, webpage );

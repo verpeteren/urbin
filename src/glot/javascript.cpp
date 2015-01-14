@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -855,6 +856,7 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cx = payload->context;
+	jContent = jHeaders = NULL;
 	JSAutoRequest ar( cx );
 	JSAutoCompartment ac( cx, payload->scopeObj );
 	thisObj = payload->scopeObj;
@@ -896,10 +898,10 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 
 	if ( ! cleanUp.good )  {
 		if ( cleanUp.headers )  {
-			JS_free( cx, jHeaders );
+			JS_free( cx, jHeaders ); jHeaders = NULL;
 		}
 		if ( cleanUp.headers )  {
-			JS_free( cx, jContent );
+			JS_free( cx, jContent ); jContent = NULL;
 		}
 	}
 	return webpageObj;
@@ -1013,82 +1015,6 @@ static void Webclient_ResultHandler_cb( const struct webpage_t * webpage ) {
 	return ( cleanUp.good ) ? true: false;
 }
 
-
-#if 0
-static bool JsnWebclient_Queue( JSContext * cx, unsigned argc, jsval * vp ) {
-	struct payload_t * payload;
-	struct webclient_t * webclient;
-	struct webpage_t * webpage;
-	struct javascript_t * javascript;
-	JSObject * webclientObj, * connObj;
-	JSString *jUrl;
-	JS::CallArgs args;
-	jsval value, fnVal, dummyVal;
-	enum requestMode_t mode;
-	char * cUrl, * cMode, * cHeaders, * cContent;
-	struct {unsigned char good:1;
-			unsigned char url:1;
-			unsigned char payload:1;} cleanUp;
-
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vp );
-	dummyVal = JSVAL_NULL;
-	cleanUp.good = ( argc >=2 );
-	fnVal = args[1];
-	cUrl = cMode = cHeaders = cContent = NULL;
-	payload = NULL;
-	mode = MODE_GET;
-	webclientObj = JS_THIS_OBJECT( cx, vp );
-	args.rval( ).setObject( *webclientObj );
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*o", &jUrl, &dummyVal, &connObj ) == true );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( ( cUrl = JS_EncodeString( cx, jUrl ) ) != NULL );
-	}
-	JS::RootedObject connObjRoot( cx, connObj );
-	JS::HandleObject connObjHandle( connObjRoot );
-	JS::RootedValue valueRoot( cx, value );
-	JS::HandleValue valueHandle( valueRoot );
-	JS::MutableHandleValue 	valueMut( &valueRoot );
-	JS::RootedValue fnValRoot( cx, fnVal );
-	JS::HandleValue fnValHandle( fnValRoot );
-	JS::MutableHandleValue 	fnValMut( &fnValRoot );
-	webclient = ( struct webclient_t *) JS_GetPrivate( webclientObj );
-	if ( cleanUp.good ) {
-		cleanUp.url = 1;
-		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
-	}
-	if ( cleanUp.good ) {
-		CONNOBJ_GET_PROP_STRING( "method", cMode );
-		CONNOBJ_GET_PROP_STRING( "headers", cHeaders );
-		CONNOBJ_GET_PROP_STRING( "content", cContent );
-	}
-	if ( cleanUp.good ) {
-		mode = ( strcmp( cMode, MethodDefinitions[MODE_POST] ) == 0 ) ? MODE_POST : MODE_GET;
-	}
-	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vp ) );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( thisObj != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( webclientObj ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		jsval dummy;
-		cleanUp.good = ( ( payload = Payload_New( cx, webclientObj, fnValMut.get( ), dummy, false ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.payload = 1;
-	}
-	if ( cleanUp.good ) {
-		cleanUp.good = ( ( webpage = Webclient_Queue( webclient, mode, cUrl, cHeaders, cContent, Webclient_ResultHandler_cb, (void *) payload, Payload_Delete_Anon ) ) != NULL );
-	}
-	JS_free( cx, cUrl ); cUrl = NULL;
-	JS_free( cx, cMode ); cMode = NULL;
-	JS_free( cx, cHeaders ); cHeaders = NULL;
-	JS_free( cx, cContent ); cContent = NULL;
-	return ( cleanUp.good ) ? true: false;
-}
-#endif
 static void JsnWebclient_Finalizer( JSFreeOp * fop, JSObject * webclientObj );
 
 static const JSClass jscWebclient = {
@@ -1101,6 +1027,7 @@ static const JSFunctionSpec jsmWebclient[ ] = {
 	JS_FS( "queue", 			JsnWebclient_Queue, 2, 0 ),
 	JS_FS_END
 };
+
 /**
  * Start a webclient.
  *
@@ -1210,95 +1137,7 @@ static const JSFunctionSpec jsmWebclient[ ] = {
 	JS_free( cx, cContent ); cContent = NULL;
 	return ( cleanUp.good ) ? true: false;
 }
-#if 0
-static bool JsnWebclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
-	struct payload_t * payload;
-	struct webclient_t * webclient;
-	struct javascript_t * javascript;
-	JSObject * webclientObj, *connObj;
-	JSString *jUrl;
-	JS::CallArgs args;
-	jsval value, fnVal, dummyVal;
-	enum requestMode_t mode;
-	int timeoutSec;
-	char * cMode, * cHeaders, * cContent, *cUrl;
-	struct {unsigned char good:1;
-			unsigned char payload:1;
-			unsigned char url:1;} cleanUp;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	args = CallArgsFromVp( argc, vp );
-	dummyVal = JSVAL_NULL;
-	value = JSVAL_NULL;
-	cleanUp.good = ( argc >= 3 );
-	fnVal = args[1];
-	timeoutSec = 0;
-	mode = MODE_GET;
-	cMode = cHeaders = cContent = cUrl = NULL;
-	//  @TODO: refractor core funcion of constructor and Queue into define
-	webclientObj = NULL;
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*o/i", &jUrl, &dummyVal, &connObj, &timeoutSec ) == true );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( ( cUrl = JS_EncodeString( cx, jUrl ) ) != NULL );
-	}
-	//somehow, connObj is not converted to an object
-	connObj = &args[2].toObject();
-	JS::RootedObject connObjRoot( cx, connObj );
-	JS::HandleObject connObjHandle( connObjRoot );
-	JS::RootedValue valueRoot( cx, value );
-	JS::HandleValue valueHandle( valueRoot );
-	JS::MutableHandleValue 	valueMut( &valueRoot );
-	JS::RootedValue fnValRoot( cx, fnVal );
-	JS::HandleValue fnValHandle( fnValRoot );
-	JS::MutableHandleValue 	fnValMut( &fnValRoot );
-	if ( cleanUp.good ) {
-		cleanUp.url = 1;
-		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
-	}
-	if ( cleanUp.good ) {
-		CONNOBJ_GET_PROP_STRING( "method", cMode );
-		CONNOBJ_GET_PROP_STRING( "headers", cHeaders );
-		CONNOBJ_GET_PROP_STRING( "content", cContent );
-	}
-	if ( cleanUp.good ) {
-		mode = ( strcmp( cMode, MethodDefinitions[MODE_POST] ) == 0 ) ? MODE_POST : MODE_GET;
-	}
-	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vp ) );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( thisObj != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( thisObj ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.good = ( ( webclientObj = 	JS_NewObject( cx, &jscWebclient, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
-	}
-	JS::RootedObject webclientObjRoot( cx, webclientObj );
-	JS::HandleObject webclientObjHandle( webclientObjRoot );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( JS_DefineFunctions( cx, webclientObjHandle, jsmWebclient ) == true );
-	}
-	if ( cleanUp.good ) {
-		jsval dummy;
-		cleanUp.good = ( ( payload = Payload_New( cx, webclientObj, fnValMut.get( ), dummy, false ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.payload = 1;
-		cleanUp.good = ( ( webclient = Webclient_New( javascript->core, mode, cUrl, cHeaders, cContent, Webclient_ResultHandler_cb, (void *) payload, Payload_Delete_Anon, (unsigned char) timeoutSec ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		JS_SetPrivate( webclientObj, ( void * ) webclient );
-		args.rval( ).setObject( *webclientObj );
-	} else {
-		args.rval( ).setUndefined( );
-	}
-	JS_free( cx, cUrl ); cUrl = NULL;
-	JS_free( cx, cMode ); cMode = NULL;
-	JS_free( cx, cHeaders ); cHeaders = NULL;
-	JS_free( cx, cContent ); cContent = NULL;
-	return ( cleanUp.good ) ? true: false;
-}
-#endif
 static void JsnWebclient_Finalizer( JSFreeOp * fop, JSObject * webclientObj ) {
 	struct webclient_t * webclient;
 
@@ -1652,9 +1491,9 @@ static const JSFunctionSpec jsmWebserverclientresponse[ ] = {
  * @example
  * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
  * ws.addRoute( '^/a$', function( client ) {
- * 	console.log( "ip: " + client.response.ip );
- * 	console.log( "url: " + client.response.url );
- * 	console.log( "method: " + client.response.method );
+ * 	console.log( 'ip: ' + client.response.ip );
+ * 	console.log( 'url: ' + client.response.url );
+ * 	console.log( 'method: ' + client.response.method );
  * 	} );
  * @see	Urbin.Webserver
  * @see	Urbin.Webserver.addRoute
@@ -2283,7 +2122,7 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vp ) {
 		}
 	}
 	if ( cleanUp.good ) {
-		args.rval( ) .setString( jFileName );
+		args.rval( ).setString( jFileName );
 	} else {
 		args.rval( ).setBoolean( false );
 	}
@@ -2298,7 +2137,6 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	}
 	return ( cleanUp.good ) ? true : false;
 }
-
 
 /**
  * Get the content of a file.
@@ -2367,6 +2205,293 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	return ( cleanUp.good ) ? true : false;
 }
 
+/**
+ * Create a directory, the permissions are set to 0770
+ *
+
+ * @name: os.mkdir
+ * @function
+ * @static
+ * @public
+ * @since 0.0.10
+ *
+ * @param {string} directory The directory to create
+ * @returns {null|boolean}  undefined: if the parameters were incorrect, false if the mkdir failed or true if the directory was created
+ *
+ * @example:
+ * var r = os.mkdir( '/tmp/tst' );
+ * @see os.rm
+ */
+static bool JsnOs_Mkdir( JSContext *cx, unsigned argc, jsval * vp ) {
+	JSString * jDir;
+	JS::CallArgs args;
+	char * cDir;
+	const mode_t mode = 0770;
+	struct {unsigned char good:1;
+			unsigned char dir:1;
+			} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	args.rval( ).setUndefined( );
+	cDir = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jDir ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cDir = JS_EncodeString( cx, jDir ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.dir = 1;
+		if ( mkdir( cDir, mode ) == 0 ) {
+			args.rval( ).setBoolean( true );
+		} else {
+			args.rval( ).setBoolean( false );
+		}
+	}
+	if ( cleanUp.dir ) {
+		free( cDir ); cDir = NULL;
+	}
+	return ( cleanUp.good ) ? true : false;
+}
+
+/**
+ * Remove a file or directory
+ *
+
+ * @name: os.rm
+ * @function
+ * @static
+ * @public
+ * @since 0.0.10
+ *
+ * @param {string} filename The filename or directory name
+ * @returns {null|boolean}  undefined: if the parameters were incorrect, false if the delete failed or true if the delete was successfull
+ *
+ * @example:
+ * var r = os.rm( '/tmp/dummy.txt' );
+ * @see os.mkdir
+ */
+static bool JsnOs_Rm( JSContext *cx, unsigned argc, jsval * vp ) {
+	JSString * jFileName;
+	JS::CallArgs args;
+	char * cFileName;
+	struct {unsigned char good:1;
+			unsigned char name:1;
+			} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	args.rval( ).setUndefined( );
+	cFileName = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jFileName ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cFileName = JS_EncodeString( cx, jFileName ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.name = 1;
+		if ( remove( cFileName ) == 0 ) {
+			args.rval( ).setBoolean( true );
+		} else {
+			args.rval( ).setBoolean( false );
+		}
+	}
+	if ( cleanUp.name ) {
+		free( cFileName ); cFileName = NULL;
+	}
+	return ( cleanUp.good ) ? true : false;
+}
+
+/**
+ * Creates a symbolic link named newpath which contains the string oldpath.
+ *
+
+ * @name: os.symlink
+ * @function
+ * @static
+ * @public
+ * @since 0.0.10
+ *
+ * @param {string} oldpath The filename or directory name
+ * @param {string} newpath The symlink name. If this existed, it will be overwritten
+ * @returns {null|boolean}  undefined: if the parameters were incorrect, false if the symlink system call failed or true if the call was successfull
+ *
+ * @example:
+ * var r = os.symlink( '/tmp/org.txt', '/tmp/link.txt' );
+ * @see os.mkdir
+ * @see os.rmk
+ */
+static bool JsnOs_Symlink( JSContext *cx, unsigned argc, jsval * vp ) {
+	JSString * jFileNameNew, * jFileNameOld;
+	JS::CallArgs args;
+	char * cFileNameNew, * cFileNameOld;
+	struct {unsigned char good:1;
+			unsigned char nameOld:1;
+			unsigned char nameNew:1;
+			} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	args.rval( ).setUndefined( );
+	cFileNameNew = cFileNameOld = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "SS", &jFileNameOld, &jFileNameNew ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cFileNameOld = JS_EncodeString( cx, jFileNameOld ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.nameOld = 1;
+		cleanUp.good = ( ( cFileNameNew = JS_EncodeString( cx, jFileNameNew ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.nameNew = 1;
+		if ( symlink( cFileNameOld, cFileNameNew ) == 0 ) {
+			args.rval( ).setBoolean( true );
+		} else {
+			args.rval( ).setBoolean( false );
+		}
+	}
+	if ( cleanUp.nameOld ) {
+		free( cFileNameOld ); cFileNameOld = NULL;
+	}
+	if ( cleanUp.nameNew ) {
+		free( cFileNameNew ); cFileNameNew = NULL;
+	}
+	return ( cleanUp.good ) ? true : false;
+}
+
+/**
+ * Get a directory listing, with out the '.' and '..'
+ *
+
+ * @name: os.dir
+ * @function
+ * @static
+ * @public
+ * @since 0.0.10
+ *
+ * @param {string} pathname The directory name
+ * @returns {null|boolean|Array}  undefined: if the parameters were incorrect, false if the directory could not be read or an array with files
+ *
+ * @example:
+ * var dir = os.dir( '/tmp' );
+ * for ( var i = 0; i < dirEntries.length; i++ {}
+ * 	console.log( "file: " + dir[i].name + " size: " + dir[i].size + " type: " + dir[i].type );
+ * }
+ * @see os.mkdir
+ */
+static bool JsnOs_Dir( JSContext *cx, unsigned argc, jsval * vp ) {
+	JSString * jDirName, * jstr;
+	JS::CallArgs args;
+	JSObject * recordObj;
+	jsval value, currentVal, jValue;
+	char * cDirName, * cFullFileName;
+	int size;
+	const char * cType;
+	unsigned int rowId;
+	size_t pathLen, fullLen;
+	DIR * dp;
+	struct stat sb;
+	struct dirent * dptr;
+	struct {unsigned char good:1;
+			unsigned char dirName:1;
+			unsigned char stat:1;
+			unsigned char fileName:1;
+			} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	args.rval( ).setUndefined( );
+	dp = NULL;
+	dptr = NULL;
+	cDirName = cFullFileName = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S", &jDirName ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cDirName = JS_EncodeString( cx, jDirName ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.dirName = 1;
+		pathLen = strlen( cDirName );
+		if ( ( dp = opendir( cDirName ) ) != NULL ) {
+			JSObject * resultArray;
+			cleanUp.good = ( ( resultArray = JS_NewArrayObject( cx, 0 ) ) != NULL );
+			JS::RootedObject resultArrayRoot( cx, resultArray );
+			JS::HandleObject resultArrayHandle( resultArrayRoot );
+			rowId = 0;
+			while ( cleanUp.good &&  NULL != ( dptr = readdir( dp ) ) ) {
+				cFullFileName = NULL;
+				cleanUp.good = ( ( recordObj = JS_NewObject( cx, NULL, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+				JS::RootedObject 		recordObjRoot( cx, recordObj );
+				JS::HandleObject 		recordObjHandle( recordObjRoot );
+				if ( cleanUp.good ) {
+					currentVal = OBJECT_TO_JSVAL( recordObj );
+					JS::RootedValue 	currentValRoot( cx, currentVal );
+					JS::HandleValue 	currentValHandle( currentValRoot );
+					JS_SetElement( cx, resultArrayHandle, rowId, currentValHandle );
+					cleanUp.good = ( ( jstr = JS_NewStringCopyZ( cx, dptr->d_name ) ) != NULL );
+					if ( cleanUp.good ) {
+						jValue = STRING_TO_JSVAL( jstr );
+						JS::RootedValue	jValueRoot( cx, jValue );
+						JS::HandleValue	jValueHandle( jValueRoot );
+						JS_SetProperty( cx, recordObjHandle, "name", jValueHandle );
+						fullLen = pathLen + strlen( dptr->d_name );
+						cleanUp.good = ( ( cFullFileName = (char *) malloc( fullLen + 2) ) != NULL );
+					}
+					if ( cleanUp.good )  {
+						cleanUp.fileName = 1;
+						if ( cDirName[ pathLen - 1 ] == PATHSEP ) {
+							snprintf( cFullFileName, fullLen + 1, "%s%s", cDirName, dptr->d_name );
+						} else {
+							snprintf( cFullFileName, fullLen + 2, "%s%c%s", cDirName, PATHSEP, dptr->d_name );
+						}
+						cleanUp.stat = ( stat( cFullFileName, &sb ) == 0 );
+						if ( ! cleanUp.stat )  {
+							size = 0;
+							cType = "dangling symlink";
+						} else {
+							size = sb.st_size;
+							switch ( sb.st_mode & S_IFMT ) {
+								case S_IFBLK:  cType = "block device";		break;
+								case S_IFCHR:  cType = "character device";	break;
+								case S_IFDIR:  cType = "directory";			break;
+								case S_IFIFO:  cType = "FIFO/pipe";			break;
+								case S_IFLNK:  cType = "symlink";			break;
+								case S_IFREG:  cType = "regular file";		break;
+								case S_IFSOCK: cType = "socket";			break;
+								default:       cType = "unknown";			break;
+							}
+						}
+					}
+					if ( cleanUp.good ) {
+						jValue = INT_TO_JSVAL( size );
+						JS::RootedValue	jValueRoot( cx, jValue );
+						JS::HandleValue	jValueHandle( jValueRoot );
+						JS_SetProperty( cx, recordObjHandle, "size", jValueHandle );
+						cleanUp.good = ( ( jstr = JS_NewStringCopyZ( cx, cType ) ) != NULL );
+					}
+					if ( cleanUp.good ) {
+						jValue = STRING_TO_JSVAL( jstr );
+						JS::RootedValue	jValueRoot( cx, jValue );
+						JS::HandleValue	jValueHandle( jValueRoot );
+						JS_SetProperty( cx, recordObjHandle, "type", jValueHandle );
+					}
+					if ( cleanUp.fileName ) {
+						cleanUp.fileName = 0;
+						free( cFullFileName ); cFullFileName = NULL;
+					}
+				}
+				rowId++;
+			}
+			closedir( dp );
+			value = OBJECT_TO_JSVAL( resultArray );
+			JS::RootedValue valueRoot( cx, value );
+			args.rval( ).set( value );
+		} else {
+			args.rval( ).setBoolean( false );
+		}
+	}
+	if ( cleanUp.dirName ) {
+		free( cDirName ); cDirName = NULL;
+	}
+	return ( cleanUp.good ) ? true : false;
+}
 
 
 /**
@@ -2379,11 +2504,11 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vp ) {
  * @static
  * @public
  * @deprecated: // @TODO:  future versions will probably run in a seperate thread
- * @since 0.08a
+ * @since 0.0.8a
  *
  * @param {string} exec The full path to the executable. This must exist and executable
  * @param {string} paramstring Parameters
- * @returns {null|boolean}  undefined: if the parameters were incorrect, false if execute could not start  or the exit code if launched successfull
+ * @returns {null|boolean}  undefined: if the parameters were incorrect, false if execute could not start or true if if launched successfull
  *
  * @example:var r = os.exec( '/usr/bin/wget', 'http://www.verpeteren.nl -o /tmp/www.verpeteren.nl.html' );
  * console.log( r );
@@ -2609,6 +2734,10 @@ static const JSFunctionSpec jsmOs[ ] = {
 	JS_FS( "getEnv", 			JsnOs_GetEnv, 1, 0 ),
 	JS_FS( "readFile", 			JsnOs_ReadFile, 1, 0 ),
 	JS_FS( "writeFile",			JsnOs_WriteFile, 2, 0 ),
+	JS_FS( "mkdir",				JsnOs_Mkdir, 1, 0 ),
+	JS_FS( "rmdir",				JsnOs_Rm, 1, 0 ),
+	JS_FS( "symlink",			JsnOs_Symlink, 2, 0 ),
+	JS_FS( "dir",				JsnOs_Dir, 1, 0 ),
 	JS_FS( "system",			JsnOs_System, 1, 0 ),
 	JS_FS( "getHostByName",		JsnOs_GetHostByName, 2, 0 ),
 	JS_FS_END
@@ -3049,7 +3178,7 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 	}
 	if ( cleanUp.good ) {
 		cleanUp.fn = 1;
-		snprintf( script->fileNameWithPath, len, "%s/%s", javascript->path, cFile );
+		snprintf( script->fileNameWithPath, len, "%s%c%s", javascript->path, PATHSEP, cFile );
 		cleanUp.good = ( stat( script->fileNameWithPath, &sb ) >= 0 && S_ISREG( sb.st_mode ) && ( sb.st_mode & S_IXUSR ) );
 	}
 	if ( cleanUp.good ) {
@@ -3240,7 +3369,7 @@ struct javascript_t * Javascript_New( const struct core_t * core, const char * p
 	if 	( cleanUp.good ) {
 		cleanUp.path = 1;
 		lastChar = (char*) &javascript->path[strlen( javascript->path ) - 1];
-		if ( '/' == *lastChar ) {
+		if ( PATHSEP == *lastChar ) {
 			*lastChar = '\0';
 		}
 		cleanUp.good = ( ( javascript->fileName = Xstrdup( fileName ) ) != NULL );

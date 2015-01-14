@@ -8,6 +8,12 @@
 extern "C" {
 #endif
 
+#ifdef _WIN32
+#define PATHSEP                    '\\'
+#else
+#define PATHSEP                     '/'
+#endif
+
 #define STRING_LENGTH_OF_INT( value ) (size_t) ( value == 0 ? 1 : ( log10( value ) + 1 ) )
 
 char * 								Xstrdup							( const char* str );

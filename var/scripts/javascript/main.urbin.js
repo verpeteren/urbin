@@ -23,10 +23,15 @@ try {
 	}
 	Urbin.onReady = function( ) {
 		var test = { webserver: 		false,
-					webclient:			true,
+					webclient:			false,
 					os: {	file: 		false,
 							env:		false,
 							system:		false,
+							mkdir:		true,
+							rm:			true,
+							dir:		true,
+							symlink:	true,
+							readdir:	true,
 							hostName:	false
 						},
 					sql: { 	pg: 		false,
@@ -78,14 +83,13 @@ try {
 					console.log( 'Could not resolve host' );
 				}
 			});
-
 		}
 		if ( test.os.env ) {
 			var env = 'SHELL';
 			console.log(' env : ' + env + ': ' + os.getEnv( env ) );
-		}
+		}		
+		var fileName = '/tmp/test.txt';
 		if ( test.os.file ) {
-			var fileName = '/tmp/test.txt';
 			var writeContent = 'blabalbla';
 			
 			os.writeFile( fileName, writeContent, false );
@@ -95,6 +99,32 @@ try {
 			} else {
 				console.log( 'os read/write function failed! got: "' + readContent + '"' + 
 							 '                          expected: "' + writeContent + '"');
+			}
+		}
+		if ( test.os.symlink ) {
+			os.symlink( fileName, fileName + ".lnk" );
+		}
+		var now = new Date( );
+		var dirName = '/tmp/dir_' + now.getTime();
+		if ( test.os.mkdir ) {
+			console.log( 'creating dir: ' + dirName );
+			var success = os.mkdir( dirName );
+			console.log( 'success : ' + success );
+		}
+		if ( test.os.rm ) {
+			console.log( 'removing dir: ' + dirName );
+			var success = os.rmdir( dirName );
+			console.log( 'success : ' + success );
+				
+			console.log( 'removing file: ' + fileName );
+			var success = os.rmdir( fileName );
+			console.log( 'success : ' + success );
+		}
+		if ( test.os.dir ) {
+			var dirEntries = os.dir( '/tmp/' );
+			for ( var i = 0; i < dirEntries.length; i++ ) {
+				var dir = dirEntries[i];
+ 				console.log( "file: " + dir.name + " size: " + dir.size + " type: " + dir.type );
 			}
 		}
 		if ( test.os.system ) {
