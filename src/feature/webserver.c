@@ -29,7 +29,7 @@ const char * MethodDefinitions[ ] = {
 };
 
 const char * ConnectionDefinitions[] = {
-	"close"
+	"close",
 	"Keep-Alive"
 };
 

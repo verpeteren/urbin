@@ -23,10 +23,11 @@ try {
 	}
 	Urbin.onReady = function( ) {
 		var test = { webserver: 		false,
+					webclient:			true,
 					os: {	file: 		false,
 							env:		false,
 							system:		false,
-							hostName:	true
+							hostName:	false
 						},
 					sql: { 	pg: 		false,
 							my: 		false
@@ -48,6 +49,19 @@ try {
 				var blog = 'Well,  on ' + params.year + '-' + params.month + '-' + params.day + ' nothing happened';
 				client.response.setContent( blog ).setMime( 'html' ).setCode( 200 );
 			 } );
+		}
+		if ( test.webclient ) {
+			var showResponse = function( data ) {
+				console.log( "\n\n\ngot webpage" );
+				console.log( data.code );
+				console.log( data.headers );
+
+			}
+			var con = {method: 'GET', headers: 'Host: www.urbin.info\r\nAccept: text/html\r\n Cache-Control: max-age=0\r\n', content: '/content/'};
+			var wc = Urbin.Webclient( 'http://127.0.0.1/benchmark.html', showResponse, con, 60 );
+			wc.queue( 'http://127.0.0.1/index.html', showResponse, con );
+			// todo with out scheme
+			// todo with port
 		}
 		if ( test.os.hostName ) {
 			os.getHostByName('www.urbin.info', function( ip ) {

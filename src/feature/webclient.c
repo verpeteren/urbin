@@ -68,9 +68,7 @@ static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 			 break;
 			default:
 				//  @FIXME:  check if readall, if fit in headers, then parse headers,  parse headers,  if corntent length in headers, reade more if http end then issue callback, ojay, probably read the specs
-				picoev_del( loop, fd );
-				picoev_add( loop, fd, PICOEV_READ, webclient->timeoutSec, Webclient_HandleRead_cb, wcArgs );
-				printf( "%s", rawBuffer->bytes );
+				webpage->response.headers = rawBuffer;
 				if ( webpage->handlerCb != NULL ) {
 					webpage->handlerCb( webpage );
 				}
@@ -94,8 +92,9 @@ static void Webclient_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 	struct webclient_t * webclient;
 	struct webpage_t * webpage;
 	ssize_t bytesWritten;
-	size_t totalBytes, len;
-	struct {unsigned char good:1; } cleanUp;
+	size_t totalBytes, len, hostLen, connLen, headerLen;
+	struct {unsigned char good:1;
+			unsigned char headers:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webclient = (struct webclient_t *) wcArgs;
@@ -115,24 +114,42 @@ static void Webclient_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 				picoev_add( loop, fd, PICOEV_READ, webclient->timeoutSec, Webclient_HandleRead_cb, wcArgs );
 				len = webpage->request.topLine->used;
 				totalBytes += len;
-				printf( "%s", webpage->request.topLine->bytes );
 				bytesWritten += write( fd, webpage->request.topLine->bytes, len );
 				totalBytes += 2;
 				bytesWritten += write( fd, "\r\n", 2 );
-				printf( "\r\n" );
-				if ( webpage->request.headers != NULL ) {
+				if ( webpage->request.headers == NULL ) {
+					//  set a default header with host + connection minimum
+					hostLen = (size_t) ( webpage->uri.hostText.afterLast - webpage->uri.hostText.first );
+					connLen = ( CONNECTION_CLOSE == webclient->connection ) ? 5 : 10;
+					headerLen = 25 + hostLen + connLen;
+					cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen ) ) != NULL );
+					if ( cleanUp.good ) {
+						cleanUp.headers = 1;
+						cleanUp.good = ( Buffer_Append( webpage->request.headers, "Host: ", 6 ) == 1 );
+					}
+					if ( cleanUp.good ) {
+						cleanUp.good = ( Buffer_Append( webpage->request.headers, webpage->uri.hostText.first, hostLen ) == 1 );
+					}
+					if ( cleanUp.good ) {
+						cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\nConnection: ", 14 ) == 1 );
+					}
+					if ( cleanUp.good ) {
+						cleanUp.good = ( Buffer_Append( webpage->request.headers, ConnectionDefinitions[webclient->connection], connLen ) == 1 );
+					}
+					if ( cleanUp.good ) {
+						cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n", 2 ) == 1 );
+					}
+				}
+				if ( cleanUp.good ) {
 					len = webpage->request.headers->used;
 					totalBytes += len;
-					printf( "%s", webpage->request.headers->bytes );
 					bytesWritten += write( fd, webpage->request.headers->bytes, len );  //  headers need to end with \r\n
 				}
 				totalBytes += 2;
-				printf( "\r\n" );
 				bytesWritten += write( fd, "\r\n", 2 );
 				if ( webpage->request.content != NULL ) {
 					len = webpage->request.content->used;
 					totalBytes += len;
-					printf( "%s", webpage->request.content->bytes );
 					bytesWritten += write( fd, webpage->request.content->bytes, len );
 				}
 				switch ( bytesWritten ) {
@@ -174,7 +191,7 @@ static void Webclient_HandleConnect_cb( picoev_loop * loop, int fd, int events, 
 static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
 	struct webpage_t * webpage;
 	UriParserStateA state;
-	size_t headerLen, hostLen, connLen;
+	size_t headerLen;
 	size_t addcrcn;
 	struct {unsigned char good:1;
 			unsigned char webpage:1;
@@ -209,7 +226,6 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 		cleanUp.uri = 1;
 		cleanUp.good = ( webpage->uri.scheme.first == NULL || strncmp( webpage->uri.scheme.first, "http", 4 ) == 0 );
 	}
-	hostLen = 0;
 	addcrcn = 0;
 	if ( cleanUp.good ) {
 		if ( headers != NULL ) {
@@ -230,29 +246,6 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 					cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n", 2 ) == 1 );
 				}
 			}
-		} else {
-			//  set a default header with host + connection minimum
-			hostLen = (size_t) ( webpage->uri.hostText.afterLast - webpage->uri.hostText.first );
-			connLen = ( CONNECTION_CLOSE == webclient->connection ) ? 5 : 10;
-			headerLen = 25 + hostLen + connLen;
-			cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen ) ) != NULL );
-			if ( cleanUp.good ) {
-				cleanUp.headers = 1;
-				cleanUp.headers = 1;
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, "Host: ", 6 ) == 1 );
-			}
-			if ( cleanUp.good ) {
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, webpage->uri.hostText.first, hostLen ) == 1 );
-			}
-			if ( cleanUp.good ) {
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\nConnection: ", 14 ) == 1 );
-			}
-			if ( cleanUp.good ) {
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, ConnectionDefinitions[webclient->connection], connLen ) == 1 );
-			}
-			if ( cleanUp.good ) {
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n", 2 ) == 1 );
-			}
 		}
 	}
 	if ( cleanUp.good ) {
@@ -262,6 +255,9 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 	}
 	if ( cleanUp.good ) {
 		cleanUp.content = 1;
+		if ( webclient->currentWebpage != NULL || webclient->webpages != NULL) {
+			webclient->connection = CONNECTION_KEEPALIVE;
+		}
 		Webclient_PushWebpage( webclient, webpage );
 		//  Let's see if we can submit this immediately to the server
 		Webclient_PopWebpage( webclient );
@@ -463,12 +459,11 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 		//  we cannot connect at this point as the host and the port are in the url
 	}
 	if ( cleanUp.good ) {
+		//  here we try to connect and queue at the same time
 		cleanUp.good = ( ( webpage = Webpage_New( webclient, mode, url, headers, content, handlerCb, cbArgs, clearFuncCb ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.webpage = 1;
-		// if the url is valid, the push routine tries to connect immediately
-		Webclient_PushWebpage( webclient, webpage );
 	}
 	if (  ! cleanUp.good  ) {
 		if ( cleanUp.webpage ) {
@@ -497,9 +492,9 @@ struct webpage_t * Webclient_Queue( struct webclient_t * webclient, enum request
 		 webpage->uri.field.first != NULL && webpage->uri.field.afterLast != NULL \
 		 ) { \
 			len = (size_t) ( current->uri.field.afterLast - current->uri.field.first ); \
-			good.field = ( strncmp( current->uri.field.first, webpage->uri.field.first, len ) == 0 ); \
+			good.good = good.field = ( strncmp( current->uri.field.first, webpage->uri.field.first, len ) == 0 ); \
 	} else { \
-		good.field = 1; \
+		good.good = good.field = 1; \
 	} \
 	while ( 0 );
 
@@ -530,7 +525,6 @@ static int Webclient_CanUseConn( struct webclient_t * webclient, struct webpage_
 
 static void Webclient_PushWebpage( struct webclient_t * webclient, struct webpage_t * webpage ) {
 	if ( webpage != NULL ) {
-
 		if ( Webclient_CanUseConn( webclient, webpage ) ) {
 			if ( webclient->webpages == NULL ) {
 				webclient->webpages = webpage;
@@ -549,10 +543,9 @@ static struct webpage_t * Webclient_PopWebpage( struct webclient_t * webclient )
 		if ( webclient->webpages != NULL ) {
 			webclient->currentWebpage = webclient->webpages;
 			if ( PR_CLIST_IS_EMPTY( &webclient->currentWebpage->mLink ) ) {
-				webclient->webpages = NULL;
 				webclient->connection = CONNECTION_CLOSE;
+				webclient->webpages = NULL;
 			} else {
-				webclient->connection = CONNECTION_KEEPALIVE;
 				next = PR_NEXT_LINK( &webclient->currentWebpage->mLink );
 				webclient->webpages = FROM_NEXT_TO_ITEM( struct webpage_t );
 			}

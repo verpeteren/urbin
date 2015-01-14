@@ -7,11 +7,14 @@
 #include <sys/types.h>
 
 #include "javascript.h"
-#include "../feature/sqlclient.h"
 #include "../feature/webserver.h"
+#include "../feature/webclient.h"
+#include "../feature/sqlclient.h"
 #include "../core/utils.h"
 
 #define MAIN_OBJ_NAME "Urbin"
+
+extern const char * ConnectionDefinitions[];
 
 /* ============================================================================================================================================================== */
 /* Naming convention deviations for this file                                                                                                                     */
@@ -207,6 +210,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 			var = ( int ) valueMut.toNumber( ); \
 		} else if ( value.isString( ) ) { \
 			char * dummy; \
+			\
 			cleanUp.good = ( ( dummy = JS_EncodeString( cx, valueMut.toString( ) ) ) != NULL ); \
 			var = atoi( dummy );\
 			JS_free( cx, dummy ); dummy = NULL; \
@@ -225,7 +229,14 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	char * cHostName, * cIp, * cUserName, * cPassword, * cDbName;
 	int port, timeoutSec;
 	JS::CallArgs args;
-	struct {unsigned char good:1;} cleanUp;
+	struct {unsigned char good:1;
+			unsigned char cHostName:1;
+			unsigned char cIp:1;
+			unsigned char cUserName:1;
+			unsigned char cPassword:1;
+			unsigned char cDbName:1;
+			unsigned char port:1;
+			} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vp );
@@ -283,6 +294,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	JS_free( cx, cUserName ); cUserName = NULL;
 	JS_free( cx, cPassword ); cPassword = NULL;
 	JS_free( cx, cDbName ); cDbName = NULL;
+	JS_free( cx, cDbName ); cDbName = NULL;
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -298,7 +310,6 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	JS::RootedObject resultObjRoot( payload->context, resultObj ); \
 	queryResultVal = OBJECT_TO_JSVAL( resultObj ); \
 	JS::RootedValue resultVal( payload->context, queryResultVal ); \
-	/*  @TODO: Howto free/delete the default allocation of payload->fnVal_cbArg; */ \
 	payload->fnVal_cbArg = JS::Heap<JS::Value>( queryResultVal ); \
 	Payload_Call( payload ); \
 	} while ( 0 );
@@ -816,11 +827,6 @@ static void JsnPostgresqlclient_Finalizer( JSFreeOp * fop, JSObject * postgresql
 		Sqlclient_Delete( postgresql ); postgresql = NULL;
 	}
 }
-/*
-   ===============================================================================
-   Webserver OBJECT
-   ===============================================================================
-*/
 extern const char * MethodDefinitions[ ];
 /**
  * Webserver response object.
@@ -829,6 +835,483 @@ extern const char * MethodDefinitions[ ];
  * @private
  * @object
  */
+/*
+   ===============================================================================
+   Webclient OBJECT
+   ===============================================================================
+*/
+
+static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, const struct webpage_t * webpage ) {
+	//  @FIXME:  allA  SEE webserver_Route_ResultToJS
+	JSContext * cx;
+	JSObject * webpageObj, * thisObj;
+	JSString * jHeaders, * jContent;
+	jsval headerVal, contentVal;
+	const unsigned int attrs = JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT;
+	struct {unsigned char good:1;
+			unsigned char obj:1;
+			unsigned char content:1;
+			unsigned char headers:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cx = payload->context;
+	JSAutoRequest ar( cx );
+	JSAutoCompartment ac( cx, payload->scopeObj );
+	thisObj = payload->scopeObj;
+	JS::RootedObject thisObjRoot( cx, thisObj );
+	JS::HandleObject thisObjHandle( thisObjRoot );
+	cleanUp.good = ( ( webpageObj =	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+	JS::RootedObject webpageObjRoot( cx, webpageObj );
+	JS::HandleObject webpageObjHandle( webpageObjRoot );
+	if ( cleanUp.good )  {
+		cleanUp.obj = 1;
+		if ( webpage->response.headers == NULL ) {
+			headerVal = JSVAL_VOID;
+		} else {
+			cleanUp.good = ( ( jHeaders = JS_NewStringCopyN( cx, webpage->response.headers->bytes, webpage->response.headers->used ) ) != NULL );
+			if ( cleanUp.good ) {
+				cleanUp.headers = 1;
+				headerVal = STRING_TO_JSVAL( jHeaders );
+			}
+		}
+		JS::RootedValue headerValRoot( cx, headerVal );
+		SET_PROPERTY_ON( webpageObjHandle, "headers", STRING_TO_JSVAL( jHeaders ) );
+	}
+	if ( cleanUp.good )  {
+		if ( webpage->response.content == NULL ) {
+			contentVal = JSVAL_VOID;
+		} else {
+			cleanUp.good = ( ( jContent = JS_NewStringCopyN( cx, webpage->response.content->bytes, webpage->response.content->used ) ) != NULL );
+			if ( cleanUp.good ) {
+				cleanUp.content = 1;
+				contentVal = STRING_TO_JSVAL( jContent );
+			}
+			JS::RootedValue contentValRoot( cx, contentVal );
+			SET_PROPERTY_ON( webpageObjHandle, "content", contentVal );
+		}
+	}
+	if ( cleanUp.good )  {
+		SET_PROPERTY_ON( webpageObjHandle, "code", INT_TO_JSVAL( webpage->response.httpCode ) );
+	}
+
+	if ( ! cleanUp.good )  {
+		if ( cleanUp.headers )  {
+			JS_free( cx, jHeaders );
+		}
+		if ( cleanUp.headers )  {
+			JS_free( cx, jContent );
+		}
+	}
+	return webpageObj;
+}
+
+static void Webclient_ResultHandler_cb( const struct webpage_t * webpage ) {
+	struct payload_t * payload;
+	JSObject * webclientObj;
+	jsval webclientVal;
+
+	payload = (struct payload_t *) webpage->cbArgs;
+	JSAutoRequest 			ar( payload->context );
+	JSAutoCompartment 		ac( payload->context, payload->scopeObj );
+	webclientObj = Webclient_Webpage_ResultToJS( payload, webpage );
+	JS::RootedObject webservClientObjRoot( payload->context, webclientObj );
+	JS::RootedValue webservClientObjVal( payload->context, webclientVal );
+	webclientVal = OBJECT_TO_JSVAL( webclientObj );
+	payload->fnVal_cbArg = JS::Heap<JS::Value>( webclientVal );
+	Payload_Call( payload );
+}
+
+
+/**
+ * Fetch another webpage on an existing webclient connection.
+ *
+ * @name	Urbin.Webclient.queue
+ * @function
+ * @public
+ * @since	0.0.10
+ * @returns	{object}							The web client javascript
+ * @param	{string}		url					The initial url
+ * @param	{object}		params				The request parameters
+ * @param	{string}		params.method		The request method "GET" or "POST"
+ * @param	{string}		params.headers		The headers, if the headers are not set, then HOST and CONNECTION will be set automatically. As long as there are requests in the queue, the connection will be Keep-Alive, else close
+ * @param	{string}		params.content		The content to sent out
+ *
+ * @example
+ * showResponse = function( responseObj ) {
+ * 	console.log( 'got ' + responseObj.content );
+ *	};
+ *
+ * var wc = Urbin.Webclient( 'http://www.urbin.com/benchmarks.html', showresponse, 60 );
+ * wc.queue( 'www.urbin.com/', showresponse );
+ *
+ * @see	Urbin.Webclient
+ */
+ static bool JsnWebclient_Queue( JSContext * cx, unsigned argc, jsval * vp ) {
+	struct payload_t * payload;
+	struct webclient_t * webclient;
+	JSObject * webclientObj, * connObj;
+	JSString *jUrl;
+	JS::CallArgs args;
+	jsval value, fnVal, dummyVal;
+	enum requestMode_t mode;
+	char * cMode, * cHeaders, * cContent, * cUrl;
+	struct {unsigned char good:1;
+			unsigned char payload:1;
+			unsigned char url:1;} cleanUp;
+
+	cleanUp.good = ( argc >= 2 );
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	dummyVal = JSVAL_NULL;
+	value = JSVAL_NULL;
+	fnVal = args[1];
+	mode = MODE_GET;
+	payload = NULL;
+	cMode = cHeaders = cContent = cUrl = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*o", &jUrl, &dummyVal, &connObj ) == true );
+		//somehow, connObj is not converted to an object
+	connObj = &args[2].toObject( );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cUrl = JS_EncodeString( cx, jUrl ) ) != NULL );
+	}
+	JS::RootedObject connObjRoot( cx, connObj );
+	JS::HandleObject connObjHandle( connObjRoot );
+	JS::RootedValue valueRoot( cx, value );
+	JS::HandleValue valueHandle( valueRoot );
+	JS::MutableHandleValue 	valueMut( &valueRoot );
+	JS::RootedValue fnValRoot( cx, fnVal );
+	JS::HandleValue fnValHandle( fnValRoot );
+	JS::MutableHandleValue 	fnValMut( &fnValRoot );
+	webclientObj = JS_THIS_OBJECT( cx, vp );
+	JS::RootedObject thisObj( cx, webclientObj );
+	webclient = ( struct webclient_t *) JS_GetPrivate( webclientObj );
+	if ( cleanUp.good ) {
+		cleanUp.url = 1;
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
+	}
+	if ( cleanUp.good ) {
+		CONNOBJ_GET_PROP_STRING( "method", cMode );
+		CONNOBJ_GET_PROP_STRING( "headers", cHeaders );
+		CONNOBJ_GET_PROP_STRING( "content", cContent );
+	}
+	if ( cleanUp.good ) {
+		mode = ( strcmp( cMode, MethodDefinitions[MODE_POST] ) == 0 ) ? MODE_POST : MODE_GET;
+	}
+	if ( cleanUp.good ) {
+		jsval dummy;
+		cleanUp.good = ( ( payload = Payload_New( cx, webclientObj, fnValMut.get( ), dummy, false ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.payload = 1;
+		cleanUp.good = ( Webclient_Queue( webclient, mode, cUrl, cHeaders, cContent, Webclient_ResultHandler_cb, (void *) payload, Payload_Delete_Anon ) != NULL );
+	}
+	args.rval( ).setObject( *webclientObj );
+	JS_free( cx, cUrl ); cUrl = NULL;
+	JS_free( cx, cMode ); cMode = NULL;
+	JS_free( cx, cHeaders ); cHeaders = NULL;
+	JS_free( cx, cContent ); cContent = NULL;
+	return ( cleanUp.good ) ? true: false;
+}
+
+
+#if 0
+static bool JsnWebclient_Queue( JSContext * cx, unsigned argc, jsval * vp ) {
+	struct payload_t * payload;
+	struct webclient_t * webclient;
+	struct webpage_t * webpage;
+	struct javascript_t * javascript;
+	JSObject * webclientObj, * connObj;
+	JSString *jUrl;
+	JS::CallArgs args;
+	jsval value, fnVal, dummyVal;
+	enum requestMode_t mode;
+	char * cUrl, * cMode, * cHeaders, * cContent;
+	struct {unsigned char good:1;
+			unsigned char url:1;
+			unsigned char payload:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	dummyVal = JSVAL_NULL;
+	cleanUp.good = ( argc >=2 );
+	fnVal = args[1];
+	cUrl = cMode = cHeaders = cContent = NULL;
+	payload = NULL;
+	mode = MODE_GET;
+	webclientObj = JS_THIS_OBJECT( cx, vp );
+	args.rval( ).setObject( *webclientObj );
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*o", &jUrl, &dummyVal, &connObj ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cUrl = JS_EncodeString( cx, jUrl ) ) != NULL );
+	}
+	JS::RootedObject connObjRoot( cx, connObj );
+	JS::HandleObject connObjHandle( connObjRoot );
+	JS::RootedValue valueRoot( cx, value );
+	JS::HandleValue valueHandle( valueRoot );
+	JS::MutableHandleValue 	valueMut( &valueRoot );
+	JS::RootedValue fnValRoot( cx, fnVal );
+	JS::HandleValue fnValHandle( fnValRoot );
+	JS::MutableHandleValue 	fnValMut( &fnValRoot );
+	webclient = ( struct webclient_t *) JS_GetPrivate( webclientObj );
+	if ( cleanUp.good ) {
+		cleanUp.url = 1;
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
+	}
+	if ( cleanUp.good ) {
+		CONNOBJ_GET_PROP_STRING( "method", cMode );
+		CONNOBJ_GET_PROP_STRING( "headers", cHeaders );
+		CONNOBJ_GET_PROP_STRING( "content", cContent );
+	}
+	if ( cleanUp.good ) {
+		mode = ( strcmp( cMode, MethodDefinitions[MODE_POST] ) == 0 ) ? MODE_POST : MODE_GET;
+	}
+	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vp ) );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( thisObj != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( webclientObj ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		jsval dummy;
+		cleanUp.good = ( ( payload = Payload_New( cx, webclientObj, fnValMut.get( ), dummy, false ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.payload = 1;
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( webpage = Webclient_Queue( webclient, mode, cUrl, cHeaders, cContent, Webclient_ResultHandler_cb, (void *) payload, Payload_Delete_Anon ) ) != NULL );
+	}
+	JS_free( cx, cUrl ); cUrl = NULL;
+	JS_free( cx, cMode ); cMode = NULL;
+	JS_free( cx, cHeaders ); cHeaders = NULL;
+	JS_free( cx, cContent ); cContent = NULL;
+	return ( cleanUp.good ) ? true: false;
+}
+#endif
+static void JsnWebclient_Finalizer( JSFreeOp * fop, JSObject * webclientObj );
+
+static const JSClass jscWebclient = {
+	"Webclient",
+	JSCLASS_HAS_PRIVATE,
+	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JsnWebclient_Finalizer, nullptr, nullptr, nullptr, nullptr, {nullptr}
+};
+
+static const JSFunctionSpec jsmWebclient[ ] = {
+	JS_FS( "queue", 			JsnWebclient_Queue, 2, 0 ),
+	JS_FS_END
+};
+/**
+ * Start a webclient.
+ *
+ * @name	Urbin.Webclient
+ * @constructor
+ * @public
+ * @since	0.0.10
+ * @returns	{object}							The web client javascript
+ * @param	{string}		url					The initial url
+ * @param	{object}		params				The request parameters
+ * @param	{string}		params.method		The request method "GET" or "POST"
+ * @param	{string}		params.headers		The headers, if the headers are not set, then HOST and CONNECTION will be set automatically. As long as there are requests in the queue, the connection will be Keep-Alive, else close
+ * @param	{string}		params.content		The content to sent out
+ * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the webclient section of the configurationFile.</p>
+ *
+ * @example
+ * showResponse = function( responseObj ) {
+ * 	console.log( 'got ' + responseObj.content );
+ *	};
+ *
+ * var wc = Urbin.Webclient( 'http://www.urbin.com/benchmarks.html', showresponse, 60 );
+ * wc.queue( 'www.urbin.com/', showresponse );
+ *
+ * @see	Urbin.Webclient.queue
+ */static bool JsnWebclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
+	struct payload_t * payload;
+	struct webclient_t * webclient;
+	struct javascript_t * javascript;
+	JSObject * webclientObj, *connObj, *thisObj;
+	JSString *jUrl;
+	JS::CallArgs args;
+	jsval value, fnVal, dummyVal;
+	enum requestMode_t mode;
+	int timeoutSec;
+	char * cMode, * cHeaders, * cContent, * cUrl;
+	struct {unsigned char good:1;
+			unsigned char payload:1;
+			unsigned char url:1;} cleanUp;
+
+	timeoutSec = 0;
+	cleanUp.good = ( argc >= 3 );
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	dummyVal = JSVAL_NULL;
+	value = JSVAL_NULL;
+	fnVal = args[1];
+	mode = MODE_GET;
+	payload = NULL;
+	cMode = cHeaders = cContent = cUrl = NULL;
+	//  @TODO: refractor core funcion of constructor and Queue into define
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*o/i", &jUrl, &dummyVal, &connObj, &timeoutSec ) == true );
+	//somehow, connObj is not converted to an object
+	connObj = &args[2].toObject( );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cUrl = JS_EncodeString( cx, jUrl ) ) != NULL );
+	}
+	JS::RootedObject connObjRoot( cx, connObj );
+	JS::HandleObject connObjHandle( connObjRoot );
+	JS::RootedValue valueRoot( cx, value );
+	JS::HandleValue valueHandle( valueRoot );
+	JS::MutableHandleValue 	valueMut( &valueRoot );
+	JS::RootedValue fnValRoot( cx, fnVal );
+	JS::HandleValue fnValHandle( fnValRoot );
+	JS::MutableHandleValue 	fnValMut( &fnValRoot );
+	webclientObj = NULL;
+	thisObj = JS_THIS_OBJECT( cx, vp );
+	JS::RootedObject thisObjRoot( cx, thisObj );
+	javascript = (struct javascript_t *) JS_GetPrivate( thisObj );
+	if ( cleanUp.good ) {
+		cleanUp.url = 1;
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
+	}
+	if ( cleanUp.good ) {
+		CONNOBJ_GET_PROP_STRING( "method", cMode );
+		CONNOBJ_GET_PROP_STRING( "headers", cHeaders );
+		CONNOBJ_GET_PROP_STRING( "content", cContent );
+	}
+	if ( cleanUp.good ) {
+		mode = ( strcmp( cMode, MethodDefinitions[MODE_POST] ) == 0 ) ? MODE_POST : MODE_GET;
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( webclientObj = 	JS_NewObject( cx, &jscWebclient, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+	}
+	JS::RootedObject webclientObjRoot( cx, webclientObj );
+	JS::HandleObject webclientObjHandle( webclientObjRoot );
+	if ( cleanUp.good ) {
+		jsval dummy;
+		cleanUp.good = ( ( payload = Payload_New( cx, webclientObj, fnValMut.get( ), dummy, false ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.payload = 1;
+		cleanUp.good = ( JS_DefineFunctions( cx, webclientObjHandle, jsmWebclient ) == true );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.payload = 1;
+		cleanUp.good = ( ( webclient = Webclient_New( javascript->core, mode, cUrl, cHeaders, cContent, Webclient_ResultHandler_cb, (void *) payload, Payload_Delete_Anon, (unsigned char) timeoutSec ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		JS_SetPrivate( webclientObj, ( void * ) webclient );
+		args.rval( ).setObject( *webclientObj );
+	} else {
+		args.rval( ).setUndefined( );
+	}
+	JS_free( cx, cUrl ); cUrl = NULL;
+	JS_free( cx, cMode ); cMode = NULL;
+	JS_free( cx, cHeaders ); cHeaders = NULL;
+	JS_free( cx, cContent ); cContent = NULL;
+	return ( cleanUp.good ) ? true: false;
+}
+#if 0
+static bool JsnWebclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
+	struct payload_t * payload;
+	struct webclient_t * webclient;
+	struct javascript_t * javascript;
+	JSObject * webclientObj, *connObj;
+	JSString *jUrl;
+	JS::CallArgs args;
+	jsval value, fnVal, dummyVal;
+	enum requestMode_t mode;
+	int timeoutSec;
+	char * cMode, * cHeaders, * cContent, *cUrl;
+	struct {unsigned char good:1;
+			unsigned char payload:1;
+			unsigned char url:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	args = CallArgsFromVp( argc, vp );
+	dummyVal = JSVAL_NULL;
+	value = JSVAL_NULL;
+	cleanUp.good = ( argc >= 3 );
+	fnVal = args[1];
+	timeoutSec = 0;
+	mode = MODE_GET;
+	cMode = cHeaders = cContent = cUrl = NULL;
+	//  @TODO: refractor core funcion of constructor and Queue into define
+	webclientObj = NULL;
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*o/i", &jUrl, &dummyVal, &connObj, &timeoutSec ) == true );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cUrl = JS_EncodeString( cx, jUrl ) ) != NULL );
+	}
+	//somehow, connObj is not converted to an object
+	connObj = &args[2].toObject();
+	JS::RootedObject connObjRoot( cx, connObj );
+	JS::HandleObject connObjHandle( connObjRoot );
+	JS::RootedValue valueRoot( cx, value );
+	JS::HandleValue valueHandle( valueRoot );
+	JS::MutableHandleValue 	valueMut( &valueRoot );
+	JS::RootedValue fnValRoot( cx, fnVal );
+	JS::HandleValue fnValHandle( fnValRoot );
+	JS::MutableHandleValue 	fnValMut( &fnValRoot );
+	if ( cleanUp.good ) {
+		cleanUp.url = 1;
+		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
+	}
+	if ( cleanUp.good ) {
+		CONNOBJ_GET_PROP_STRING( "method", cMode );
+		CONNOBJ_GET_PROP_STRING( "headers", cHeaders );
+		CONNOBJ_GET_PROP_STRING( "content", cContent );
+	}
+	if ( cleanUp.good ) {
+		mode = ( strcmp( cMode, MethodDefinitions[MODE_POST] ) == 0 ) ? MODE_POST : MODE_GET;
+	}
+	JS::RootedObject thisObj( cx, JS_THIS_OBJECT( cx, vp ) );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( thisObj != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( javascript = (struct javascript_t *) JS_GetPrivate( thisObj ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( webclientObj = 	JS_NewObject( cx, &jscWebclient, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+	}
+	JS::RootedObject webclientObjRoot( cx, webclientObj );
+	JS::HandleObject webclientObjHandle( webclientObjRoot );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( JS_DefineFunctions( cx, webclientObjHandle, jsmWebclient ) == true );
+	}
+	if ( cleanUp.good ) {
+		jsval dummy;
+		cleanUp.good = ( ( payload = Payload_New( cx, webclientObj, fnValMut.get( ), dummy, false ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.payload = 1;
+		cleanUp.good = ( ( webclient = Webclient_New( javascript->core, mode, cUrl, cHeaders, cContent, Webclient_ResultHandler_cb, (void *) payload, Payload_Delete_Anon, (unsigned char) timeoutSec ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		JS_SetPrivate( webclientObj, ( void * ) webclient );
+		args.rval( ).setObject( *webclientObj );
+	} else {
+		args.rval( ).setUndefined( );
+	}
+	JS_free( cx, cUrl ); cUrl = NULL;
+	JS_free( cx, cMode ); cMode = NULL;
+	JS_free( cx, cHeaders ); cHeaders = NULL;
+	JS_free( cx, cContent ); cContent = NULL;
+	return ( cleanUp.good ) ? true: false;
+}
+#endif
+static void JsnWebclient_Finalizer( JSFreeOp * fop, JSObject * webclientObj ) {
+	struct webclient_t * webclient;
+
+	if ( ( webclient = ( struct webclient_t * ) JS_GetPrivate( webclientObj ) ) != NULL ) {
+		Webclient_Delete( webclient ); webclient = NULL;
+	}
+}
+/*
+   ===============================================================================
+   Webserver OBJECT
+   ===============================================================================
+*/
+
 static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj );
 
 /**
@@ -1025,28 +1508,32 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 	jsval jValue;
 	JSString * jString;
 	size_t i;
+	struct {unsigned char good:1; } cleanUp;
 
-	matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) );
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cleanUp.good = ( ( matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
 	JS::RootedObject matchObjRoot( cx, matchObj );
 	JS::MutableHandleObject matchObjMut( &matchObjRoot );
-	args = CallArgsFromVp( argc, vp );
-	thisObj = JS_THIS_OBJECT( cx, vp );
-	JS::RootedObject thisObjRoot( cx, thisObj );
-	webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
-	namedRegex = Webserverclient_GetNamedGroups( webserverclient );
-	if ( namedRegex != NULL ) {
-		for ( i = 0; i < namedRegex->numGroups * 2; i += 2 ) {
-			jString = JS_NewStringCopyZ( cx, namedRegex->kvPairs[i + 1] );
-			jValue =  STRING_TO_JSVAL( jString );
-			JS::RootedValue	jValueRoot( cx, jValue );
-			JS::HandleValue	jValueHandle( jValueRoot );
-			JS::RootedString jStringRoot( cx, jString );
-			JS_SetProperty( cx, matchObjMut, namedRegex->kvPairs[i], jValueHandle );
-			//	printf( "%d %s %s\n", i, namedRegex->kvPairs[i], namedRegex->kvPairs[i + 1] );
+	if ( cleanUp.good ) {
+		args = CallArgsFromVp( argc, vp );
+		thisObj = JS_THIS_OBJECT( cx, vp );
+		JS::RootedObject thisObjRoot( cx, thisObj );
+		webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
+		namedRegex = Webserverclient_GetNamedGroups( webserverclient );
+		if ( namedRegex != NULL ) {
+			for ( i = 0; i < namedRegex->numGroups * 2; i += 2 ) {
+				jString = JS_NewStringCopyZ( cx, namedRegex->kvPairs[i + 1] );
+				jValue =  STRING_TO_JSVAL( jString );
+				JS::RootedValue	jValueRoot( cx, jValue );
+				JS::HandleValue	jValueHandle( jValueRoot );
+				JS::RootedString jStringRoot( cx, jString );
+				JS_SetProperty( cx, matchObjMut, namedRegex->kvPairs[i], jValueHandle );
+				//	printf( "%d %s %s\n", i, namedRegex->kvPairs[i], namedRegex->kvPairs[i + 1] );
+			}
 		}
+		args.rval( ).set( OBJECT_TO_JSVAL( matchObjMut.get( ) ) );
 	}
-	args.rval( ).set( OBJECT_TO_JSVAL( matchObjMut.get( ) ) );
-	return true;
+	return ( cleanUp.good ) ? true : false;
 }
 
 /**
@@ -1119,6 +1606,7 @@ static const JSClass jscWebserverclientresponse = {
 	JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
 };
+
 
 static const JSFunctionSpec jsmWebserverclientresponse[ ] = {
 	JS_FS( "setContent", 			JsnWebserverclientresponse_SetContent, 1, 0 ),
@@ -1312,7 +1800,6 @@ static void Webserver_Route_ResultHandler_cb( const struct webserverclient_t * w
 	JS::RootedObject webservClientObjRoot( payload->context, webserverClientObj );
 	JS::RootedValue webservClientObjVal( payload->context, webserverClientVal );
 	webserverClientVal = OBJECT_TO_JSVAL( webserverClientObj );
-	/*  @TODO: Howto free/delete the default allocation of payload->fnVal_cbArg; */
 	payload->fnVal_cbArg = JS::Heap<JS::Value>( webserverClientVal );
 	Payload_Call( payload );
 }
@@ -1491,7 +1978,7 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * @constructor
  * @public
  * @since	0.0.5b
- * @returns	{object}							The web server javascript javascript
+ * @returns	{object}							The web server javascript
  * @param	{object}		params				The connection string.
  * @param	{string}		params.ip			The Ip address that the server will listen to.<p>default: The value for 'ip' in the webserver  section of the configurationFile.</p>
  * @param	{int}			params.port			The port that the server should bind to.<p>default: The value for 'port' in the webserver section of the configurationFile.</p>
@@ -1516,22 +2003,22 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	JS::CallArgs args;
 	char * cServerIp;
 	int port, timeoutSec;
+	jsval value;
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vp );
+	value = JSVAL_NULL;
 	timeoutSec = 0;
 	port = 0;
 	cServerIp = NULL;
+	webserverObj = NULL;
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "o/i", &connObj, &timeoutSec ) == true );
+	JS::RootedObject connObjRoot( cx, connObj );
+	JS::HandleObject connObjHandle( connObjRoot );
+	JS::RootedValue valueRoot( cx, value );
+	JS::MutableHandleValue valueMut( &valueRoot );
 	if ( cleanUp.good ) {
-		jsval value;
-
-		value = JSVAL_NULL;
-		JS::RootedObject connObjRoot( cx, connObj );
-		JS::HandleObject connObjHandle( connObjRoot );
-		JS::RootedValue valueRoot( cx, value );
-		JS::MutableHandleValue valueMut( &valueRoot );
 		CONNOBJ_GET_PROP_STRING( "ip", cServerIp );
 		CONNOBJ_GET_PROP_NR( "port", port );
 	}
@@ -1547,9 +2034,11 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, (unsigned char) timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		webserverObj = 	JS_NewObject( cx, &jscWebserver, JS::NullPtr( ), JS::NullPtr( ) );
-		JS::RootedObject webserverObjRoot( cx, webserverObj );
-		JS::HandleObject webserverObjHandle( webserverObjRoot );
+		cleanUp.good = ( ( webserverObj = 	JS_NewObject( cx, &jscWebserver, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
+	}
+	JS::RootedObject webserverObjRoot( cx, webserverObj );
+	JS::HandleObject webserverObjHandle( webserverObjRoot );
+	if ( cleanUp.good ) {
 		cleanUp.good = ( JS_DefineFunctions( cx, webserverObjHandle, jsmWebserver ) == true );
 	}
 	if ( cleanUp.good ) {
@@ -2325,7 +2814,7 @@ static int Payload_Call( const struct payload_t * payload ) {
 		JS::RootedValue retValRoot( payload->context, retVal );
 		JS::MutableHandleValue retValMut( &retValRoot );
 		JS_CallFunctionValue( payload->context, objHandle, fnValHandle, fnValArrayHandle, retValMut );
-		// the payload is cleaned-up by automatically, spawned by Core_ProcessTick and clearFunc_cb
+		// the payload is cleaned-up by automatically, spawned by Core_ProcessTick and clearFuncCb
 		// We don't need to clear the payload, because that is needed also the next time that this route will be called
 	}
 	return ( payload->repeat ) ? 1 : 0;
@@ -2635,9 +3124,15 @@ static int Javascript_Run( struct javascript_t * javascript ) {
 	JS::HandleObject			urbinObjHandle( urbinObjRoot );
 	JS_SetPrivate( urbinObj, (void * ) javascript );
 
+	JSObject * webclientObj;
+	webclientObj = 	JS_InitClass( javascript->context, urbinObjHandle, JS::NullPtr( ), &jscWebclient, JsnWebclient_Constructor, 1, nullptr, jsmWebclient, nullptr, nullptr );
+	JS::RootedObject webclientObjRoot( javascript->context, webclientObj );
+
 	JSObject * webserverObj;
 	webserverObj = 	JS_InitClass( javascript->context, urbinObjHandle, JS::NullPtr( ), &jscWebserver, JsnWebserver_Constructor, 1, nullptr, jsmWebserver, nullptr, nullptr );
 	JS::RootedObject webserverObjRoot( javascript->context, webserverObj );
+
+
 #if HAVE_MYSQL == 1
 	JSObject * mysqlObj;
 	mysqlObj = JS_InitClass( javascript->context, urbinObjHandle, JS::NullPtr( ), &jscMysqlclient, JsnMysqlclient_Constructor, 1, nullptr, jsmMysqlclient, nullptr, nullptr );
