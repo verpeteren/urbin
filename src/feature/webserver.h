@@ -98,8 +98,6 @@ struct webserverclientresponse_t {
 			struct buffer_t *		buffer;
 					}			dynamic;
 			}				content;
-	unsigned char			headersSent:1;
-	unsigned char			contentSent:1;
 };
 
 struct webserverclient_t{
