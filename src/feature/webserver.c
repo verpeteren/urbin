@@ -251,7 +251,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 	/*****************************************************************************/
 	/* webserverclient                                                                 */
 	/*****************************************************************************/
-	static struct webserverclient_t * Webserverclient_New( struct webserver_t * webserver, int socketFd) {
+static struct webserverclient_t * Webserverclient_New( struct webserver_t * webserver, int socketFd) {
 	struct webserverclient_t * webserverclient;
 	struct {unsigned char good:1;
 			unsigned char onig:1;
@@ -271,6 +271,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 		webserverclient->response.contentType = CONTENTTYPE_BUFFER;
 		webserverclient->response.httpCode = HTTPCODE_OK;
 		webserverclient->connection = CONNECTION_CLOSE;
+		webserverclient->wroteBytes = 0;
 		webserverclient->mode = MODE_GET;
 		memset( webserverclient->buffer, '\0', HTTP_BUFF_LENGTH );
 		if ( webserverclient == CONTENTTYPE_BUFFER ) {
@@ -750,11 +751,13 @@ static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) 
 		webserverclient->response.mimeType = MIMETYPE_HTML;
 		webserverclient->connection = CONNECTION_CLOSE;
 		webserverclient->mode = MODE_GET;
+		webserverclient->wroteBytes = 0;
 		if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
 			free( (char * ) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL;
 			webserverclient->response.content.file.contentLength = 0;
 		} else {
-			Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
+//			Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
+			Buffer_Reset( webserverclient->response.content.dynamic.buffer, webserverclient->response.content.dynamic.buffer->size );
 		}
 		webserverclient->response.contentType = CONTENTTYPE_BUFFER;
 		onig_region_free( webserverclient->region, 0 );
@@ -778,12 +781,15 @@ static void Webserverclient_Delete( struct webserverclient_t * webserverclient )
 	webserverclient->response.mimeType = MIMETYPE_HTML;
 	webserverclient->connection = CONNECTION_CLOSE;
 	webserverclient->mode = MODE_GET;
+	webserverclient->wroteBytes = 0;
 	onig_region_free( webserverclient->region, 1 ); webserverclient->region = NULL;
 	if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
 		free( (char * ) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL;
 		webserverclient->response.content.file.contentLength = 0;
 	} else {
-		Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
+		if ( webserverclient->response.content.dynamic.buffer != NULL ) {
+			Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
+		}
 	}
 	webserverclient->response.contentType = CONTENTTYPE_BUFFER;
 
@@ -874,6 +880,7 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 		default: /* got some data, send back */
 			picoev_del( loop, fd );
 			Webserverclient_PrepareRequest( webserverclient );
+			webserverclient->wroteBytes = 0;
 			picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWriteTopLine_cb, wcArg );
 			break;
 		}
@@ -883,8 +890,8 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 static void Webserver_HandleWriteFile_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webserverclient_t * webserverclient;
 	size_t contentLen;
-	ssize_t wroteBytes;
 	int done, fileHandle;
+	off_t offset;
 	struct { unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -902,9 +909,11 @@ static void Webserver_HandleWriteFile_cb( picoev_loop * loop, int fd, int events
 		} else {
 			cleanUp.good = ( ( fileHandle = open( webserverclient->response.content.file.fileName, O_RDONLY | O_NONBLOCK ) ) > 0 );
 			if ( cleanUp.good ) {
-				wroteBytes = sendfile( fd, fileHandle, 0, webserverclient->response.content.file.contentLength );
+				//  @TODO:  investigate TPC_CORK feature
+				offset = webserverclient->wroteBytes;
+				webserverclient->wroteBytes += sendfile( fd, fileHandle, &offset, webserverclient->response.content.file.contentLength - webserverclient->wroteBytes );
 				close( fileHandle );
-				switch ( wroteBytes ) {
+				switch ( webserverclient->wroteBytes ) {
 				case 0: /*  the other end cannot keep up  */
 					break;
 				case -1: /*  error  */
@@ -915,7 +924,7 @@ static void Webserver_HandleWriteFile_cb( picoev_loop * loop, int fd, int events
 					}
 					break;
 				default: /*  got some data, send back  */
-					if ( contentLen != (size_t) wroteBytes) {
+					if ( contentLen != (size_t) webserverclient->wroteBytes) {
 						Webserverclient_CloseConn( webserverclient ); /*  failed to send all data at once, close  */
 					} else {
 						done = 1;
@@ -940,7 +949,6 @@ static void Webserver_HandleWriteFile_cb( picoev_loop * loop, int fd, int events
 static void Webserver_HandleWriteContent_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webserverclient_t * webserverclient;
 	size_t contentLen;
-	ssize_t wroteBytes;
 	int done;
 
 	webserverclient = (struct webserverclient_t *) wcArg;
@@ -955,8 +963,8 @@ static void Webserver_HandleWriteContent_cb( picoev_loop * loop, int fd, int eve
 		if ( contentLen == 0 ) {
 			done = 1;
 		} else {
-			wroteBytes = write( fd, webserverclient->response.content.dynamic.buffer->bytes, webserverclient->response.content.dynamic.buffer->used );
-			switch ( wroteBytes ) {
+			webserverclient->wroteBytes += write( fd, &webserverclient->response.content.dynamic.buffer->bytes[webserverclient->wroteBytes], webserverclient->response.content.dynamic.buffer->used - webserverclient->wroteBytes );
+			switch ( webserverclient->wroteBytes ) {
 			case 0: /*  the other end cannot keep up  */
 				break;
 			case -1: /*  error  */
@@ -967,7 +975,7 @@ static void Webserver_HandleWriteContent_cb( picoev_loop * loop, int fd, int eve
 				}
 				break;
 			default: /*  got some data, send back  */
-				if ( contentLen != (size_t) wroteBytes ) {
+				if ( contentLen != (size_t) webserverclient->wroteBytes ) {
 					Webserverclient_CloseConn( webserverclient ); /*  failed to send all data at once, close  */
 				}
 				break;
@@ -989,7 +997,6 @@ static void Webserver_HandleWriteContent_cb( picoev_loop * loop, int fd, int eve
 static void Webserver_HandleWriteHeader_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webserverclient_t * webserverclient;
 	size_t headerLen, contentLen;
-	ssize_t wroteBytes;
 	char header[HTTP_HEADER_LENGTH];
 	char dateString[30];
 	const char * contentTypeString;
@@ -1010,8 +1017,8 @@ static void Webserver_HandleWriteHeader_cb( picoev_loop * loop, int fd, int even
 		tm_info = localtime( &webserverclient->response.end );
 		strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", tm_info );
 		headerLen = snprintf( &header[0], HTTP_HEADER_LENGTH, "Content-Length: %d\r\nConnection: %s\r\nContent-Type: %s\r\nDate: %s\r\nServer: %s/%s\r\n\r\n", contentLen, connectionString, contentTypeString, dateString, PR_NAME, PR_VERSION );
-		wroteBytes = write( fd, header, headerLen );
-		switch ( wroteBytes ) {
+		webserverclient->wroteBytes += write( fd, &header[webserverclient->wroteBytes], headerLen - webserverclient->wroteBytes );
+		switch ( webserverclient->wroteBytes ) {
 		case 0: /* the other end cannot keep up */
 			break;
 		case -1: /*  error  */
@@ -1022,10 +1029,11 @@ static void Webserver_HandleWriteHeader_cb( picoev_loop * loop, int fd, int even
 			}
 			break;
 		default: /*  got some data, send back  */
-			if ( headerLen != (size_t) wroteBytes ) {
+			if ( headerLen != (size_t) webserverclient->wroteBytes ) {
 				Webserverclient_CloseConn( webserverclient ); /*  failed to send all data at once, close  */
 			} else {
 				picoev_del( loop, fd );
+				webserverclient->wroteBytes = 0;
 				if ( webserverclient->response.contentType == CONTENTTYPE_FILE) {
 					picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWriteFile_cb, wcArg );
 				} else {
@@ -1041,7 +1049,6 @@ static void Webserver_HandleWriteHeader_cb( picoev_loop * loop, int fd, int even
 static void Webserver_HandleWriteTopLine_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webserverclient_t * webserverclient;
 	size_t topLineLen;
-	ssize_t wroteBytes;
 	char topLine[HTTP_TOPLINE_LENGTH];
 
 	webserverclient = (struct webserverclient_t *) wcArg;
@@ -1052,8 +1059,8 @@ static void Webserver_HandleWriteTopLine_cb( picoev_loop * loop, int fd, int eve
 		/* update timeout, and write */
 		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
 		topLineLen = snprintf( &topLine[0], HTTP_TOPLINE_LENGTH, "HTTP/1.1 %d OK\r\n", webserverclient->response.httpCode );
-		wroteBytes = write( fd, topLine, topLineLen );
-		switch ( wroteBytes ) {
+		webserverclient->wroteBytes += write( fd, &topLine[webserverclient->wroteBytes], topLineLen - webserverclient->wroteBytes );
+		switch ( webserverclient->wroteBytes ) {
 		case 0: /* the other end cannot keep up */
 			break;
 		case -1: /*  error  */
@@ -1064,10 +1071,11 @@ static void Webserver_HandleWriteTopLine_cb( picoev_loop * loop, int fd, int eve
 			}
 			break;
 		default: /*  got some data, send back  */
-			if ( topLineLen != (size_t) wroteBytes ) {
+			if ( topLineLen != (size_t) webserverclient->wroteBytes ) {
 				Webserverclient_CloseConn( webserverclient ); /*  failed to send all data at once, close  */
 			} else {
 				picoev_del( loop, fd );
+				webserverclient->wroteBytes = 0;
 				picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWriteHeader_cb, wcArg );
 			}
 			break;

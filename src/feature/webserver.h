@@ -1,7 +1,6 @@
 #ifndef SRC_FEATURE_WEBSERVER_H_
 #define SRC_FEATURE_WEBSERVER_H_
 
-
 #include <time.h>
 #include <stdint.h>
 
@@ -102,6 +101,7 @@ struct webserverclientresponse_t {
 
 struct webserverclient_t{
 	int									socketFd;
+	ssize_t								wroteBytes;
 	enum requestMode_t					mode;
 	enum connection_t					connection;
 	struct webserver_t *		 		webserver;
