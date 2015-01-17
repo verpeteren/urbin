@@ -23,7 +23,7 @@ enum contentType_t{
 
 //  @TODO:  use /etc/mime.types for this
 enum mimeType_t {
-	MIMETYPE_HTML 				= 0,
+	MIMETYPE_HTML 				 = 0,
 	MIMETYPE_TXT,
 	MIMETYPE_CSS,
 	MIMETYPE_HTM,
@@ -52,7 +52,7 @@ enum routeType_t {
 	ROUTETYPE_DYNAMIC
 };
 enum sending_t{
-	SENDING_NONE 				= 0,
+	SENDING_NONE 				 = 0,
 	SENDING_TOPLINE,
 	SENDING_HEADER,
 	SENDING_FILE,

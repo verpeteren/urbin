@@ -16,6 +16,8 @@ extern "C" {
 
 #define STRING_LENGTH_OF_INT( value ) (size_t) ( value == 0 ? 1 : ( log10( value ) + 1 ) )
 
+#define FULL_PATH( target, size, path, filename ) snprintf( &target[0], size, "%s%c%s", path, PATHSEP, filename );
+
 char * 								Xstrdup							( const char* str );
 int									FullPath						( char target[], const size_t size, const char * path, const char * filename );
 char *								FileGetContents					( const char * fileName );

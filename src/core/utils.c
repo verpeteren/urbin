@@ -4,13 +4,6 @@
 
 #include "utils.h"
 
-int FullPath( char target[], const size_t size, const char * path, const char * filename ) {
-	char * first;
-
-	first = &target[0];
-	memset( first, '\0', size );
-	return snprintf( first, size, "%s%s%s", path, "/", filename );
-}
 
 char * Xstrdup( const char* str ) {
 #ifdef POSIX
