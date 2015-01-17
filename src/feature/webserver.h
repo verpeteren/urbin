@@ -23,7 +23,7 @@ enum contentType_t{
 
 //  @TODO:  use /etc/mime.types for this
 enum mimeType_t {
-	MIMETYPE_HTML = 0,
+	MIMETYPE_HTML 				= 0,
 	MIMETYPE_TXT,
 	MIMETYPE_CSS,
 	MIMETYPE_HTM,
@@ -50,6 +50,13 @@ typedef void 				(* webserverHandler_cb_t)	( const struct webserverclient_t * we
 enum routeType_t {
 	ROUTETYPE_DOCUMENTROOT,
 	ROUTETYPE_DYNAMIC
+};
+enum sending_t{
+	SENDING_NONE 				= 0,
+	SENDING_TOPLINE,
+	SENDING_HEADER,
+	SENDING_FILE,
+	SENDING_CONTENT
 };
 
 struct route_t {
@@ -102,6 +109,7 @@ struct webserverclientresponse_t {
 struct webserverclient_t{
 	int									socketFd;
 	ssize_t								wroteBytes;
+	enum sending_t						sendingNow;
 	enum requestMode_t					mode;
 	enum connection_t					connection;
 	struct webserver_t *		 		webserver;
