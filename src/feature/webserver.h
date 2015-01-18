@@ -51,13 +51,6 @@ enum routeType_t {
 	ROUTETYPE_DOCUMENTROOT,
 	ROUTETYPE_DYNAMIC
 };
-enum sending_t{
-	SENDING_NONE 				 = 0,
-	SENDING_TOPLINE,
-	SENDING_HEADER,
-	SENDING_FILE,
-	SENDING_CONTENT
-};
 
 struct route_t {
 	enum routeType_t			routeType;

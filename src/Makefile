@@ -59,7 +59,7 @@ docs:   $(DOC_OBJECTS)
 
 $(OBJ_DIR)/main_server.o:			EXCEPTION =
 $(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion -Wno-array-bounds
-$(OBJ_DIR)/webclient.o	:			EXCEPTION = -Wno-strict-aliasing
+$(OBJ_DIR)/webclient.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION = 
 $(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return
 $(OBJ_DIR)/core.o:					EXCEPTION = -Wno-unused-result
@@ -77,7 +77,7 @@ $(OBJ_DIR)/configuration.o:			EXCEPTION +=
 else 
 $(OBJ_DIR)/main_server.o:			EXCEPTION +=
 $(OBJ_DIR)/webserver.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
-$(OBJ_DIR)/webclient.o:				EXCEPTION += -Wno-cast-align
+$(OBJ_DIR)/webclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION += -Wno-unreachable-code -Wno-cast-align
 $(OBJ_DIR)/javascript.o:			EXCEPTION += -Wno-cast-align
 $(OBJ_DIR)/core.o:					EXCEPTION += -Wno-unreachable-code -Wno-cast-align -Wno-format-nonliteral

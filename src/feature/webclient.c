@@ -17,12 +17,12 @@ static void						Webclient_HandleRead_cb		( picoev_loop * loop, int fd, int even
 static void						Webclient_HandleWrite_cb	( picoev_loop * loop, int fd, int events, void * wcArgs );
 static void						Webclient_HandleConnect_cb	( picoev_loop * loop, int fd, int events, void * wsArgs );
 static void 					Webclient_Connect			( struct webclient_t * webclient );
+static void 					Webclient_GenTopLine			( struct webclient_t * webclient, struct webpage_t * webpage );
+static void 					Webclient_GenHeader			( struct webclient_t * webclient, struct webpage_t * webpage );
 static void 					Webclient_PushWebpage		( struct webclient_t * webclient, struct webpage_t * webpage );
 static struct webpage_t * 		Webclient_PopWebpage		( struct webclient_t * webclient );
 
-static struct buffer_t * 		Webpage_TopLine				( struct webpage_t * webpage );
 static void 					Webpage_Delete				( struct webpage_t * webpage );
-
 
 static void Webclient_CloseConn( struct webclient_t * webclient ) {
 	picoev_del( webclient->core->loop, webclient->socketFd );
@@ -91,15 +91,12 @@ static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 static void Webclient_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArgs ) {
 	struct webclient_t * webclient;
 	struct webpage_t * webpage;
-	ssize_t bytesWritten;
-	size_t totalBytes, len, hostLen, connLen, headerLen;
-	struct {unsigned char good:1;
-			unsigned char headers:1; } cleanUp;
+	size_t len;
+	int done;
 
-	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webclient = (struct webclient_t *) wcArgs;
-	totalBytes = 0;
-	bytesWritten = 0;
+	done = 0;
+	len = 0;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Webclient_CloseConn( webclient );
 	} else if ( ( events & PICOEV_WRITE ) != 0 ) {
@@ -107,70 +104,81 @@ static void Webclient_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 		//  Let's get some work
 		webpage = Webclient_PopWebpage( webclient );
 		if ( webpage != NULL ) {
-			cleanUp.good = ( Webpage_TopLine( webpage ) != NULL );
-			if ( cleanUp.good ) {
-				//  @FIXME: writebytes in a loop,,,, check if everything is written. etc
+tryToSendMore:
+			switch ( webpage->sendingNow ) {
+			case SENDING_NONE:  // we start here
+				webpage->sendingNow = SENDING_TOPLINE;
+				// fallthrough
+			case SENDING_TOPLINE:
+				if ( webpage->request.topLine == NULL ) {
+					Webclient_GenTopLine( webclient, webpage );
+				}
+				if ( webpage->request.topLine != NULL ) {
+					len = webpage->request.topLine->used;
+					webpage->wroteBytes += write( fd, &webpage->request.topLine->bytes[webpage->wroteBytes], len - webpage->wroteBytes );
+				} else {
+					Webclient_CloseConn( webclient );
+				}
+				break;
+			case SENDING_HEADER:
+				if ( webpage->request.headers == NULL ) {
+					Webclient_GenHeader( webclient, webpage );
+				}
+				if ( webpage->request.headers != NULL ) {
+					len = webpage->request.headers->used;
+					webpage->wroteBytes += write( fd, &webpage->request.headers->bytes[webpage->wroteBytes], len - webpage->wroteBytes );  //  headers need to end with \r\n\n
+				} else {
+					Webclient_CloseConn( webclient );
+				}
+				break;
+			case SENDING_CONTENT:
+				if ( webpage->request.content == NULL ) {
+					done = 1;
+				} else {
+					len = webpage->request.content->used;
+					webpage->wroteBytes += write( fd, &webpage->request.content->bytes[webpage->wroteBytes], len - webpage->wroteBytes );
+					done = ( (size_t) webpage->wroteBytes == len );
+				}
+				break;
+			case SENDING_FILE:  //  Not applicable
+			default:
+				break;
+			}
+			if ( done ) {
 				picoev_del( loop, fd );
 				picoev_add( loop, fd, PICOEV_READ, webclient->timeoutSec, Webclient_HandleRead_cb, wcArgs );
-				len = webpage->request.topLine->used;
-				totalBytes += len;
-				bytesWritten += write( fd, webpage->request.topLine->bytes, len );
-				totalBytes += 2;
-				bytesWritten += write( fd, "\r\n", 2 );
-				if ( webpage->request.headers == NULL ) {
-					//  set a default header with host + connection minimum
-					hostLen = (size_t) ( webpage->uri.hostText.afterLast - webpage->uri.hostText.first );
-					connLen = ( CONNECTION_CLOSE == webclient->connection ) ? 5 : 10;
-					headerLen = 25 + hostLen + connLen;
-					cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen ) ) != NULL );
-					if ( cleanUp.good ) {
-						cleanUp.headers = 1;
-						cleanUp.good = ( Buffer_Append( webpage->request.headers, "Host: ", 6 ) == 1 );
-					}
-					if ( cleanUp.good ) {
-						cleanUp.good = ( Buffer_Append( webpage->request.headers, webpage->uri.hostText.first, hostLen ) == 1 );
-					}
-					if ( cleanUp.good ) {
-						cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\nConnection: ", 14 ) == 1 );
-					}
-					if ( cleanUp.good ) {
-						cleanUp.good = ( Buffer_Append( webpage->request.headers, ConnectionDefinitions[webclient->connection], connLen ) == 1 );
-					}
-					if ( cleanUp.good ) {
-						cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n", 2 ) == 1 );
-					}
-				}
-				if ( cleanUp.good ) {
-					len = webpage->request.headers->used;
-					totalBytes += len;
-					bytesWritten += write( fd, webpage->request.headers->bytes, len );  //  headers need to end with \r\n
-				}
-				totalBytes += 2;
-				bytesWritten += write( fd, "\r\n", 2 );
-				if ( webpage->request.content != NULL ) {
-					len = webpage->request.content->used;
-					totalBytes += len;
-					bytesWritten += write( fd, webpage->request.content->bytes, len );
-				}
-				switch ( bytesWritten ) {
-					case 0:
-						Webclient_CloseConn( webclient );
-						break;
-					case -1:
-						if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-							//pass
-						} else {
-							Webclient_CloseConn( webclient );
-						}
-					default:
-						if ( (size_t) bytesWritten != totalBytes ) {
-							Webclient_CloseConn( webclient );
-						} else {
-						}
-						break;
-				}
 			} else {
-				Webclient_CloseConn( webclient );
+				switch ( webpage->wroteBytes ) {
+				case 0:
+					Webclient_CloseConn( webclient );
+					break;
+				case -1:
+					if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+						//pass
+					} else {
+						Webclient_CloseConn( webclient );
+					}
+				default:
+					if ( len == (size_t) webpage->wroteBytes ) {
+						webpage->wroteBytes = 0;
+						switch ( webpage->sendingNow ) {
+						case SENDING_TOPLINE:
+							webpage->sendingNow = SENDING_HEADER;
+							goto tryToSendMore;
+							break;
+						case SENDING_HEADER:
+							webpage->sendingNow = SENDING_CONTENT;
+							goto tryToSendMore;
+							break;
+						case SENDING_CONTENT:  //  FT
+						case SENDING_FILE:  //  Not applicable
+						case SENDING_NONE:  //  FT
+						default:
+							break;
+						}
+						break;
+					}
+				}
 			}
 		}
 	}
@@ -213,6 +221,8 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 		webpage->request.content = NULL;
 		webpage->response.headers = NULL;
 		webpage->response.content = NULL;
+		webpage->sendingNow = SENDING_NONE;
+		webpage->wroteBytes = 0;
 		webpage->response.httpCode = HTTPCODE_NONE;
 		cleanUp.good = ( ( webpage->url = Xstrdup( url ) ) != NULL );
 	}
@@ -229,21 +239,26 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 	addcrcn = 0;
 	if ( cleanUp.good ) {
 		if ( headers != NULL ) {
-			//  use the header, make shure it ends with \r\n
+			//  use the header, make shure it ends with \r\n\r\n
 			headerLen = strlen( headers );
-			if ( headerLen > 2 && headers[headerLen - 2] != '\r' && headers[headerLen - 1] != '\n' ) {
+ 			if ( headerLen > 4	 && ( headers[headerLen - 4] == '\r' && headers[headerLen - 3] == '\n' )
+								 && ( headers[headerLen - 2] == '\r' && headers[headerLen - 1] == '\n' ) ) {
+				addcrcn = 0;
+			} else if ( headerLen > 2 && ( headers[headerLen - 2] == '\r' && headers[headerLen - 1] == '\n' ) ) {
 				addcrcn = 2;
 			} else {
-				//  @TODO:  edge case
+				addcrcn = 4;
+				//  @TODO:  edge cases
 			}
 			cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen + addcrcn + 1 ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.headers = 1;
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, headers, headerLen + addcrcn ) == 1 );
+				cleanUp.good = ( Buffer_Append( webpage->request.headers, headers, headerLen  ) == 1 );
 			}
 			if ( cleanUp.good ) {
-				if ( addcrcn ) {
+				while ( addcrcn != 0 ) {
 					cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n", 2 ) == 1 );
+					addcrcn -= 2;
 				}
 			}
 		}
@@ -300,18 +315,18 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 }
 
 #define HTTP_VERSION "HTTP/1.1"
-static struct buffer_t * Webpage_TopLine( struct webpage_t * webpage ) {
+static void Webclient_GenTopLine( struct webclient_t * webclient, struct webpage_t * webpage ) {
 	size_t modeStringLen, hostLen, topLineLen, versionLen;
 	const char * modeString;
 	struct {unsigned char good:1;
 			unsigned char topLine:1;} cleanUp;
+
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	//  portLen = ( uri->portText.first != NULL ) ? ( uri->portText.afterLast - uri->portText.first ) : 0;
 	modeString = MethodDefinitions[webpage->mode];
 	modeStringLen = strlen( modeString );
 	versionLen = strlen( HTTP_VERSION );
 	hostLen = (size_t) ( webpage->uri.hostText.afterLast - webpage->uri.hostText.first );
-	topLineLen = modeStringLen + 3 * hostLen +  versionLen + 4; //  2x' ' + 1x'/'+ 1x'\0'
+	topLineLen = modeStringLen + 3 * hostLen +  versionLen + 6; //  2x' ' + 1x'/'+ 1x'\0' + 1 x \r\n
 	if ( webpage->request.topLine == NULL ) {
 		cleanUp.good = ( ( webpage->request.topLine = Buffer_New( topLineLen ) ) != NULL );
 	} else {
@@ -334,12 +349,40 @@ static struct buffer_t * Webpage_TopLine( struct webpage_t * webpage ) {
 	if ( cleanUp.good ) {
 		cleanUp.good = ( Buffer_Append( webpage->request.topLine, HTTP_VERSION, versionLen ) == 1 );
 	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Buffer_Append( webpage->request.topLine, "\r\n", 2 ) == 1 );
+	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.topLine ) {
 			free( webpage->request.topLine ); webpage->request.topLine = NULL;
 		}
 	}
-	return webpage->request.topLine;
+}
+
+static void Webclient_GenHeader( struct webclient_t * webclient, struct webpage_t * webpage ) {
+	size_t hostLen, connLen, headerLen;
+	struct {unsigned char good:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	hostLen = (size_t) ( webpage->uri.hostText.afterLast - webpage->uri.hostText.first );
+	connLen = ( CONNECTION_CLOSE == webclient->connection ) ? 5 : 10;
+	headerLen = 27 + hostLen + connLen;
+	cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, "Host: ", 6 ) == 1 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, webpage->uri.hostText.first, hostLen ) == 1 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\nConnection: ", 14 ) == 1 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, ConnectionDefinitions[webclient->connection], connLen ) == 1 );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n\r\n", 4 ) == 1 );
+	}
 }
 
 static void Webpage_Delete( struct webpage_t * webpage ) {
@@ -358,6 +401,8 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	webpage->response.httpCode = HTTPCODE_NONE;
 	webpage->handlerCb = NULL;
 	webpage->mode = MODE_GET;
+	webpage->sendingNow = SENDING_NONE;
+	webpage->wroteBytes = 0;
 	webpage->cbArgs = NULL;
 	webpage->clearFuncCb = NULL;
 	uriFreeUriMembersA( &webpage->uri );
@@ -404,7 +449,7 @@ static void Webclient_Connect( struct webclient_t * webclient ) {
 		serverAddr.sin_family = AF_INET;
 		serverAddr.sin_port = htons( webclient->port );
 		serverAddr.sin_addr.s_addr = inet_addr( webclient->ip );
-		cleanUp.good =  ( connect( webclient->socketFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) != -1 );
+		cleanUp.good =  ( connect( webclient->socketFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) == 0 );
 	}
 	if ( cleanUp.good ) {
 		SetupSocket( webclient->socketFd, 1 );

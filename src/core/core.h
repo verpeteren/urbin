@@ -16,6 +16,14 @@
 extern "C" {
 #endif
 
+enum sending_t{
+	SENDING_NONE 				 = 0,
+	SENDING_TOPLINE,
+	SENDING_HEADER,
+	SENDING_FILE,
+	SENDING_CONTENT
+};
+
 struct core_t;
 struct module_t;
 
