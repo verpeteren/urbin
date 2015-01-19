@@ -11,8 +11,8 @@
 /*****************************************************************************/
 /* Static etc.                                                               */
 /*****************************************************************************/
-static struct sqlclient_t *			Sqlclient_New				( const struct core_t * core, const enum sqlAdapter_t adapter, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char *password, const char * dbName, const unsigned char timeoutSec );
-static void							Sqlclient_Connect			( struct sqlclient_t * sqlclient );
+static struct sqlclient_t *			Sqlclient_New				( const struct core_t * core, const enum sqlAdapter_t adapter, const char * hostName, const uint16_t port, const char * loginName, const char *password, const char * dbName, const unsigned char timeoutSec );
+static void							Sqlclient_ConnectToIp		( struct dns_cb_data * dnsData );
 static void							Sqlclient_CloseConn			( struct sqlclient_t * sqlclient );
 static void 						Sqlclient_PushQuery 		( struct sqlclient_t * sqlclient, struct query_t * query );
 static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient );
@@ -77,7 +77,7 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 		//  Let's see if we can submit this immediately to the server
 			Sqlclient_PopQuery( sqlclient );
 		if ( sqlclient->socketFd < 1 ) {
-			Sqlclient_Connect( sqlclient );
+			Core_GetHostByName( (struct core_t *) sqlclient->core, sqlclient->hostName, Sqlclient_ConnectToIp, (void *) sqlclient );
 		}
 	}
 	if ( ! cleanUp.good ) {
@@ -293,12 +293,6 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 	timeSec = 0; \
 	modulesSection = cfg_getnsec( (cfg_t *) core->config, "modules", 0 ); \
 	sqlSection = cfg_getnsec( modulesSection, sectionName, 0 ); \
-	if ( ip == NULL ) { \
-		ip = cfg_getstr( sqlSection, "ip" ); \
-	} \
-	if ( ip == NULL ) { \
-		ip = PR_CFG_MODULES_ ## type ## SQLCLIENT_IP; \
-	} \
 	if ( port == 0 ) { \
 		prt = (uint16_t) cfg_getint( sqlSection, "port" ); \
 	} \
@@ -319,12 +313,12 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 	} \
 } while ( 0 );
 
-struct sqlclient_t * Postgresql_New( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
+struct sqlclient_t * Postgresql_New( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
 	uint16_t prt;
 	unsigned char timeSec;
 
 	SET_DEFAULTS_FOR_CONN( PG, "postgresqlclient" ) \
-	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, ip, prt, loginName, password, dbName, timeSec );
+	return Sqlclient_New( core, SQLADAPTER_POSTGRESQL, hostName, prt, loginName, password, dbName, timeSec );
 }
 
 #if HAVE_MYSQL == 1
@@ -553,22 +547,21 @@ static void Mysql_HandleConnect_cb( picoev_loop * loop, const int fd, const int 
 	}
 }
 
-struct sqlclient_t * Mysql_New( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
+struct sqlclient_t * Mysql_New( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
 	int prt;
 	unsigned char timeSec;
 
 	SET_DEFAULTS_FOR_CONN( MY, "mysqlclient" ) \
-	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, ip, port, loginName, password, dbName, timeSec );
+	return Sqlclient_New( core, SQLADAPTER_MYSQL, hostName, port, loginName, password, dbName, timeSec );
 }
 #endif
 /*****************************************************************************/
 /* Generic                                                                   */
 /*****************************************************************************/
-static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enum sqlAdapter_t adapter, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
+static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enum sqlAdapter_t adapter, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
 	struct sqlclient_t * sqlclient;
 	struct {unsigned char sqlclient:1;
 			unsigned char hostName:1;
-			unsigned char ip:1;
 			unsigned char loginName:1;
 			unsigned char password:1;
 			unsigned char dbName:1;
@@ -594,15 +587,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 				break;
 			break;
 		}
-		sqlclient->hostName = sqlclient->ip = sqlclient->loginName = sqlclient->password = sqlclient->dbName = NULL;
-	}
-	  //  @TODO:  drop parameter ip and do a hostname lookup. Well actually at 'connect' as the ip address could change
-	if ( hostName == NULL && ip == NULL ) {
-		return NULL;
-	} else if ( hostName == NULL && ip != NULL ) {
-		hostName = ip;
-	} else if ( hostName != NULL && ip == NULL ) {
-		ip = hostName;
+		sqlclient->hostName = sqlclient->loginName = sqlclient->password = sqlclient->dbName = NULL;
 	}
 	if ( loginName == NULL ) {
 		loginName = "";
@@ -616,10 +601,8 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 		cleanUp.good = ( ( sqlclient->hostName = Xstrdup( hostName ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.hostName = 1;
-			cleanUp.good = ( ( sqlclient->ip = Xstrdup( ip ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.ip = 1;
 		cleanUp.good = ( ( sqlclient->loginName = Xstrdup( loginName ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -638,15 +621,12 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 		sqlclient->timeoutSec = timeoutSec;
 		sqlclient->socketFd = 0;
 		sqlclient->currentQuery = NULL;
-		Sqlclient_Connect( sqlclient );
+		Core_GetHostByName( (struct core_t *) sqlclient->core, sqlclient->hostName, Sqlclient_ConnectToIp, (void *) sqlclient );
 		Core_Log( sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "New Sqlclient allocated" );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.hostName ) {
 			free( (char *) sqlclient->hostName ); sqlclient->hostName = NULL;
-		}
-		if ( cleanUp.ip ) {
-			free( (char *) sqlclient->ip); 	sqlclient->ip = NULL;
 		}
 		if ( cleanUp.loginName ) {
 			free( (char *) sqlclient->loginName ); 	sqlclient->loginName = NULL;
@@ -666,86 +646,96 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 	return sqlclient;
 }
 
-static void Sqlclient_Connect( struct sqlclient_t * sqlclient ) {
+static void Sqlclient_ConnectToIp( struct dns_cb_data * dnsData ) {
+	struct sqlclient_t * sqlclient;
 	char * connString;
 	size_t len;
+	char * ip;
 	struct {unsigned char conn:1;
+			unsigned char ip:1;
 			unsigned char connString:1;
 			unsigned char socket:1;
 			unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	connString = NULL;
-	switch ( sqlclient->adapter ) {
-		case SQLADAPTER_POSTGRESQL:
-			if ( sqlclient->connection.pg.conn == NULL ) {
+	ip = NULL;
+	sqlclient= ( struct sqlclient_t *) dnsData->context;
+	cleanUp.good = ( ( ip = DnsData_ToString( dnsData ) ) != NULL );
+	if ( cleanUp.good ) {
+		cleanUp.ip = 1;
+		switch ( sqlclient->adapter ) {
+			case SQLADAPTER_POSTGRESQL:
+				if ( sqlclient->connection.pg.conn == NULL ) {
 #define CONNSTRING_TEMPLATE "host=%s port=%d dbname=%s user=%s password=%s hostaddr=%s"
-				len = 1 + strlen( CONNSTRING_TEMPLATE ) + strlen( sqlclient->hostName ) + 5 + strlen( sqlclient->dbName ) + strlen( sqlclient->loginName ) + strlen( sqlclient->password ) + strlen( sqlclient->ip ) - 12;
-				cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
-				if ( cleanUp.good ) {
-					cleanUp.connString = 1;
-				snprintf( connString, len, CONNSTRING_TEMPLATE, sqlclient->hostName, sqlclient->port, sqlclient->dbName, sqlclient->loginName, sqlclient->password, sqlclient->ip );
-#undef CONNSTRING_TEMPLATE
-					cleanUp.good = ( ( sqlclient->connection.pg.conn = PQconnectStart( connString ) ) != NULL );
-				}
-				if ( cleanUp.good ) {
-					cleanUp.conn = 1;
-					cleanUp.good = ( ( sqlclient->socketFd = PQsocket( sqlclient->connection.pg.conn ) ) > 0 );
-				}
-				if ( cleanUp.good ) {
-					cleanUp.conn = 1;
-					picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READWRITE, sqlclient->timeoutSec, Postgresql_HandleConnect_cb, (void * ) sqlclient );
-					PQsetnonblocking( sqlclient->connection.pg.conn, 1 );
-				}
-				if ( ! cleanUp.good ) {
-					if ( cleanUp.conn ) {
-						PQfinish( sqlclient->connection.pg.conn ); sqlclient->connection.pg.conn = NULL;
-					}
-				}
-			}
-			break;
-#if HAVE_MYSQL == 1
-		case SQLADAPTER_MYSQL:
-			if ( sqlclient->connection.my.conn == NULL ) {
-#define CONNSTRING_TEMPLATE "%s:%d"
-				len = 1 + strlen( CONNSTRING_TEMPLATE ) + 5 + strlen( sqlclient->hostName ) - 4;
-				cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
-				if ( cleanUp.good ) {
-					cleanUp.connString = 1;
-					snprintf( connString, len, CONNSTRING_TEMPLATE, sqlclient->ip, sqlclient->port);
-#undef CONNSTRING_TEMPLATE
+					len = 1 + strlen( CONNSTRING_TEMPLATE ) + strlen( sqlclient->hostName ) + 5 + strlen( sqlclient->dbName ) + strlen( sqlclient->loginName ) + strlen( sqlclient->password ) + strlen( ip ) - 12;
+					cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
 					if ( cleanUp.good ) {
-						cleanUp.good = ( ( sqlclient->connection.my.conn = mysac_new( MYSQL_BUFS ) ) != NULL );
+						cleanUp.connString = 1;
+					snprintf( connString, len, CONNSTRING_TEMPLATE, sqlclient->hostName, sqlclient->port, sqlclient->dbName, sqlclient->loginName, sqlclient->password, ip );
+#undef CONNSTRING_TEMPLATE
+						cleanUp.good = ( ( sqlclient->connection.pg.conn = PQconnectStart( connString ) ) != NULL );
 					}
 					if ( cleanUp.good ) {
 						cleanUp.conn = 1;
-						mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0 );
-						mysac_connect( sqlclient->connection.my.conn );
-						cleanUp.good = ( ( sqlclient->socketFd = mysac_get_fd( sqlclient->connection.my.conn ) ) > 0 );
+						cleanUp.good = ( ( sqlclient->socketFd = PQsocket( sqlclient->connection.pg.conn ) ) > 0 );
 					}
 					if ( cleanUp.good ) {
-						SetupSocket( sqlclient->socketFd, 0 );
-						picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleConnect_cb, (void * ) sqlclient );
+						cleanUp.conn = 1;
+						picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READWRITE, sqlclient->timeoutSec, Postgresql_HandleConnect_cb, (void * ) sqlclient );
+						PQsetnonblocking( sqlclient->connection.pg.conn, 1 );
 					}
 					if ( ! cleanUp.good ) {
 						if ( cleanUp.conn ) {
-							mysac_close( sqlclient->connection.my.conn ); sqlclient->connection.my.conn = NULL;
+							PQfinish( sqlclient->connection.pg.conn ); sqlclient->connection.pg.conn = NULL;
 						}
 					}
 				}
-			}
-			break;
+				break;
+#if HAVE_MYSQL == 1
+			case SQLADAPTER_MYSQL:
+				if ( sqlclient->connection.my.conn == NULL ) {
+#define CONNSTRING_TEMPLATE "%s:%d"
+					len = 1 + strlen( CONNSTRING_TEMPLATE ) + 5 + strlen( ip ) - 4;
+					cleanUp.good = ( ( connString = calloc( len, 1 ) ) != NULL );
+					if ( cleanUp.good ) {
+						cleanUp.connString = 1;
+						snprintf( connString, len, CONNSTRING_TEMPLATE, ip, sqlclient->port);
+#undef CONNSTRING_TEMPLATE
+						if ( cleanUp.good ) {
+							cleanUp.good = ( ( sqlclient->connection.my.conn = mysac_new( MYSQL_BUFS ) ) != NULL );
+						}
+						if ( cleanUp.good ) {
+							cleanUp.conn = 1;
+							mysac_setup( sqlclient->connection.my.conn, connString, sqlclient->loginName, sqlclient->password, sqlclient->dbName, 0 );
+							mysac_connect( sqlclient->connection.my.conn );
+							cleanUp.good = ( ( sqlclient->socketFd = mysac_get_fd( sqlclient->connection.my.conn ) ) > 0 );
+						}
+						if ( cleanUp.good ) {
+							SetupSocket( sqlclient->socketFd, 0 );
+							picoev_add( sqlclient->core->loop, sqlclient->socketFd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleConnect_cb, (void * ) sqlclient );
+						}
+						if ( ! cleanUp.good ) {
+							if ( cleanUp.conn ) {
+								mysac_close( sqlclient->connection.my.conn ); sqlclient->connection.my.conn = NULL;
+							}
+						}
+					}
+				}
+				break;
 #endif
-		default:
-			break;
+			default:
+				break;
+		}
 	}
 	// allways cleanup
-	//if  ( ! cleanUp.good ) {
-		if ( cleanUp.connString ) {
-			memset( connString, 0, strlen( connString ) );  //  password is in the postgresql sqlclient string
-			free( connString ); connString = NULL;
-		}
-	//}
+	if ( cleanUp.ip ) {
+		free( ip ); ip = NULL;
+	}
+	if ( cleanUp.connString ) {
+		memset( connString, 0, strlen( connString ) );  //  password is in the postgresql sqlclient string
+		free( connString ); connString = NULL;
+	}
 }
 
 static void Sqlclient_CloseConn( struct sqlclient_t * sqlclient ) {
@@ -816,7 +806,6 @@ void Sqlclient_Delete( struct sqlclient_t * sqlclient ) {
 	sqlclient->timeoutSec = 0;
 	memset( (char *) sqlclient->password, '\0', strlen( sqlclient->password ) );
 	free( (char *) sqlclient->hostName ); 		sqlclient->hostName = NULL;
-	free( (char *) sqlclient->ip ); 			sqlclient->ip = NULL;
 	free( (char *) sqlclient->loginName );		sqlclient->loginName = NULL;
 	free( (char *) sqlclient->password );		sqlclient->password = NULL;
 	free( (char *) sqlclient->dbName ); 		sqlclient->dbName = NULL;

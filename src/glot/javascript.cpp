@@ -227,12 +227,11 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	struct sqlclient_t * sqlclient;
 	struct javascript_t * instance;
 	JSObject * globalObj, * sqlclientObj, * connObj, * thisObj;
-	char * cHostName, * cIp, * cUserName, * cPassword, * cDbName;
+	char * cHostName, * cUserName, * cPassword, * cDbName;
 	int port, timeoutSec;
 	JS::CallArgs args;
 	struct {unsigned char good:1;
 			unsigned char cHostName:1;
-			unsigned char cIp:1;
 			unsigned char cUserName:1;
 			unsigned char cPassword:1;
 			unsigned char cDbName:1;
@@ -243,7 +242,6 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	args = CallArgsFromVp( argc, vp );
 	cUserName = NULL;
 	cHostName = NULL;
-	cIp = NULL;
 	cUserName = NULL;
 	cPassword = NULL;
 	cDbName = NULL;
@@ -260,7 +258,6 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 		JS::MutableHandleValue valueMut( &valueRoot );
 		/*  Refer to http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS for more details. */ \
 		CONNOBJ_GET_PROP_STRING( "host", cHostName );
-		CONNOBJ_GET_PROP_STRING( "ip", cIp );
 		CONNOBJ_GET_PROP_STRING( "user", cUserName );
 		CONNOBJ_GET_PROP_STRING( "password", cPassword );
 		CONNOBJ_GET_PROP_STRING( "db", cDbName );
@@ -274,7 +271,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	if ( cleanUp.good ) {
 		globalObj = JS_GetGlobalForObject( cx, &args.callee( ) );
 		instance = (struct javascript_t * ) JS_GetPrivate( globalObj );
-		cleanUp.good = ( ( sqlclient = engine_new( instance->core, cHostName, cIp, (uint16_t) port, cUserName, cPassword, cDbName, (unsigned char) timeoutSec ) ) != NULL );
+		cleanUp.good = ( ( sqlclient = engine_new( instance->core, cHostName, (uint16_t) port, cUserName, cPassword, cDbName, (unsigned char) timeoutSec ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		sqlclientObj = JS_NewObjectForConstructor( cx, jsnClass, args );
@@ -291,7 +288,6 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 
 	memset( cPassword, '\0', strlen( cPassword ) ); /*  @TODO:  clean jPassword */
 	JS_free( cx, cHostName ); cHostName = NULL;
-	JS_free( cx, cIp ); cIp = NULL;
 	JS_free( cx, cUserName ); cUserName = NULL;
 	JS_free( cx, cPassword ); cPassword = NULL;
 	JS_free( cx, cDbName ); cDbName = NULL;
@@ -586,7 +582,7 @@ static bool JsnMysqlclient_GetInsertId( JSContext * cx, unsigned argc, jsval * v
 	sqlObj = JS_THIS_OBJECT( cx, vp );
 	JS::RootedObject sqlObjRoot( cx, sqlObj );
 	sqlclient = (struct sqlclient_t *) JS_GetPrivate( sqlObj );
-	args.rval( ).set( INT_TO_JSVAL( mysac_insert_id( sqlclient->connection.my.conn ) ) );
+	args.rval( ).set( INT_TO_JSVAL( (int32_t ) mysac_insert_id( sqlclient->connection.my.conn ) ) ); //  this cast is not 100% correct.
 	return true;
 }
 
@@ -612,7 +608,6 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * @returns	{object}							The mysql client javascript instance
  * @param	{object}		params				The connection string.
  * @param	{string}		params.host			The host name for auth
- * @param	{string}		params.ip			The host ip
  * @param	{int}			params.port			The port number
  * @param	{string}		params.db			The database name
  * @param	{string}		params.user			The database user
@@ -620,7 +615,7 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
- * var my = Urbin.MysqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * var my = Urbin.MysqlClient( {host : 'localhast', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
  * my.query( "SELECT name, sales FROM sales WHERE customer = ? );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
@@ -829,7 +824,6 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
  * @returns	{object}							The postgresql client javascript instance or null on failure
  * @param	{object}		params				The connection string.
  * @param	{string}		params.host			The host name for pg auth
- * @param	{string}		params.ip			The host ip
  * @param	{int}			params.port			The port number
  * @param	{string}		params.db			The database name
  * @param	{string}		params.user			The database user
@@ -837,7 +831,7 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
  *
  * @example
- * var pg = Urbin.PostgresqlClient( {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
+ * var pg = Urbin.PostgresqlClient( {host : 'localhost', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
  * pg.query( "SELECT name, sales FROM sales WHERE customer = $1 );" , ['foobar' ], function( res ) {
  * 	if ( Array.isArray( res ) ) {
  * 		for ( var rowId = 0; rowId < res.length; rowId++ ) {
@@ -1916,7 +1910,6 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	}
 	if ( cleanUp.good ) {
 		JS_SetPrivate( webserverObj, ( void * ) webserver );
-		Webserver_JoinCore( webserver );
 		args.rval( ).setObject( *webserverObj );
 	} else {
 		args.rval( ).setUndefined( );
@@ -2621,34 +2614,14 @@ static void Payload_Dns_ResultHandler_cb( struct dns_cb_data * dnsData ) {
 	jsval ipValue;
 	JSString * jIp;
 	char * cIp;
-	char pos[4];
-	size_t i, len;
 	struct {unsigned char good:1;
 			unsigned char ip:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	payload = ( struct payload_t * ) dnsData->context;
-	cIp = NULL;
-	i = 0;
-	len = dnsData->addr_len;
-	if ( dnsData->addr_len != 0 ) {
-		for ( i = 0; i < dnsData->addr_len; i++ ) {
-			len += STRING_LENGTH_OF_INT( dnsData->addr[i] );
-		}
-	 	cleanUp.good = ( ( cIp = (char *) calloc( len, 1 ) ) != NULL );
-	}
+	cleanUp.good = ( ( cIp = DnsData_ToString( dnsData ) ) != NULL );
 	if ( cleanUp.good ) {
-		if ( dnsData->addr_len == 4 ) {
-			snprintf( cIp, len, "%u.%u.%u.%u", dnsData->addr[0], dnsData->addr[1], dnsData->addr[2], dnsData->addr[3] );
-		} else {
-			//  @TODO:  ipv6
-			for ( i = 0; i < dnsData->addr_len; i++ ) {
-				snprintf( &pos[0], 4, "%u", (unsigned int ) dnsData->addr[i] );
-				strcat( cIp, &pos[0] );
-				strcat( cIp, "." );
-			};
-			cIp[len] = '\0';
-		}
+		cleanUp.ip = 1;
 	}
 	JSAutoRequest 			ar( payload->context );
 	JSAutoCompartment 		ac( payload->context, payload->scopeObj );

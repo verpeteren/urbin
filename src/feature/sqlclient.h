@@ -23,7 +23,7 @@ extern "C" {
 struct query_t;
 
 typedef void					( * queryHandler_cb_t )			( const struct query_t * query );
-typedef struct sqlclient_t *	( * sqlNew_cb_t)				( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
+typedef struct sqlclient_t *	( * sqlNew_cb_t)				( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
 
 enum sqlAdapter_t {
 	SQLADAPTER_POSTGRESQL,
@@ -48,7 +48,6 @@ struct sqlclient_t {
 #endif
 							}	connection;
 	const char *				hostName;
-	const char *				ip;
 	const char *				loginName;
 	const char *				password;
 	const char *				dbName;
@@ -84,9 +83,9 @@ struct query_t{
 };
 
 #if HAVE_MYSQL == 1
-struct sqlclient_t *			Mysql_New					( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
+struct sqlclient_t *			Mysql_New					( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
 #endif
-struct sqlclient_t *			Postgresql_New				( const struct core_t * core, const char * hostName, const char * ip, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
+struct sqlclient_t *			Postgresql_New				( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
 void							Sqlclient_Delete			( struct sqlclient_t * sqlclient );
 
 void 							Query_New					( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFuncCb );

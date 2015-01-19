@@ -34,10 +34,6 @@ typedef unsigned char		( * moduleHandler_cb_t )	( const struct core_t * core, st
 
 #define FROM_NEXT_TO_ITEM( type ) ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
 
-#define FEATURE_JOINCORE( Feat, feature ) \
-void Feat##_JoinCore( struct feature##_t * feature ) { \
-	picoev_add( feature->core->loop, feature->socketFd, PICOEV_READ, 0, Feat##_HandleAccept_cb, (void * ) feature ); \
-}
 struct buffer_t{
 	char * 								bytes;
 	size_t								used;
@@ -92,11 +88,16 @@ struct buffer_t * 				Buffer_NewText			( const char * text );
 unsigned char 					Buffer_Append			( struct buffer_t * buffer, const char * bytes, size_t bytesLen );
 unsigned char 					Buffer_Reset			( struct buffer_t * buffer, size_t minLen );
 void 							Buffer_Delete			( struct buffer_t * buffer );
+
 void							Boot					( const int maxFds );
 void							Shutdown				( );
 void							SetupSocket				( const int fd,  const unsigned char tcp );
+
+char * 							DnsData_ToString		( const struct dns_cb_data * dnsData );
+
 struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data, const clearFunc_cb_t clearFunc );
 void 							Module_Delete			( struct module_t * module );
+
 struct core_t *					Core_New				( const cfg_t * config );
 void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message );
 int 							Core_PrepareDaemon		( const struct core_t * core, const signalAction_cb_t signalHandler );

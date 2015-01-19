@@ -410,15 +410,43 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	free( webpage ); webpage = NULL;
 }
 
-static void Webclient_Connect( struct webclient_t * webclient ) {
+static void Webclient_ConnectToIp( struct dns_cb_data * dnsData ) {
+	struct webclient_t * webclient;
 	struct sockaddr_in serverAddr;
+	char *ip;
+	struct { unsigned char good:1;
+			unsigned char ip:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	ip = NULL;
+	webclient = (struct webclient_t *) dnsData->context;
+	cleanUp.good = ( dnsData->addr_len > 0 );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( ip = DnsData_ToString( dnsData ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.ip = 1;
+		serverAddr.sin_family = AF_INET;
+		serverAddr.sin_port = htons( webclient->port );
+		serverAddr.sin_addr.s_addr = inet_addr( ip );
+		cleanUp.good =  ( connect( webclient->socketFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) == 0 );
+	}
+	if ( cleanUp.good )  {
+		SetupSocket( webclient->socketFd, 1 );
+		picoev_add( webclient->core->loop, webclient->socketFd, PICOEV_READWRITE, webclient->timeoutSec , Webclient_HandleConnect_cb, (void *) webclient );
+	}
+	//  always cleanup
+	if ( cleanUp.ip ) {
+		free( ip ); ip = NULL;
+	}
+}
+
+static void Webclient_Connect( struct webclient_t * webclient ) {
 	UriUriA * uri;
 	char portString[7];
 	size_t len;
 	struct {unsigned char conn:1;
-			unsigned char ev:1;
-			unsigned char socket:1;
-			unsigned char ip:1;
+			unsigned char hostName:1;
 			unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -427,11 +455,11 @@ static void Webclient_Connect( struct webclient_t * webclient ) {
 	if ( cleanUp.good ) {
 		uri = &webclient->currentWebpage->uri;
 		len = (size_t) ( uri->hostText.afterLast - uri->hostText.first );
-		cleanUp.good = ( ( webclient->ip = malloc( len + 1 ) ) != NULL ); // for now: assume hostName = Ip
+		cleanUp.good = ( ( webclient->hostName = malloc( len + 1 ) ) != NULL );
 	}
 	if ( cleanUp.good )  {
-		cleanUp.ip = 1;
-		snprintf( webclient->ip, len + 1, "%s", uri->hostText.first );
+		cleanUp.hostName = 1;
+		snprintf( webclient->hostName, len + 1, "%s", uri->hostText.first );
 		len = (size_t) ( uri->portText.afterLast - uri->portText.first );
 		snprintf( &portString[0], len + 1, "%s", uri->portText.first );
 		webclient->port = (uint16_t) atoi( &portString[0] );
@@ -446,27 +474,11 @@ static void Webclient_Connect( struct webclient_t * webclient ) {
 				webclient->port = 80;
 			}
 		}
-		serverAddr.sin_family = AF_INET;
-		serverAddr.sin_port = htons( webclient->port );
-		serverAddr.sin_addr.s_addr = inet_addr( webclient->ip );
-		cleanUp.good =  ( connect( webclient->socketFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) == 0 );
-	}
-	if ( cleanUp.good ) {
-		SetupSocket( webclient->socketFd, 1 );
-		picoev_add( webclient->core->loop, webclient->socketFd, PICOEV_READWRITE, webclient->timeoutSec , Webclient_HandleConnect_cb, (void *) webclient );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.ev = 1;
+		Core_GetHostByName( (struct core_t *) webclient->core, webclient->hostName, Webclient_ConnectToIp, (void *) webclient );
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.socket ) {
-			close( webclient->socketFd ); webclient->socketFd = 0;
-		}
-		if ( cleanUp.ip ) {
-			free( webclient->ip ); webclient->ip = NULL;
-		}
-		if ( cleanUp.ev ) {
-			picoev_del( webclient->core->loop, webclient->socketFd );
+		if ( cleanUp.hostName ) {
+			free( webclient->hostName ); webclient->hostName = NULL;
 		}
 	}
 }
@@ -492,7 +504,7 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 		webclient->webpages = NULL;
 		webclient->currentWebpage = NULL;
 		webclient->socketFd = 0;
-		webclient->ip = NULL;
+		webclient->hostName = NULL;
 		webclient->core = core;
 		webclient->connection = CONNECTION_CLOSE;
 		if ( timeoutSec == 0 ) {
@@ -520,7 +532,7 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 			webclient->currentWebpage = NULL;
 			webclient->core = NULL;
 			webclient->socketFd = 0;
-			webclient->ip = NULL;
+			webclient->hostName = NULL;
 			free(  webclient  ); webclient = NULL;
 		}
 	}
@@ -531,7 +543,6 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 struct webpage_t * Webclient_Queue( struct webclient_t * webclient, enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
 	return Webpage_New( webclient, mode, url, headers, content, handlerCb, cbArgs, clearFuncCb );
 }
-//  @TODO:  if the first was set and the next has defaults this breaks. e.g. http://www.urbin.info:80/index.html vs www:urbin.info/benchmark.html it even gets uglier if the dns name and the ip adress are the same
 #define CHECK_SAME_CONN( field ) do \
 	if ( current->uri.field.first != NULL && current->uri.field.afterLast != NULL && \
 		 webpage->uri.field.first != NULL && webpage->uri.field.afterLast != NULL \
@@ -615,8 +626,8 @@ void Webclient_Delete( struct webclient_t * webclient ) {
 	webclient->socketFd = 0;
 	webclient->core = NULL;
 	webclient->connection = CONNECTION_CLOSE;
-	if ( webclient->ip != NULL ) {
-		free( webclient->ip ); webclient->ip = NULL;
+	if ( webclient->hostName != NULL ) {
+		free( webclient->hostName ); webclient->hostName = NULL;
 	}
 	free(  webclient  ); webclient = NULL;
 }

@@ -46,7 +46,7 @@ struct webclient_t {
 	uint16_t							port;
 	enum connection_t					connection;
 	unsigned char						timeoutSec;
-	char *								ip;
+	char *								hostName;
 };
 
 struct webpage_t * 						Webclient_Queue				( struct webclient_t * webclient, const enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb );

@@ -21,17 +21,17 @@
 #define PR_CFG_GLOT_MAIN							PR_NAME						//  cfg:  glot/../main
 #define PR_CFG_MODULES_WEBSERVER_ROOT				"../var/www/"				//  cfg:  modules/WEBSERVER/documentroot
 #define PR_CFG_MODULES_WEBSERVER_PATH				"/static/(.*)"				//  cfg:  modules/WEBSERVER/path
-#define PR_CFG_MODULES_WEBSERVER_IP					"localhost"					//  cfg:  modules/WEBSERVER/ip
+#define PR_CFG_MODULES_WEBSERVER_HOSTNAME			"localhost"					//  cfg:  modules/WEBSERVER/ip
 #define PR_CFG_MODULES_WEBSERVER_PORT				8080						//  cfg:  modules/WEBSERVER/port
 #define PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC		10 							//  cfg:  modules/WEBSERVER/timeout_sec
 #define PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG		( PR_CFG_CORE_MAX_FDS / 10 )//  cfg:  modules/WEBSERVER/listen_backlog
 #define PR_CFG_MODULES_WEBCLIENT_TIMEOUT_SEC		10 							//  cfg:  modules/WEBCLIENT/timeout_sec
 #define PR_CFG_MODULES_MYSQLCLIENT_DATABASE			"mysql"						//  cfg:  modules/MYSQLCLIENT/database
-#define PR_CFG_MODULES_MYSQLCLIENT_IP				"127.0.0.1"					//  cfg:  modules/MYSQLCLIENT/ip
+#define PR_CFG_MODULES_MYSQLCLIENT_HOSTNAME			"localhost"					//  cfg:  modules/MYSQLCLIENT/ip
 #define PR_CFG_MODULES_MYSQLCLIENT_PORT				3306						//  cfg:  modules/MYSQLCLIENT/port
 #define PR_CFG_MODULES_MYSQLCLIENT_TIMEOUT_SEC		10							//  cfg:  modules/MYSQLCLIENT/timeout_sec
 #define PR_CFG_MODULES_PGSQLCLIENT_DATABASE			"postgresql"				//  cfg:  modules/PGSQLCLIENT/database
-#define PR_CFG_MODULES_PGSQLCLIENT_IP				"127.0.0.1"					//  cfg:  modules/PGSQLCLIENT/ip
+#define PR_CFG_MODULES_PGSQLCLIENT_HOSTNAME			"localhost"					//  cfg:  modules/PGSQLCLIENT/ip
 #define PR_CFG_MODULES_PGSQLCLIENT_PORT				5432						//  cfg:  modules/PGSQLCLIENT/port
 #define PR_CFG_MODULES_PGSQLCLIENT_TIMEOUT_SEC		10							//  cfg:  modules/PGSQLCLIENT/timeout_sec
 

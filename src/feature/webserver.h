@@ -78,7 +78,7 @@ struct webserver_t {
 	uint16_t					port;
 	int							socketFd;
 	unsigned char				timeoutSec;
-	const char *				ip;
+	const char *				hostName;
 
 };
 

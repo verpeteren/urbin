@@ -29,7 +29,7 @@ static const cfg_opt_t mainCfgOpts[] = {
 static const cfg_opt_t webserverCfgOpts[] = {
 	CFG_STR( (char *) "documentroot", 		(char *)	PR_CFG_MODULES_WEBSERVER_ROOT, CFGF_NONE ),
 	CFG_STR( (char *) "path", 				(char *)	PR_CFG_MODULES_WEBSERVER_PATH, CFGF_NONE ),
-	CFG_STR( (char *) "ip", 				(char *)	PR_CFG_MODULES_WEBSERVER_IP, CFGF_NONE ),
+	CFG_STR( (char *) "hostname",			(char *)	PR_CFG_MODULES_WEBSERVER_HOSTNAME, CFGF_NONE ),
 	CFG_INT( (char *) "port", 							PR_CFG_MODULES_WEBSERVER_PORT, CFGF_NONE ),
 	CFG_INT( (char *) "timeout_sec", 					PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC, CFGF_NONE ),
 	CFG_INT( (char *) "listen_backlog", 				PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG, CFGF_NONE ),
@@ -44,7 +44,7 @@ static const cfg_opt_t webclientCfgOpts[] = {
 
 static const cfg_opt_t mysqlclientCfgOpts[] = {
 	CFG_STR( (char *) "database",	 		(char *)	PR_CFG_MODULES_MYSQLCLIENT_DATABASE, CFGF_NONE ),
-	CFG_STR( (char *) "ip", 				(char *)	PR_CFG_MODULES_MYSQLCLIENT_IP, CFGF_NONE ),
+	CFG_STR( (char *) "hostname",			(char *)	PR_CFG_MODULES_MYSQLCLIENT_HOSTNAME, CFGF_NONE ),
 	CFG_INT( (char *) "port", 							PR_CFG_MODULES_MYSQLCLIENT_PORT, CFGF_NONE ),
 	CFG_INT( (char *) "timeout_sec", 					PR_CFG_MODULES_MYSQLCLIENT_TIMEOUT_SEC, CFGF_NONE ),
 	CFG_END( )
@@ -52,7 +52,7 @@ static const cfg_opt_t mysqlclientCfgOpts[] = {
 
 static const cfg_opt_t pgsqlclientCfgOpts[] = {
 	CFG_STR( (char *) "database",	 		(char *)	PR_CFG_MODULES_PGSQLCLIENT_DATABASE, CFGF_NONE ),
-	CFG_STR( (char *) "ip", 				(char *)	PR_CFG_MODULES_PGSQLCLIENT_IP, CFGF_NONE ),
+	CFG_STR( (char *) "hostname", 			(char *)	PR_CFG_MODULES_PGSQLCLIENT_HOSTNAME, CFGF_NONE ),
 	CFG_INT( (char *) "port", 							PR_CFG_MODULES_PGSQLCLIENT_PORT, CFGF_NONE ),
 	CFG_INT( (char *) "timeout_sec", 					PR_CFG_MODULES_PGSQLCLIENT_TIMEOUT_SEC, CFGF_NONE ),
 	CFG_END( )

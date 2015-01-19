@@ -591,6 +591,40 @@ static void Dns_ReadWrite_cb( picoev_loop * loop, int fd, int events, void * cbA
 	}
 }
 
+char * DnsData_ToString( const struct dns_cb_data * dnsData ) {
+	char *cIp;
+	char pos[4];
+	size_t i, len;
+	struct {unsigned char good:1;
+			unsigned char ip:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	cIp = NULL;
+	i = 0;
+	len = dnsData->addr_len;
+	if ( dnsData->addr_len != 0 ) {
+		for ( i = 0; i < dnsData->addr_len; i++ ) {
+			len += STRING_LENGTH_OF_INT( dnsData->addr[i] );
+		}
+	 	cleanUp.good = ( ( cIp = (char *) calloc( len, 1 ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		if ( dnsData->addr_len == 4 ) {
+			snprintf( cIp, len, "%u.%u.%u.%u", dnsData->addr[0], dnsData->addr[1], dnsData->addr[2], dnsData->addr[3] );
+		} else {
+			//  @TODO:  ipv6
+			for ( i = 0; i < dnsData->addr_len; i++ ) {
+				snprintf( &pos[0], 4, "%u", (unsigned int ) dnsData->addr[i] );
+				strcat( cIp, &pos[0] );
+				strcat( cIp, "." );
+			};
+			cIp[len] = '\0';
+		}
+	}
+
+	return cIp;
+}
+
 void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb, void * queryCbArgs ) {
 	enum dns_query_type queryType;
 	int dnsSocketFd;
