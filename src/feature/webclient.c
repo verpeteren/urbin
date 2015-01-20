@@ -32,7 +32,6 @@ static void Webclient_CloseConn( struct webclient_t * webclient ) {
 static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wcArgs ) {
 	struct webclient_t * webclient;
 	struct webpage_t * webpage;
-	struct buffer_t * rawBuffer;
 	ssize_t didReadBytes, canReadBytes;
 	struct {unsigned char headers:1;
 			unsigned char content:1;
@@ -46,13 +45,13 @@ static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, webclient->timeoutSec );
 		webpage = webclient->currentWebpage;
-		cleanUp.good = ( ( rawBuffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+		cleanUp.good = ( ( webpage->response.headers = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
 tryToReadMoreWebclient:
 		if ( cleanUp.good ) {
-			canReadBytes = rawBuffer->size - rawBuffer->used;
+			canReadBytes = webpage->response.headers->size - webpage->response.headers->used;
 			cleanUp.raw = 1;
 			//  BUFFER HACK
-			didReadBytes = read( fd, &rawBuffer->bytes[rawBuffer->used], canReadBytes );
+			didReadBytes = read( fd, &webpage->response.headers->bytes[webpage->response.headers->used], canReadBytes );
 			switch ( didReadBytes ) {
 			case 0:
 				Webclient_CloseConn( webclient );
@@ -65,16 +64,15 @@ tryToReadMoreWebclient:
 				}
 			 break;
 			default:
-				rawBuffer->used += (size_t) didReadBytes;
+				webpage->response.headers->used += (size_t) didReadBytes;
 				if ( didReadBytes == canReadBytes ) {
 					// There is more to read
-					cleanUp.good = ( Buffer_Increase( rawBuffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
+					cleanUp.good = ( Buffer_Increase( webpage->response.headers, HTTP_READ_BUFFER_LENGTH ) == 1 );
 					goto tryToReadMoreWebclient;
 				}
-				rawBuffer->bytes[rawBuffer->used] = '\0';
+				webpage->response.headers->bytes[webpage->response.headers->used] = '\0';
 				//  @FIXME: read until content length faund and end of headers, then read the rest.
 				//  @TODO:  then parse headers,  parse headers and split the headers and the content
-				webpage->response.headers = rawBuffer;
 				if ( webpage->handlerCb != NULL ) {
 					webpage->handlerCb( webpage );
 				}
@@ -398,6 +396,7 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	if ( webpage->clearFuncCb != NULL && webpage->cbArgs != NULL ) {
 		webpage->clearFuncCb( webpage->cbArgs );
 	}
+	//  response
 	if ( webpage->request.topLine != NULL ) {
 		Buffer_Delete( webpage->request.topLine ); webpage->request.topLine = NULL;
 	}
@@ -407,6 +406,14 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	if ( webpage->request.content != NULL ) {
 		Buffer_Delete( webpage->request.content ); webpage->request.content = NULL;
 	}
+	//  request
+	if ( webpage->response.headers != NULL ) {
+		Buffer_Delete( webpage->response.headers ); webpage->response.headers = NULL;
+	}
+	if ( webpage->response.content != NULL ) {
+		Buffer_Delete( webpage->response.content ); webpage->response.content = NULL;
+	}
+
 	webpage->response.httpCode = HTTPCODE_NONE;
 	webpage->handlerCb = NULL;
 	webpage->mode = MODE_GET;
@@ -626,8 +633,8 @@ void Webclient_Delete( struct webclient_t * webclient ) {
 	if ( webclient->currentWebpage != NULL ) {
 		Webpage_Delete( webclient->currentWebpage ); webclient->currentWebpage = NULL;
 	}
-	while( ( webpage = Webclient_PopWebpage( webclient ) ) != NULL ) {
-			Webpage_Delete( webpage ); webclient->currentWebpage = NULL;  //  pop sets also current webpage
+	while ( ( webpage = Webclient_PopWebpage( webclient ) ) != NULL ) {
+		Webpage_Delete( webpage ); webclient->currentWebpage = NULL;  //  pop sets also current webpage
 	}
 	//  clean the rest
 	webclient->timeoutSec = 0;

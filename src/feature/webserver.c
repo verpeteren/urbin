@@ -756,6 +756,7 @@ static void Webserverclient_CloseConn( struct webserverclient_t * webserverclien
 	}
 
 static void Webserverclient_Delete( struct webserverclient_t * webserverclient ) {
+	printf("\n*******************\n");
 	if ( webserverclient->header != NULL ) {
 		h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
 	}
@@ -768,6 +769,9 @@ static void Webserverclient_Delete( struct webserverclient_t * webserverclient )
 	webserverclient->connection = CONNECTION_CLOSE;
 	webserverclient->mode = MODE_GET;
 	webserverclient->wroteBytes = 0;
+	if ( webserverclient->buffer != NULL ) {
+		Buffer_Delete( webserverclient->buffer ); webserverclient->buffer = NULL;
+	}
 	onig_region_free( webserverclient->region, 1 ); webserverclient->region = NULL;
 	if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
 		free( (char * ) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL;
@@ -778,7 +782,6 @@ static void Webserverclient_Delete( struct webserverclient_t * webserverclient )
 		}
 	}
 	webserverclient->response.contentType = CONTENTTYPE_BUFFER;
-
 
 	free( webserverclient ); webserverclient = NULL;
 }

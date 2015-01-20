@@ -797,7 +797,7 @@ void Sqlclient_Delete( struct sqlclient_t * sqlclient ) {
 	if ( sqlclient->currentQuery != NULL ) {
 		Query_Delete( sqlclient->currentQuery ); sqlclient->currentQuery = NULL;
 	}
-	while( ( query = Sqlclient_PopQuery( sqlclient ) ) != NULL ) {
+	while ( ( query = Sqlclient_PopQuery( sqlclient ) ) != NULL ) {
 		Query_Delete( query ); sqlclient->currentQuery = NULL;  //  pop sets also current query
 	}
 	//  cleanup the rest

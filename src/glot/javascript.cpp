@@ -1375,9 +1375,11 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 	jsval jValue;
 	JSString * jString;
 	size_t i;
-	struct {unsigned char good:1; } cleanUp;
+	struct {unsigned char good:1;
+			unsigned char named:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	namedRegex = NULL;
 	cleanUp.good = ( ( matchObj = 	JS_NewObject( cx, nullptr, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );
 	JS::RootedObject matchObjRoot( cx, matchObj );
 	JS::MutableHandleObject matchObjMut( &matchObjRoot );
@@ -1388,6 +1390,7 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 		webserverclient = (struct webserverclient_t *) JS_GetPrivate( thisObj );
 		namedRegex = Webserverclient_GetNamedGroups( webserverclient );
 		if ( namedRegex != NULL ) {
+			cleanUp.named = 1;
 			for ( i = 0; i < namedRegex->numGroups * 2; i += 2 ) {
 				jString = JS_NewStringCopyZ( cx, namedRegex->kvPairs[i + 1] );
 				jValue =  STRING_TO_JSVAL( jString );
@@ -1399,6 +1402,10 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 			}
 		}
 		args.rval( ).set( OBJECT_TO_JSVAL( matchObjMut.get( ) ) );
+	}
+	//  always cleanup
+	if ( cleanUp.named ) {
+		NamedRegex_Delete( namedRegex ); namedRegex = NULL;
 	}
 	return ( cleanUp.good ) ? true : false;
 }
