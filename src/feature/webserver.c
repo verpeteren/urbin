@@ -62,7 +62,7 @@ static void 					Webserver_FindRoute				( const struct webserver_t * webserver, 
 static void						Webserver_AddRoute				( struct webserver_t * webserver, struct route_t * route );
 static void						Webserver_DelRoute				( struct webserver_t * webserver, struct route_t * route );
 static struct webserverclient_t *Webserverclient_New			( struct webserver_t * webserver, int socketFd);
-static void						Webserverclient_PrepareRequest	( struct webserverclient_t * webserverclient );
+static unsigned char 			Webserverclient_PrepareRequest	( struct webserverclient_t * webserverclient );
 static void						Webserverclient_RenderFile		( struct webserverclient_t * webserverclient );
 static void 					Webserverclient_CloseConn		( struct webserverclient_t * webserverclient );
 static void 					Webserverclient_Delete			( struct webserverclient_t * webserverclient );
@@ -547,7 +547,7 @@ static void Webserverclient_RenderFile( struct webserverclient_t * webserverclie
 	}
 }
 
-static void Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient ) {
+static unsigned char Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient ) {
 	HeaderField * field;
 	size_t i;
 	const char * close, * keepAlive;
@@ -723,6 +723,8 @@ static void Webserverclient_PrepareRequest( struct webserverclient_t * webserver
 			h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
 		}
 	}
+
+	return ( cleanUp.good ) ? 1 : 0;
 }
 
 static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) {
@@ -890,10 +892,14 @@ tryToReadMoreWebserver:
 					goto tryToReadMoreWebserver;
 				}
 				webserverclient->buffer->bytes[webserverclient->buffer->used] = '\0';
-				Webserverclient_PrepareRequest( webserverclient );
-				webserverclient->sendingNow = SENDING_TOPLINE;
-				picoev_del( loop, fd );
-				picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wcArg );
+				cleanUp.good = ( Webserverclient_PrepareRequest( webserverclient ) == 1 );
+				if ( cleanUp.good )  {
+					webserverclient->sendingNow = SENDING_TOPLINE;
+					picoev_del( loop, fd );
+					picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wcArg );
+				} else {
+					Webserverclient_CloseConn( webserverclient );
+				}
 				break;
 			}
 		} else {

@@ -589,6 +589,7 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 			if ( 0 != fork( ) ) {
 				exit( 0 );
 			}
+ 			signal( SIGPIPE, SIG_IGN );
 		}
 	}
 	if ( cleanUp.good ) {
