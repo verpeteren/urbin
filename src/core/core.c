@@ -162,6 +162,36 @@ struct buffer_t * Buffer_NewText( const char * text ) {
 
 	return buffer;
 }
+unsigned char Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * otherBuffer, size_t orgBufferSplitPos ) {
+	size_t rest;
+	struct {unsigned char good:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	assert( orgBufferSplitPos < orgBuffer->size );
+	assert( orgBufferSplitPos < orgBuffer->used );
+	rest = orgBuffer->used - orgBufferSplitPos;
+	if ( otherBuffer == NULL ) {
+		//  there is no spoon
+		cleanUp.good = ( ( Buffer_NewText( orgBuffer->bytes + orgBufferSplitPos ) ) != NULL );
+	} else if ( rest > otherBuffer->size ) {
+		//  it does not fit
+		cleanUp.good = ( Buffer_Increase( otherBuffer, otherBuffer->size - rest ) == 1 );
+		if ( cleanUp.good ) {
+			otherBuffer->used = 0;
+			Buffer_Append( otherBuffer, orgBuffer->bytes + orgBufferSplitPos, rest );
+		}
+	} else {
+		// it does fit
+		cleanUp.good = 1;
+		otherBuffer->used = 0;
+		Buffer_Append( otherBuffer, orgBuffer->bytes + orgBufferSplitPos, rest );
+	}
+	if ( cleanUp.good ) {
+		memset( orgBuffer->bytes + orgBufferSplitPos, '\0', rest );
+		orgBuffer->used = orgBufferSplitPos;
+	}
+	return ( cleanUp.good ) ? 1: 0;
+}
 
 unsigned char Buffer_Append( struct buffer_t * buffer, const char * bytes, size_t bytesLen ) {
 	size_t i, newSize;
@@ -385,6 +415,7 @@ struct core_t * Core_New( const cfg_t * config ) {
 	if ( cleanUp.good ) {
 		cleanUp.config = 1;
 		core->maxIdentifier = 1;
+		core->loop = NULL;
 		core->config =  config;
 		core->timings = NULL;
 		core->modules = NULL;
@@ -426,6 +457,7 @@ struct core_t * Core_New( const cfg_t * config ) {
 		}
 		if ( cleanUp.loop ) {
 			picoev_destroy_loop( core->loop );
+			core->loop = NULL;
 		}
 		if ( cleanUp.config ) {
 			cfg_free( (cfg_t *) core->config ); core->config = NULL;

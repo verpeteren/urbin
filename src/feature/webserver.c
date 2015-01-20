@@ -566,6 +566,7 @@ static void Webserverclient_PrepareRequest( struct webserverclient_t * webserver
 		}
 		for ( i = 0; i < webserverclient->header->HeaderSize; i++ ) {
 			field = &webserverclient->header->Fields[i];
+			//  @TODO:  https://github.com/c9s/h3/issues/4
 			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada... http://i.stack.imgur.com/whhD1.png
 				close = ConnectionDefinitions[CONNECTION_CLOSE];
 				keepAlive = ConnectionDefinitions[CONNECTION_KEEPALIVE];
@@ -756,7 +757,6 @@ static void Webserverclient_CloseConn( struct webserverclient_t * webserverclien
 	}
 
 static void Webserverclient_Delete( struct webserverclient_t * webserverclient ) {
-	printf("\n*******************\n");
 	if ( webserverclient->header != NULL ) {
 		h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
 	}
@@ -878,6 +878,10 @@ tryToReadMoreWebserver:
 				webserverclient->buffer->used += (size_t) didReadBytes;
 				if ( didReadBytes == canReadBytes ) {
 					// There is more to read
+					if ( webserverclient->buffer->used > HTTP_READ_BUFFER_LIMIT ) {
+						Webserverclient_CloseConn( webserverclient );
+						break;
+					}
 					cleanUp.good = ( Buffer_Increase( webserverclient->buffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
 					goto tryToReadMoreWebserver;
 				}

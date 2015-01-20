@@ -1100,6 +1100,8 @@ static const JSFunctionSpec jsmWebclient[ ] = {
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	args = CallArgsFromVp( argc, vp );
 	dummyVal = JSVAL_NULL;
+	cMode = cHeaders = cContent = cUrl = NULL;
+	javascript = NULL;
 	value = JSVAL_NULL;
 	fnVal = args[1];
 	mode = MODE_GET;

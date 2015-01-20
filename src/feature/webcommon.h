@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include <h3.h>
-#include <oniguruma.h>
 
 #include "../core/core.h"
 
@@ -14,7 +13,8 @@
 extern "C" {
 #endif
 
-#define HTTP_READ_BUFFER_LENGTH 1024
+#define HTTP_READ_BUFFER_LENGTH 2048
+#define HTTP_READ_BUFFER_LIMIT  1024 * 1024 * 50  //  50 MB
 
 enum requestMode_t {
 	MODE_GET 								 = 0,

@@ -4,7 +4,6 @@
 #include <time.h>
 #include <stdint.h>
 
-#include <h3.h>
 #include <oniguruma.h>
 
 #include "../core/core.h"

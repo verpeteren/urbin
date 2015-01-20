@@ -67,11 +67,30 @@ tryToReadMoreWebclient:
 				webpage->response.headers->used += (size_t) didReadBytes;
 				if ( didReadBytes == canReadBytes ) {
 					// There is more to read
+					//  @FIXME: read until content length found and end of headers, always validating that it is valid HTTP. then read the rest.
+					if ( webpage->response.headers->used > HTTP_READ_BUFFER_LIMIT ) {
+						Webclient_CloseConn( webclient );
+						break;
+					}
 					cleanUp.good = ( Buffer_Increase( webpage->response.headers, HTTP_READ_BUFFER_LENGTH ) == 1 );
 					goto tryToReadMoreWebclient;
 				}
 				webpage->response.headers->bytes[webpage->response.headers->used] = '\0';
-				//  @FIXME: read until content length faund and end of headers, then read the rest.
+				if ( h3_request_header_parse( webpage->response.header, webpage->response.headers->bytes, webpage->response.headers->used ) == 0 ) {
+					HeaderField * headerField;
+					size_t contentStartPos;
+					// it is a valid HTTP request
+					contentStartPos = 0;
+					if ( webpage->response.header->Fields != NULL ) {
+						headerField = &webpage->response.header->Fields[webpage->response.header->HeaderSize];
+						contentStartPos = headerField->Value + headerField->ValueLen + 4 - webpage->response.headers->bytes;
+					} else {
+						contentStartPos = webpage->response.header->RequestLineEnd + 4 - webpage->response.headers->bytes;
+					}
+					if ( contentStartPos > 0 && contentStartPos < webpage->response.headers->used ) {
+						cleanUp.good = ( Buffer_Split( webpage->response.headers, webpage->response.content, contentStartPos ) == 1 );
+					}
+				}
 				//  @TODO:  then parse headers,  parse headers and split the headers and the content
 				if ( webpage->handlerCb != NULL ) {
 					webpage->handlerCb( webpage );
@@ -211,6 +230,7 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 	struct {unsigned char good:1;
 			unsigned char webpage:1;
 			unsigned char uri:1;
+			unsigned char h3:1;
 			unsigned char headers:1;
 			unsigned char content:1;
 			unsigned char url:1;} cleanUp;
@@ -226,6 +246,7 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 		webpage->request.topLine = NULL;
 		webpage->request.headers = NULL;
 		webpage->request.content = NULL;
+		webpage->response.header = NULL;
 		webpage->response.headers = NULL;
 		webpage->response.content = NULL;
 		webpage->sendingNow = SENDING_NONE;
@@ -277,6 +298,10 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 	}
 	if ( cleanUp.good ) {
 		cleanUp.content = 1;
+		cleanUp.good = ( ( webpage->response.header = h3_request_header_new( ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.h3 = 1;
 		if ( webclient->currentWebpage != NULL || webclient->webpages != NULL ) {
 			webclient->connection = CONNECTION_KEEPALIVE;
 		}
@@ -299,6 +324,9 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 		}
 		if ( cleanUp.url ) {
 			free( webpage->url ); webpage->url = NULL;
+		}
+		if ( cleanUp.h3 ) {
+			h3_request_header_free( webpage->response.header ); webpage->response.header = NULL;
 		}
 		if ( cleanUp.webpage ) {
 			if ( webpage->clearFuncCb != NULL && webpage->cbArgs != NULL ) {
@@ -413,7 +441,9 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	if ( webpage->response.content != NULL ) {
 		Buffer_Delete( webpage->response.content ); webpage->response.content = NULL;
 	}
-
+	if ( webpage->response.header != NULL ) {
+		h3_request_header_free( webpage->response.header ); webpage->response.header = NULL;
+	}
 	webpage->response.httpCode = HTTPCODE_NONE;
 	webpage->handlerCb = NULL;
 	webpage->mode = MODE_GET;

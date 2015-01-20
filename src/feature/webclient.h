@@ -32,6 +32,7 @@ struct webpage_t{
 		struct buffer_t *					content;
 								}		request;
 	struct {
+		RequestHeader *	 					header;
 		enum httpCode_t 					httpCode;
 		struct buffer_t *					headers;
 		struct buffer_t *					content;
