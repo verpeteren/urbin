@@ -1471,6 +1471,8 @@ static const JSFunctionSpec jsmWebserverclient[ ] = {
  * @see	Urbin.Webserver.addRoute
  * @see	Urbin.webserverclient
  * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.request
+ * @see	Urbin.webserverclient.request.buffer
  * @see	Urbin.webserverclient.response.setContent
  * @see	Urbin.webserverclient.response.setCode
  * @see	Urbin.webserverclient.response.setMime
@@ -1483,11 +1485,45 @@ static const JSClass jscWebserverclientresponse = {
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
 };
 
-
 static const JSFunctionSpec jsmWebserverclientresponse[ ] = {
 	JS_FS( "setContent", 			JsnWebserverclientresponse_SetContent, 1, 0 ),
 	JS_FS( "setCode", 				JsnWebserverclientresponse_SetCode, 1, 0 ),
 	JS_FS( "setMime", 				JsnWebserverclientresponse_SetMime, 1, 0 ),
+	JS_FS_END
+};
+/**
+ * The HTTP request object
+ *
+ * In a dynamic route, this is variable is available in the callback function
+ *
+ * @name	Urbin.Webserverclient.request
+ * @object
+ * @public
+ * @since	0.0.10
+ *
+ * @example
+ * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
+ * ws.addRoute( '^/a$', function( client ) {
+ * 	console.log( client.request.buffer );
+ * 	} );
+ * @see	Urbin.Webserver
+ * @see	Urbin.Webserver.addRoute
+ * @see	Urbin.webserverclient
+ * @see	Urbin.webserverclient.response
+ * @see	Urbin.webserverclient.request
+ * @see	Urbin.webserverclient.request.buffer
+ * @see	Urbin.webserverclient.response.setContent
+ * @see	Urbin.webserverclient.response.setCode
+ * @see	Urbin.webserverclient.response.setMime
+ */
+
+static const JSClass jscWebserverclientrequest = {
+	"Webserverclientresponse",
+	JSCLASS_HAS_PRIVATE,
+	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
+};
+
+static const JSFunctionSpec jsmWebserverclientrequest[ ] = {
 	JS_FS_END
 };
 
@@ -1571,23 +1607,23 @@ static const JSFunctionSpec jsmWebserverclientresponse[ ] = {
 static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const struct webserverclient_t * webserverclient );
 static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const struct webserverclient_t * webserverclient ) {
 	JSContext * cx;
-	JSObject * webserverclientObj, * responseObj, * thisObj;
-	JSString * jIp, * jUrl, * jMethod;
+	JSObject * webserverclientObj, * responseObj, * requestObj, * thisObj;
+	JSString * jIp, * jUrl, * jMethod, * jBuffer; //  @TODO: split buffer into headers and content
 	const char * ip, * url;
 	const unsigned int attrs = JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT;
 	struct {unsigned char ip:1;
 		unsigned char jip:1;
 		unsigned char url:1;
 		unsigned char jurl:1;
+		unsigned char jbuffer:1;
 		unsigned char method:1;
 		unsigned char cli:1;
 		unsigned char resp:1;
 		unsigned char good:1;} cleanUp;
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 
-	webserverclientObj = NULL;
-	responseObj = NULL;
-	jIp = jUrl = jMethod = NULL;
+	webserverclientObj = requestObj = responseObj = NULL;
+	jIp = jUrl = jMethod = jBuffer = NULL;
 	ip = url = NULL;
 	cx = payload->context;
 	JSAutoRequest ar( cx );
@@ -1596,8 +1632,6 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	JS::RootedObject thisObjRoot( cx, thisObj );
 	JS::HandleObject thisObjHandle( thisObjRoot );
 	cleanUp.good = ( ( webserverclientObj = 	JS_InitClass( cx, thisObjHandle, JS::NullPtr( ), &jscWebserverclient, nullptr, 0, nullptr, jsmWebserverclient, nullptr, nullptr ) ) != NULL );
-	JS::RootedObject	responseObjRoot( cx, responseObj );
-	JS::HandleObject	responseObjHandle( responseObjRoot );
 	JS::RootedObject	webserverclientObjRoot( cx, webserverclientObj );
 	JS::HandleObject	webserverclientObjHandle( webserverclientObjRoot );
 	if ( cleanUp.good ) {
@@ -1626,7 +1660,23 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.method = 1;
+		if ( webserverclient->buffer != NULL ) {
+			cleanUp.good = ( ( jBuffer = JS_NewStringCopyN( cx, webserverclient->buffer->bytes, webserverclient->buffer->used ) ) != NULL );
+		}
+	}
+	if ( cleanUp.good ) {
+		cleanUp.jbuffer = 1;
 		cleanUp.good = ( ( responseObj = 	JS_InitClass( cx, webserverclientObjHandle, JS::NullPtr( ), &jscWebserverclientresponse, nullptr, 0, nullptr, jsmWebserverclientresponse, nullptr, nullptr ) ) != NULL );
+	}
+	JS::RootedObject	responseObjRoot( cx, responseObj );
+	JS::HandleObject	responseObjHandle( responseObjRoot );
+	if ( cleanUp.good ) {
+		cleanUp.good = ( ( requestObj = 	JS_InitClass( cx, webserverclientObjHandle, JS::NullPtr( ), &jscWebserverclientrequest, nullptr, 0, nullptr, jsmWebserverclientrequest, nullptr, nullptr ) ) != NULL );
+	}
+	JS::RootedObject	requestObjRoot( cx, requestObj );
+	JS::HandleObject	requestObjHandle( requestObjRoot );
+	if ( cleanUp.good ) {
+		SET_PROPERTY_ON( webserverclientObjHandle, "method", STRING_TO_JSVAL( jMethod ) );
 	}
 	if ( cleanUp.good ) {
 		SET_PROPERTY_ON( webserverclientObjHandle, "ip", STRING_TO_JSVAL( jIp ) );
@@ -1635,23 +1685,32 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		SET_PROPERTY_ON( webserverclientObjHandle, "url", STRING_TO_JSVAL( jUrl ) );
 	}
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( webserverclientObjHandle, "response", OBJECT_TO_JSVAL( responseObj ) );
+		SET_PROPERTY_ON( webserverclientObjHandle, "request", OBJECT_TO_JSVAL( requestObj ) );
 	}
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( webserverclientObjHandle, "method", STRING_TO_JSVAL( jMethod ) );
+		JS_SetPrivate( requestObj, ( void * ) &webserverclient->buffer );
+	}
+	if ( cleanUp.good ) {
+		SET_PROPERTY_ON( requestObjHandle, "buffer", STRING_TO_JSVAL( jBuffer ) );
+	}
+	if ( cleanUp.good ) {
+		SET_PROPERTY_ON( webserverclientObjHandle, "response", OBJECT_TO_JSVAL( responseObj ) );
 	}
 	if ( cleanUp.good ) {
 		JS_SetPrivate( responseObj, ( void * ) &webserverclient->response );
 	}
 	if ( ! cleanUp.good ) {
+		if ( cleanUp.method ) {
+			JS_free( cx, jMethod ); jMethod = NULL;
+		}
 		if ( cleanUp.jip ) {
 			JS_free( cx, jIp ); jIp = NULL;
 		}
 		if ( cleanUp.jurl ) {
 			JS_free( cx, jUrl ); jUrl = NULL;
 		}
-		if ( cleanUp.method ) {
-			JS_free( cx, jMethod ); jMethod = NULL;
+		if ( cleanUp.jbuffer ) {
+			JS_free( cx, jBuffer ); jBuffer = NULL;
 		}
 	}
 	// always cleanup
