@@ -45,7 +45,11 @@ static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, webclient->timeoutSec );
 		webpage = webclient->currentWebpage;
-		cleanUp.good = ( ( webpage->response.headers = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+		if ( webpage->response.headers != NULL ) {
+			cleanUp.good = 1;
+		} else {
+			cleanUp.good = ( ( webpage->response.headers = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+		}
 tryToReadMoreWebclient:
 		if ( cleanUp.good ) {
 			canReadBytes = webpage->response.headers->size - webpage->response.headers->used;

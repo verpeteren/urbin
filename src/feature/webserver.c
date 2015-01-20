@@ -857,7 +857,11 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	} else {
 		/* update timeout, and read */
 		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
-		cleanUp.good = ( ( webserverclient->buffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+		if ( webserverclient->buffer != NULL ) {
+			cleanUp.good = 1;
+		} else {
+			cleanUp.good = ( ( webserverclient->buffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+		}
 tryToReadMoreWebserver:
 		if ( cleanUp.good ) {
 			canReadBytes = webserverclient->buffer->size - webserverclient->buffer->used;
