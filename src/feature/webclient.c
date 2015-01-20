@@ -29,13 +29,11 @@ static void Webclient_CloseConn( struct webclient_t * webclient ) {
 	close( webclient->socketFd ); webclient->socketFd = 0;
 }
 
-#define RAWLENG 1024
-#define CONTLENG 1024
 static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wcArgs ) {
 	struct webclient_t * webclient;
 	struct webpage_t * webpage;
 	struct buffer_t * rawBuffer;
-	ssize_t bytesRead;
+	ssize_t didReadBytes, canReadBytes;
 	struct {unsigned char headers:1;
 			unsigned char content:1;
 			unsigned char raw:1;
@@ -48,26 +46,34 @@ static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, webclient->timeoutSec );
 		webpage = webclient->currentWebpage;
-		//  @FIXME:  this is wrong, all buffers are mixedup
-		cleanUp.good = ( ( rawBuffer = Buffer_New( RAWLENG ) ) != NULL );
+		cleanUp.good = ( ( rawBuffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+tryToReadMoreWebclient:
 		if ( cleanUp.good ) {
+			canReadBytes = rawBuffer->size - rawBuffer->used;
 			cleanUp.raw = 1;
 			//  BUFFER HACK
-			bytesRead = read( fd, rawBuffer->bytes, CONTLENG );
-			rawBuffer->used = (size_t) bytesRead;
-			switch ( bytesRead ) {
+			didReadBytes = read( fd, &rawBuffer->bytes[rawBuffer->used], canReadBytes );
+			switch ( didReadBytes ) {
 			case 0:
 				Webclient_CloseConn( webclient );
 				 break;
 			case -1:
 				if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 					//  loop once more
-			  } else {
-				Webclient_CloseConn( webclient );
-			 }
+				} else {
+					Webclient_CloseConn( webclient );
+				}
 			 break;
 			default:
-				//  @FIXME:  check if readall, if fit in headers, then parse headers,  parse headers,  if corntent length in headers, reade more if http end then issue callback, ojay, probably read the specs
+				rawBuffer->used += (size_t) didReadBytes;
+				if ( didReadBytes == canReadBytes ) {
+					// There is more to read
+					cleanUp.good = ( Buffer_Increase( rawBuffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
+					goto tryToReadMoreWebclient;
+				}
+				rawBuffer->bytes[rawBuffer->used] = '\0';
+				//  @FIXME: read until content length faund and end of headers, then read the rest.
+				//  @TODO:  then parse headers,  parse headers and split the headers and the content
 				webpage->response.headers = rawBuffer;
 				if ( webpage->handlerCb != NULL ) {
 					webpage->handlerCb( webpage );
@@ -92,11 +98,13 @@ static void Webclient_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 	struct webclient_t * webclient;
 	struct webpage_t * webpage;
 	size_t len;
+	ssize_t wroteBytes;
 	int done;
 
 	webclient = (struct webclient_t *) wcArgs;
 	done = 0;
 	len = 0;
+	wroteBytes = 0;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Webclient_CloseConn( webclient );
 	} else if ( ( events & PICOEV_WRITE ) != 0 ) {
@@ -104,7 +112,7 @@ static void Webclient_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 		//  Let's get some work
 		webpage = Webclient_PopWebpage( webclient );
 		if ( webpage != NULL ) {
-tryToSendMore:
+tryToWriteMoreWebclient:
 			switch ( webpage->sendingNow ) {
 			case SENDING_NONE:  // we start here
 				webpage->sendingNow = SENDING_TOPLINE;
@@ -115,7 +123,7 @@ tryToSendMore:
 				}
 				if ( webpage->request.topLine != NULL ) {
 					len = webpage->request.topLine->used;
-					webpage->wroteBytes += write( fd, &webpage->request.topLine->bytes[webpage->wroteBytes], len - webpage->wroteBytes );
+					wroteBytes = write( fd, &webpage->request.topLine->bytes[webpage->wroteBytes], len - webpage->wroteBytes );
 				} else {
 					Webclient_CloseConn( webclient );
 				}
@@ -126,7 +134,7 @@ tryToSendMore:
 				}
 				if ( webpage->request.headers != NULL ) {
 					len = webpage->request.headers->used;
-					webpage->wroteBytes += write( fd, &webpage->request.headers->bytes[webpage->wroteBytes], len - webpage->wroteBytes );  //  headers need to end with \r\n\n
+					wroteBytes = write( fd, &webpage->request.headers->bytes[webpage->wroteBytes], len - webpage->wroteBytes );  //  headers need to end with \r\n\n
 				} else {
 					Webclient_CloseConn( webclient );
 				}
@@ -136,8 +144,8 @@ tryToSendMore:
 					done = 1;
 				} else {
 					len = webpage->request.content->used;
-					webpage->wroteBytes += write( fd, &webpage->request.content->bytes[webpage->wroteBytes], len - webpage->wroteBytes );
-					done = ( (size_t) webpage->wroteBytes == len );
+					wroteBytes = write( fd, &webpage->request.content->bytes[webpage->wroteBytes], len - webpage->wroteBytes );
+					done = ( (size_t) webpage->wroteBytes + wroteBytes == len );
 				}
 				break;
 			case SENDING_FILE:  //  Not applicable
@@ -148,7 +156,7 @@ tryToSendMore:
 				picoev_del( loop, fd );
 				picoev_add( loop, fd, PICOEV_READ, webclient->timeoutSec, Webclient_HandleRead_cb, wcArgs );
 			} else {
-				switch ( webpage->wroteBytes ) {
+				switch ( wroteBytes ) {
 				case 0:
 					Webclient_CloseConn( webclient );
 					break;
@@ -159,16 +167,17 @@ tryToSendMore:
 						Webclient_CloseConn( webclient );
 					}
 				default:
+					webpage->wroteBytes += wroteBytes;
 					if ( len == (size_t) webpage->wroteBytes ) {
 						webpage->wroteBytes = 0;
 						switch ( webpage->sendingNow ) {
 						case SENDING_TOPLINE:
 							webpage->sendingNow = SENDING_HEADER;
-							goto tryToSendMore;
+							goto tryToWriteMoreWebclient;
 							break;
 						case SENDING_HEADER:
 							webpage->sendingNow = SENDING_CONTENT;
-							goto tryToSendMore;
+							goto tryToWriteMoreWebclient;
 							break;
 						case SENDING_CONTENT:  //  FT
 						case SENDING_FILE:  //  Not applicable
@@ -617,10 +626,9 @@ void Webclient_Delete( struct webclient_t * webclient ) {
 	if ( webclient->currentWebpage != NULL ) {
 		Webpage_Delete( webclient->currentWebpage ); webclient->currentWebpage = NULL;
 	}
-	do {
-		webpage = Webclient_PopWebpage( webclient );
-		Webpage_Delete( webpage ); webclient->currentWebpage = NULL;  //  pop sets also current webpage
-	} while ( webpage != NULL );
+	while( ( webpage = Webclient_PopWebpage( webclient ) ) != NULL ) {
+			Webpage_Delete( webpage ); webclient->currentWebpage = NULL;  //  pop sets also current webpage
+	}
 	//  clean the rest
 	webclient->timeoutSec = 0;
 	webclient->socketFd = 0;

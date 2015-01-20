@@ -29,7 +29,7 @@ const char * MethodDefinitions[ ] = {
 };
 
 const char * ConnectionDefinitions[] = {
-	"close",
+	"Close",
 	"Keep-Alive"
 };
 
@@ -272,7 +272,7 @@ static struct webserverclient_t * Webserverclient_New( struct webserver_t * webs
 		webserverclient->connection = CONNECTION_CLOSE;
 		webserverclient->wroteBytes = 0;
 		webserverclient->mode = MODE_GET;
-		memset( webserverclient->buffer, '\0', HTTP_BUFF_LENGTH );
+		webserverclient->buffer = NULL;
 		if ( webserverclient == CONTENTTYPE_BUFFER ) {
 			webserverclient->response.content.dynamic.buffer = NULL;
 		} else {
@@ -558,7 +558,7 @@ static void Webserverclient_PrepareRequest( struct webserverclient_t * webserver
 	cleanUp.good = ( ( webserverclient->header = h3_request_header_new( ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.h3 = 1;
-		cleanUp.good = ( ( h3_request_header_parse( webserverclient->header, webserverclient->buffer, strlen( webserverclient->buffer ) ) ) == 0 );
+		cleanUp.good = ( ( h3_request_header_parse( webserverclient->header, webserverclient->buffer->bytes, webserverclient->buffer->used ) ) == 0 );
 	}
 	if ( cleanUp.good ) {
 		if ( strncmp( webserverclient->header->RequestMethod, "POST", webserverclient->header->RequestMethodLen ) == 0 ) {
@@ -569,9 +569,11 @@ static void Webserverclient_PrepareRequest( struct webserverclient_t * webserver
 			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada... http://i.stack.imgur.com/whhD1.png
 				close = ConnectionDefinitions[CONNECTION_CLOSE];
 				keepAlive = ConnectionDefinitions[CONNECTION_KEEPALIVE];
-				if ( strncmp( field->Value, close, field->ValueLen ) == 0 ) {
+				if ( strncmp( field->Value, close, field->ValueLen ) == 0 ||
+					 strncmp( field->Value, "close", field->ValueLen ) == 0 ) {
 					webserverclient->connection = CONNECTION_CLOSE;
-				} else 	if ( strncmp( field->Value, keepAlive, field->ValueLen ) == 0 ) {
+				} else 	if ( strncmp( field->Value, keepAlive, field->ValueLen ) == 0 ||
+							 strncmp( field->Value, "keep-alive", field->ValueLen ) == 0 ) {
 					webserverclient->connection = CONNECTION_KEEPALIVE;
 				}
 			}
@@ -726,7 +728,7 @@ static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) 
 	if ( webserverclient->header != NULL ) {
 			h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
 		}
-		memset( webserverclient->buffer, '\0', strlen( webserverclient->buffer ) );
+		Buffer_Reset( webserverclient->buffer, webserverclient->buffer->size );
 		webserverclient->route = NULL;
 		webserverclient->response.start = time( 0 );
 		webserverclient->response.end = 0;
@@ -740,7 +742,6 @@ static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) 
 			free( (char * ) webserverclient->response.content.file.fileName ); webserverclient->response.content.file.fileName = NULL;
 			webserverclient->response.content.file.contentLength = 0;
 		} else {
-//			Buffer_Delete( webserverclient->response.content.dynamic.buffer ); webserverclient->response.content.dynamic.buffer = NULL;
 			Buffer_Reset( webserverclient->response.content.dynamic.buffer, webserverclient->response.content.dynamic.buffer->size );
 		}
 		webserverclient->response.contentType = CONTENTTYPE_BUFFER;
@@ -840,7 +841,11 @@ static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, v
 
 static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webserverclient_t * webserverclient;
-	ssize_t r;
+	ssize_t didReadBytes, canReadBytes;
+	struct {unsigned char raw:1;
+			unsigned char good:1;} cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
 
 	webserverclient = (struct webserverclient_t *) wcArg;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
@@ -849,25 +854,39 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	} else {
 		/* update timeout, and read */
 		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
-		r = read( fd, webserverclient->buffer, HTTP_BUFF_LENGTH );
-		webserverclient->buffer[r] = '\0';
-		switch ( r ) {
-		case 0: /* connection closed by peer */
-			Webserverclient_CloseConn( webserverclient );
-			break;
-		case -1: /* error */
-			if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /* try again later */
-				break;
-			} else { /* fatal error */
+		cleanUp.good = ( ( webserverclient->buffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+tryToReadMoreWebserver:
+		if ( cleanUp.good ) {
+			canReadBytes = webserverclient->buffer->size - webserverclient->buffer->used;
+			//  BUFFER HACK
+			didReadBytes = read( fd, webserverclient->buffer->bytes, canReadBytes );
+			switch ( didReadBytes ) {
+			case 0: /* connection closed by peer */
 				Webserverclient_CloseConn( webserverclient );
+				break;
+			case -1: /* error */
+				if ( errno == EAGAIN || errno == EWOULDBLOCK ) { /* try again later */
+					break;
+				} else { /* fatal error */
+					Webserverclient_CloseConn( webserverclient );
+				}
+				break;
+			default:
+				webserverclient->buffer->used += (size_t) didReadBytes;
+				if ( didReadBytes == canReadBytes ) {
+					// There is more to read
+					cleanUp.good = ( Buffer_Increase( webserverclient->buffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
+					goto tryToReadMoreWebserver;
+				}
+				webserverclient->buffer->bytes[webserverclient->buffer->used] = '\0';
+				Webserverclient_PrepareRequest( webserverclient );
+				webserverclient->sendingNow = SENDING_TOPLINE;
+				picoev_del( loop, fd );
+				picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wcArg );
+				break;
 			}
-			break;
-		default: /* got some data, send back */
-			picoev_del( loop, fd );
-			Webserverclient_PrepareRequest( webserverclient );
-			webserverclient->sendingNow = SENDING_TOPLINE;
-			picoev_add( loop, fd, PICOEV_WRITE, webserverclient->webserver->timeoutSec , Webserver_HandleWrite_cb, wcArg );
-			break;
+		} else {
+			Webserverclient_CloseConn( webserverclient );
 		}
 	}
 }
@@ -877,10 +896,12 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
 	struct webserverclient_t * webserverclient;
 	size_t len;
+	ssize_t wroteBytes;
 	int done;
 
 	done = 0;
 	len = 0;
+	wroteBytes = 0;
 	webserverclient = (struct webserverclient_t *) wcArg;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
@@ -888,13 +909,13 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 	} else {
 		/* update timeout, and write */
 		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
-tryToSendMore:
+tryToWriteMoreWebserver:
 		switch ( webserverclient->sendingNow ) {
 		case SENDING_TOPLINE: {
 			char topLine[HTTP_TOPLINE_LENGTH];
 
 			len = snprintf( &topLine[0], HTTP_TOPLINE_LENGTH, "HTTP/1.1 %d OK\r\n", webserverclient->response.httpCode );
-			webserverclient->wroteBytes += write( fd, &topLine[webserverclient->wroteBytes], len - webserverclient->wroteBytes );
+			wroteBytes = write( fd, &topLine[webserverclient->wroteBytes], len - webserverclient->wroteBytes );
 			} break;
 		case SENDING_HEADER: {
 			size_t contentLen;
@@ -911,16 +932,15 @@ tryToSendMore:
 			tm_info = localtime( &webserverclient->response.end );
 			strftime( &dateString[0], 30, "%a, %d %b %Y %H:%M:%S %Z", tm_info );
 			len = snprintf( &header[0], HTTP_HEADER_LENGTH, "Content-Length: %d\r\nConnection: %s\r\nContent-Type: %s\r\nDate: %s\r\nServer: %s/%s\r\n\r\n", contentLen, connectionString, contentTypeString, dateString, PR_NAME, PR_VERSION );
-			webserverclient->wroteBytes += write( fd, &header[webserverclient->wroteBytes], len - webserverclient->wroteBytes );
+			wroteBytes = write( fd, &header[webserverclient->wroteBytes], len - webserverclient->wroteBytes );
 			} break;
 		case SENDING_CONTENT: {
-
 			len = webserverclient->response.content.dynamic.buffer->used;
 			if ( len == 0 ) {
 				done = 1;
 			} else {
-				webserverclient->wroteBytes += write( fd, &webserverclient->response.content.dynamic.buffer->bytes[webserverclient->wroteBytes], webserverclient->response.content.dynamic.buffer->used - webserverclient->wroteBytes );
-				done = ( len == (size_t) webserverclient->wroteBytes );
+				wroteBytes = write( fd, &webserverclient->response.content.dynamic.buffer->bytes[webserverclient->wroteBytes], webserverclient->response.content.dynamic.buffer->used - webserverclient->wroteBytes );
+				done = ( len == (size_t) webserverclient->wroteBytes + wroteBytes );
 			}
 			} break;
 		case SENDING_FILE: {
@@ -934,9 +954,9 @@ tryToSendMore:
 				if ( ( fileHandle = open( webserverclient->response.content.file.fileName, O_RDONLY | O_NONBLOCK ) ) > 0 ) {
 					//  @TODO:  investigate TPC_CORK feature
 					offset = webserverclient->wroteBytes;
-					webserverclient->wroteBytes += sendfile( fd, fileHandle, &offset, len - webserverclient->wroteBytes );
+					wroteBytes = sendfile( fd, fileHandle, &offset, len - webserverclient->wroteBytes );
 					close( fileHandle );
-					done = ( len == (size_t) webserverclient->wroteBytes);
+					done = ( len == (size_t) webserverclient->wroteBytes + wroteBytes );
 				}
 			}
 			} break;
@@ -953,7 +973,7 @@ tryToSendMore:
 				Webserverclient_CloseConn( webserverclient );
 			}
 		} else {
-			switch ( webserverclient->wroteBytes ) {
+			switch ( wroteBytes ) {
 			case 0: /* the other end cannot keep up */
 				break;
 			case -1: /*  error  */
@@ -963,14 +983,15 @@ tryToSendMore:
 					Webserverclient_CloseConn( webserverclient );
 				}
 				break;
-			default: /*  got some data, send back  */
+			default:
+				webserverclient->wroteBytes += wroteBytes;
 				if ( len == (size_t) webserverclient->wroteBytes ) {
 					//  We are don with this stage, go to the next
 					webserverclient->wroteBytes = 0;
 					switch ( webserverclient->sendingNow ) {
 					case SENDING_TOPLINE:
 						webserverclient->sendingNow = SENDING_HEADER;
-						goto tryToSendMore;
+						goto tryToWriteMoreWebserver;
 						break;
 					case SENDING_HEADER:
 						if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
@@ -978,7 +999,7 @@ tryToSendMore:
 						} else {
 							webserverclient->sendingNow = SENDING_CONTENT;
 						}
-						goto tryToSendMore;
+						goto tryToWriteMoreWebserver;
 						break;
 					case SENDING_FILE:  	//  FT this is handled by 'done'
 					case SENDING_CONTENT:	//  FT this is handled by 'done'

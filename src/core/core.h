@@ -84,6 +84,7 @@ struct core_t {
 
 
 struct buffer_t *				Buffer_New				( size_t initialSize );
+unsigned char 					Buffer_Increase			( struct buffer_t * buffer, size_t extraBytes );
 struct buffer_t * 				Buffer_NewText			( const char * text );
 unsigned char 					Buffer_Append			( struct buffer_t * buffer, const char * bytes, size_t bytesLen );
 unsigned char 					Buffer_Reset			( struct buffer_t * buffer, size_t minLen );

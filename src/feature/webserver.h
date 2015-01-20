@@ -14,8 +14,6 @@
 extern "C" {
 #endif
 
-#define HTTP_BUFF_LENGTH 1024
-
 enum contentType_t{
 	CONTENTTYPE_BUFFER,
 	CONTENTTYPE_FILE,
@@ -109,7 +107,7 @@ struct webserverclient_t{
 	struct route_t *					route;
 	OnigRegion *						region;
 	RequestHeader *	 					header;
-	char								buffer[HTTP_BUFF_LENGTH];
+	struct buffer_t *					buffer;
 	struct webserverclientresponse_t	response;
 	};
 

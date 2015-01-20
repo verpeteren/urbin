@@ -14,6 +14,8 @@
 extern "C" {
 #endif
 
+#define HTTP_READ_BUFFER_LENGTH 1024
+
 enum requestMode_t {
 	MODE_GET 								 = 0,
 	MODE_POST 								 = 1

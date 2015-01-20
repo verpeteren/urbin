@@ -196,6 +196,25 @@ unsigned char Buffer_Append( struct buffer_t * buffer, const char * bytes, size_
 	return ( cleanUp.good ) ? 1: 0;
 }
 
+unsigned char Buffer_Increase( struct buffer_t * buffer, size_t extraBytes ) {
+	size_t newSize;
+	char * newBytes;
+	struct {unsigned char good:1; } cleanUp;
+
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
+	newSize = buffer->size + extraBytes;
+	cleanUp.good = ( ( newBytes = realloc( buffer->bytes, newSize  ) ) != NULL );
+	if ( cleanUp.good ) {
+		memset( newBytes + buffer->size,'\0', extraBytes );
+		buffer->size = newSize;
+		buffer->bytes = newBytes;
+	} else {
+		Buffer_Delete( buffer ); buffer = NULL;
+	}
+
+	return ( cleanUp.good ) ? 1: 0;
+}
+
 unsigned char Buffer_Reset( struct buffer_t * buffer, size_t minLen ) {
 	struct {unsigned char good:1; } cleanUp;
 
