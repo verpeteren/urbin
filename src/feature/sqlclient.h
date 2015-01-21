@@ -34,7 +34,7 @@ enum sqlAdapter_t {
 struct query_t;
 
 struct sqlclient_t {
-	const struct core_t *		core;
+	struct core_t *				core;
 	struct query_t *			currentQuery;
 	enum sqlAdapter_t			adapter;
 	union {

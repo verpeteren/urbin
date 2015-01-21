@@ -456,6 +456,7 @@ static void Webclient_ConnectToIp( struct dns_cb_data * dnsData ) {
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	ip = NULL;
 	webclient = (struct webclient_t *) dnsData->context;
+	webclient->core->dns.actives--;
 	cleanUp.good = ( dnsData->addr_len > 0 );
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( ip = DnsData_ToString( dnsData ) ) != NULL );
@@ -510,7 +511,7 @@ static void Webclient_Connect( struct webclient_t * webclient ) {
 				webclient->port = 80;
 			}
 		}
-		Core_GetHostByName( (struct core_t *) webclient->core, webclient->hostName, Webclient_ConnectToIp, (void *) webclient );
+		Core_GetHostByName( webclient->core, webclient->hostName, Webclient_ConnectToIp, (void *) webclient );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.hostName ) {
@@ -541,7 +542,7 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 		webclient->currentWebpage = NULL;
 		webclient->socketFd = 0;
 		webclient->hostName = NULL;
-		webclient->core = core;
+		webclient->core = (struct core_t *) core;
 		webclient->connection = CONNECTION_CLOSE;
 		if ( timeoutSec == 0 ) {
 			timeSec = (unsigned char) cfg_getint( webclientSection, "timeout_sec" );

@@ -635,14 +635,14 @@ static void Dns_ReadWrite_cb( picoev_loop * loop, int fd, int events, void * cbA
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout, stop and retry again..... */
 		core->dns.actives--;
-		if ( core->dns.actives < 1 ) {
-			picoev_del( loop, fd );
-		}
 	} else {
 		//  sending and receiving shit
 		picoev_set_timeout( loop, fd, DNS_QUERY_TIMEOUT );
 		dns_poll( core->dns.dns );
 		//  @TODO:  somehow every callbackHandler must decrement core->dns.actives, else the cpu load will rise through the roof.
+	}
+	if ( core->dns.actives < 1 ) {
+		picoev_del( loop, fd );
 	}
 }
 

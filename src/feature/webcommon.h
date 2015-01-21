@@ -19,13 +19,13 @@ extern "C" {
 #define H3_HEADERS_BLOCK( header, start, end, found ) do {\
 	start = end = NULL; \
 	if ( (header)->Fields != NULL ) { \
-		start = (char *) (header)->Fields[0].Value;\
-		end = (char *) ( (header)->Fields[(header)->HeaderSize].Value + (header)->Fields[(header)->HeaderSize].ValueLen ) ;\
+		start = (char *) (header)->Fields[0].Value; \
+		end = (char *) ( (header)->Fields[(header)->HeaderSize].Value + (header)->Fields[(header)->HeaderSize].ValueLen ); \
 	} else if ( (header)->RequestLineEnd > (header)->RequestLineEnd ) { \
 		end = start = ( char *) ( (header)->RequestLineEnd + 4 ); \
 	} \
 	found = ( start != NULL ); \
-} while( 0 );
+} while ( 0 );
 
 enum requestMode_t {
 	MODE_GET 								 = 0,

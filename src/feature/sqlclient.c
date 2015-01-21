@@ -573,7 +573,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( ( sqlclient = malloc( sizeof( *sqlclient ) ) ) != NULL ) );
 	if ( cleanUp.good ) {
-		sqlclient->core = core;
+		sqlclient->core = (struct core_t *) core;
 		sqlclient->port = port;
 		sqlclient->adapter = adapter;
 		switch ( sqlclient->adapter ) {
@@ -622,7 +622,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 		sqlclient->timeoutSec = timeoutSec;
 		sqlclient->socketFd = 0;
 		sqlclient->currentQuery = NULL;
-		Core_GetHostByName( (struct core_t *) sqlclient->core, sqlclient->hostName, Sqlclient_ConnectToIp, (void *) sqlclient );
+		Core_GetHostByName( sqlclient->core, sqlclient->hostName, Sqlclient_ConnectToIp, (void *) sqlclient );
 		Core_Log( sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "New Sqlclient allocated" );
 	}
 	if ( ! cleanUp.good ) {
@@ -662,6 +662,7 @@ static void Sqlclient_ConnectToIp( struct dns_cb_data * dnsData ) {
 	connString = NULL;
 	ip = NULL;
 	sqlclient= ( struct sqlclient_t *) dnsData->context;
+	sqlclient->core->dns.actives--;
 	cleanUp.good = ( ( ip = DnsData_ToString( dnsData ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.ip = 1;

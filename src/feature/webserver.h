@@ -102,7 +102,7 @@ struct webserverclient_t{
 };
 
 struct webserver_t {
-	const struct core_t *		core;
+	struct core_t *				core;
 	struct route_t *			routes;
 	OnigOptionType				regexOptions;
 	uint16_t					port;

@@ -38,7 +38,7 @@ struct webpage_t{
 };
 
 struct webclient_t {
-	const struct core_t *				core;
+	struct core_t *						core;
 	struct webpage_t *					webpages;
 	struct webpage_t *					currentWebpage;
 	int									socketFd;

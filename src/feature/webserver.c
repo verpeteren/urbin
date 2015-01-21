@@ -107,7 +107,6 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	namedRegex = (struct namedRegex_t *) cbArgs;
 	region = namedRegex->webserverclient->region;
-	//  printf( "once %d %d\n", ngroupNum, *group_nums );
 	slot = 0;
 	for ( i = 0; i < ngroupNum; i++ ) {
 		gn = group_nums[i];
@@ -126,7 +125,6 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 		} else {
 			break;
 		}
-		//  printf( "%d   %s\t%s\t%d\t%d\t%d\n", gn, namedRegex->kvPairs[slot], namedRegex->kvPairs[ slot + 1 ], startPos, endPos, len  );
 	}
 	if ( ! cleanUp.good ) {
 		for ( j = 0; j < slot; j++ ) {
@@ -852,11 +850,10 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 			unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-
 	webserverclient = (struct webserverclient_t *) wcArg;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
-		Webserverclient_CloseConn( webserverclient );
+			Webserverclient_CloseConn( webserverclient );
 	} else {
 		/* update timeout, and read */
 		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
@@ -1048,6 +1045,7 @@ static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
 	webserver = (struct webserver_t *) dnsData->context;
 	flag = 1;
 	ip = NULL;
+	webserver->core->dns.actives--;
 	modulesSection = cfg_getnsec( (cfg_t *) webserver->core->config, "modules", 0 );
 	webserverSection = cfg_getnsec( modulesSection, "webserver", 0 );
 	listenBacklog = cfg_getint( webserverSection, "listen_backlog" );
@@ -1111,7 +1109,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * hos
 		modulesSection = cfg_getnsec( (cfg_t *) core->config, "modules", 0 );
 		webserverSection = cfg_getnsec( modulesSection, "webserver", 0 );
 		cleanUp.webserver = 1;
-		webserver->core = core;
+		webserver->core = (struct core_t *) core;
 		webserver->socketFd = 0;
 		webserver->routes = NULL;
 		//webserver->regexOptions = ONIG_OPTION_SINGLELINE | ONIG_OPTION_FIND_LONGEST | ONIG_OPTION_CAPTURE_GROUP;  //  | ONIG_OPTION_IGNORECASE | ONIG_OPTION_DEFAULT;
@@ -1140,7 +1138,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * hos
 	}
 	if ( cleanUp.good ) {
 		cleanUp.hostName = 1;
-		Core_GetHostByName( (struct core_t *) webserver->core, webserver->hostName, Webserver_AcceptAtIp, (void *) webserver );
+		Core_GetHostByName( webserver->core, webserver->hostName, Webserver_AcceptAtIp, (void *) webserver );
 	}
 	if ( cleanUp.good ) {
 		Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "New Webserver allocated" );

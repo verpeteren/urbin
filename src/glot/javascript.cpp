@@ -899,7 +899,7 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 		headerVal = JSVAL_VOID;
 		H3_HEADERS_BLOCK( webpage->response.header, start, end, found );
 		if ( found  && end > start ) {
-			cleanUp.good = ( ( jHeaders = JS_NewStringCopyN( cx, start, end - start ) ) != NULL );
+			cleanUp.good = ( ( jHeaders = JS_NewStringCopyN( cx, start, (size_t) ( end - start ) ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.headers = 1;
 				headerVal = STRING_TO_JSVAL( jHeaders );
@@ -911,7 +911,7 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 	if ( cleanUp.good )  {
 		contentVal = JSVAL_VOID;
 		if ( found && start < &webpage->response.buffer->bytes[webpage->response.buffer->used] ) {
-			cleanUp.good = ( ( jContent = JS_NewStringCopyN( cx, start, webpage->response.buffer->used - ( start - webpage->response.buffer->bytes ) ) ) != NULL );
+			cleanUp.good = ( ( jContent = JS_NewStringCopyN( cx, start, webpage->response.buffer->used - (size_t) ( start - webpage->response.buffer->bytes ) ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.content = 1;
 				contentVal = STRING_TO_JSVAL( jContent );
@@ -1747,7 +1747,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		if ( cleanUp.jurl ) {
 			JS_free( cx, jUrl ); jUrl = NULL;
 		}
-		if ( cleanUp.jheaders) {
+		if ( cleanUp.jheaders ) {
 			JS_free( cx, jHeaders ); jHeaders =  NULL;
 		}
 		if ( cleanUp.jcontent) {
