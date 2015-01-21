@@ -596,7 +596,9 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 		}
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Core_SwitchToUser( core ) ) ? 1 : 0;
+		if ( getuid( ) == 0 ) {
+			cleanUp.good = ( Core_SwitchToUser( core ) ) ? 1 : 0;
+		}
 	}
 	return cleanUp.good;
 }
