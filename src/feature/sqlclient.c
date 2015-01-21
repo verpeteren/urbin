@@ -143,6 +143,7 @@ void Query_Delete( struct query_t * query ) {
 		}
 		Core_Log( query->sqlclient->core, LOG_INFO, __FILE__ , __LINE__, "Delete query free-ed" );
 		query->sqlclient = NULL;
+		PR_INIT_CLIST( &query->mLink );
 		free( query ); query = NULL;
 	}
 }

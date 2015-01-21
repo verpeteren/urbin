@@ -874,6 +874,8 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 	JSObject * webpageObj, * thisObj;
 	JSString * jHeaders, * jContent;
 	jsval headerVal, contentVal;
+	char * start, *end;
+	int found;
 	const unsigned int attrs = JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT;
 	struct {unsigned char good:1;
 			unsigned char obj:1;
@@ -883,6 +885,7 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cx = payload->context;
 	jContent = jHeaders = NULL;
+	found = 0;
 	JSAutoRequest ar( cx );
 	JSAutoCompartment ac( cx, payload->scopeObj );
 	thisObj = payload->scopeObj;
@@ -893,30 +896,29 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 	JS::HandleObject webpageObjHandle( webpageObjRoot );
 	if ( cleanUp.good )  {
 		cleanUp.obj = 1;
-		if ( webpage->response.headers == NULL ) {
-			headerVal = JSVAL_VOID;
-		} else {
-			cleanUp.good = ( ( jHeaders = JS_NewStringCopyN( cx, webpage->response.headers->bytes, webpage->response.headers->used ) ) != NULL );
+		headerVal = JSVAL_VOID;
+		H3_HEADERS_BLOCK( webpage->response.header, start, end, found );
+		if ( found  && end > start ) {
+			cleanUp.good = ( ( jHeaders = JS_NewStringCopyN( cx, start, end - start ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.headers = 1;
 				headerVal = STRING_TO_JSVAL( jHeaders );
 			}
 		}
 		JS::RootedValue headerValRoot( cx, headerVal );
-		SET_PROPERTY_ON( webpageObjHandle, "headers", STRING_TO_JSVAL( jHeaders ) );
+		SET_PROPERTY_ON( webpageObjHandle, "headers", headerVal );
 	}
 	if ( cleanUp.good )  {
-		if ( webpage->response.content == NULL ) {
-			contentVal = JSVAL_VOID;
-		} else {
-			cleanUp.good = ( ( jContent = JS_NewStringCopyN( cx, webpage->response.content->bytes, webpage->response.content->used ) ) != NULL );
+		contentVal = JSVAL_VOID;
+		if ( found && start < &webpage->response.buffer->bytes[webpage->response.buffer->used] ) {
+			cleanUp.good = ( ( jContent = JS_NewStringCopyN( cx, start, webpage->response.buffer->used - ( start - webpage->response.buffer->bytes ) ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.content = 1;
 				contentVal = STRING_TO_JSVAL( jContent );
 			}
-			JS::RootedValue contentValRoot( cx, contentVal );
-			SET_PROPERTY_ON( webpageObjHandle, "content", contentVal );
 		}
+		JS::RootedValue contentValRoot( cx, contentVal );
+		SET_PROPERTY_ON( webpageObjHandle, "content", contentVal )
 	}
 	if ( cleanUp.good )  {
 		SET_PROPERTY_ON( webpageObjHandle, "code", INT_TO_JSVAL( webpage->response.httpCode ) );
@@ -959,6 +961,10 @@ static void Webclient_ResultHandler_cb( const struct webpage_t * webpage ) {
  * @since	0.0.10
  * @returns	{object}							The web client javascript
  * @param	{string}		url					The initial url
+ * @param   {function}		callback			The callback function
+ *-@param   {integer}		callback.code		The return code
+ *-@param   {string}		callback.header		The returned headers
+ *-@param   {string}		callback.content	The returned content
  * @param	{object}		params				The request parameters
  * @param	{string}		params.method		The request method "GET" or "POST"
  * @param	{string}		params.headers		The headers, if the headers are not set, then HOST and CONNECTION will be set automatically. As long as there are requests in the queue, the connection will be Keep-Alive, else close
@@ -966,7 +972,9 @@ static void Webclient_ResultHandler_cb( const struct webpage_t * webpage ) {
  *
  * @example
  * showResponse = function( responseObj ) {
- * 	console.log( 'got ' + responseObj.content );
+ * 	console.log( 'code:    ' + responseObj.code );
+ * 	console.log( 'headers: ' + responseObj.headers );
+ * 	console.log( 'content: ' + responseObj.content );
  *	};
  *
  * var wc = Urbin.Webclient( 'http://www.urbin.com/benchmarks.html', showresponse, 60 );
@@ -1063,6 +1071,10 @@ static const JSFunctionSpec jsmWebclient[ ] = {
  * @since	0.0.10
  * @returns	{object}							The web client javascript
  * @param	{string}		url					The initial url
+ * @param   {function}		callback			The callback function
+ *-@param   {integer}		callback.code		The return code
+ *-@param   {string}		callback.header		The returned headers
+ *-@param   {string}		callback.content	The returned content
  * @param	{object}		params				The request parameters
  * @param	{string}		params.method		The request method "GET" or "POST"
  * @param	{string}		params.headers		The headers, if the headers are not set, then HOST and CONNECTION will be set automatically. As long as there are requests in the queue, the connection will be Keep-Alive, else close
@@ -1071,14 +1083,17 @@ static const JSFunctionSpec jsmWebclient[ ] = {
  *
  * @example
  * showResponse = function( responseObj ) {
- * 	console.log( 'got ' + responseObj.content );
+ * 	console.log( 'code:     ' + responseObj.content );
+ * 	console.log( 'headers:     ' + responseObj.headers );
+ * 	console.log( 'content:     ' + responseObj.content );
  *	};
  *
  * var wc = Urbin.Webclient( 'http://www.urbin.com/benchmarks.html', showresponse, 60 );
  * wc.queue( 'www.urbin.com/', showresponse );
  *
  * @see	Urbin.Webclient.queue
- */static bool JsnWebclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
+ */
+static bool JsnWebclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
 	struct payload_t * payload;
 	struct webclient_t * webclient;
 	struct javascript_t * javascript;
@@ -1606,22 +1621,25 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const struct webserverclient_t * webserverclient ) {
 	JSContext * cx;
 	JSObject * webserverclientObj, * responseObj, * requestObj, * thisObj;
-	JSString * jIp, * jUrl, * jMethod, * jBuffer; //  @TODO: split buffer into headers and content
+	JSString * jIp, * jUrl, * jMethod, * jHeaders, * jContent;
+	jsval valueH, valueC;
 	const char * ip, * url;
 	const unsigned int attrs = JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT;
 	struct {unsigned char ip:1;
 		unsigned char jip:1;
 		unsigned char url:1;
 		unsigned char jurl:1;
-		unsigned char jbuffer:1;
-		unsigned char method:1;
+		unsigned char jheaders:1;
+		unsigned char jcontent:1;
+		unsigned char jmethod:1;
 		unsigned char cli:1;
 		unsigned char resp:1;
+		unsigned char req:1;
 		unsigned char good:1;} cleanUp;
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 
 	webserverclientObj = requestObj = responseObj = NULL;
-	jIp = jUrl = jMethod = jBuffer = NULL;
+	jIp = jUrl = jMethod = jHeaders = jContent = NULL;
 	ip = url = NULL;
 	cx = payload->context;
 	JSAutoRequest ar( cx );
@@ -1637,7 +1655,6 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		JS_SetPrivate( webserverclientObj, (void * ) webserverclient );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.resp = 1;
 		cleanUp.good = ( ( ip = Webserverclient_GetIp( webserverclient ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -1646,6 +1663,9 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.jip = 1;
+		SET_PROPERTY_ON( webserverclientObjHandle, "ip", STRING_TO_JSVAL( jIp ) );
+	}
+	if ( cleanUp.good ) {
 		cleanUp.good = ( ( url = Webserverclient_GetUrl( webserverclient ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
@@ -1654,51 +1674,71 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	}
 	if ( cleanUp.good ) {
 		cleanUp.jurl = 1;
+		SET_PROPERTY_ON( webserverclientObjHandle, "url", STRING_TO_JSVAL( jUrl ) );
+	}
+	if ( cleanUp.good ) {
 		cleanUp.good = ( ( jMethod = JS_NewStringCopyZ( cx, MethodDefinitions[webserverclient->mode] ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.method = 1;
-		if ( webserverclient->buffer != NULL ) {
-			cleanUp.good = ( ( jBuffer = JS_NewStringCopyN( cx, webserverclient->buffer->bytes, webserverclient->buffer->used ) ) != NULL );
-		}
+		cleanUp.jmethod = 1;
+		SET_PROPERTY_ON( webserverclientObjHandle, "method", STRING_TO_JSVAL( jMethod ) );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.jbuffer = 1;
 		cleanUp.good = ( ( responseObj = 	JS_InitClass( cx, webserverclientObjHandle, JS::NullPtr( ), &jscWebserverclientresponse, nullptr, 0, nullptr, jsmWebserverclientresponse, nullptr, nullptr ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.resp = 1;
+		JS_SetPrivate( responseObj, ( void * ) &webserverclient->response );
 	}
 	JS::RootedObject	responseObjRoot( cx, responseObj );
 	JS::HandleObject	responseObjHandle( responseObjRoot );
+	if ( cleanUp.good ) {
+		SET_PROPERTY_ON( webserverclientObjHandle, "response", OBJECT_TO_JSVAL( responseObj ) );
+	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( requestObj = 	JS_InitClass( cx, webserverclientObjHandle, JS::NullPtr( ), &jscWebserverclientrequest, nullptr, 0, nullptr, jsmWebserverclientrequest, nullptr, nullptr ) ) != NULL );
 	}
 	JS::RootedObject	requestObjRoot( cx, requestObj );
 	JS::HandleObject	requestObjHandle( requestObjRoot );
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( webserverclientObjHandle, "method", STRING_TO_JSVAL( jMethod ) );
-	}
-	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( webserverclientObjHandle, "ip", STRING_TO_JSVAL( jIp ) );
-	}
-	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( webserverclientObjHandle, "url", STRING_TO_JSVAL( jUrl ) );
+		cleanUp.req = 1;
+		JS_SetPrivate( requestObj, ( void * ) &webserverclient );
 	}
 	if ( cleanUp.good ) {
 		SET_PROPERTY_ON( webserverclientObjHandle, "request", OBJECT_TO_JSVAL( requestObj ) );
 	}
 	if ( cleanUp.good ) {
-		JS_SetPrivate( requestObj, ( void * ) &webserverclient->buffer );
+		//  @this is not rigth
+		if ( webserverclient->request.buffer != NULL ) {
+			cleanUp.good = ( ( jHeaders = JS_NewStringCopyN( cx, webserverclient->request.buffer->bytes, webserverclient->request.buffer->used ) ) != NULL );
+		}
 	}
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( requestObjHandle, "buffer", STRING_TO_JSVAL( jBuffer ) );
+		cleanUp.jheaders = 1;
+		if ( cleanUp.jheaders ) {
+			valueH = JSVAL_VOID;
+		} else {
+			valueH = STRING_TO_JSVAL( jHeaders );
+		}
+		SET_PROPERTY_ON( requestObjHandle, "headers", valueH );
+	}
+
+	if ( cleanUp.good ) {
+		//  @this is not rigth
+		if ( webserverclient->request.buffer != NULL ) {
+			cleanUp.good = ( ( jContent = JS_NewStringCopyN( cx, webserverclient->request.buffer->bytes, webserverclient->request.buffer->used ) ) != NULL );
+		}
 	}
 	if ( cleanUp.good ) {
-		SET_PROPERTY_ON( webserverclientObjHandle, "response", OBJECT_TO_JSVAL( responseObj ) );
-	}
-	if ( cleanUp.good ) {
-		JS_SetPrivate( responseObj, ( void * ) &webserverclient->response );
+		if ( cleanUp.jcontent ) {
+			valueC = JSVAL_VOID;
+		} else {
+			valueC = STRING_TO_JSVAL( jContent );
+		}
+		SET_PROPERTY_ON( requestObjHandle, "content", valueC );
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.method ) {
+		if ( cleanUp.jmethod ) {
 			JS_free( cx, jMethod ); jMethod = NULL;
 		}
 		if ( cleanUp.jip ) {
@@ -1707,8 +1747,11 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 		if ( cleanUp.jurl ) {
 			JS_free( cx, jUrl ); jUrl = NULL;
 		}
-		if ( cleanUp.jbuffer ) {
-			JS_free( cx, jBuffer ); jBuffer = NULL;
+		if ( cleanUp.jheaders) {
+			JS_free( cx, jHeaders ); jHeaders =  NULL;
+		}
+		if ( cleanUp.jcontent) {
+			JS_free( cx, jContent ); jContent = NULL;
 		}
 	}
 	// always cleanup
@@ -3252,7 +3295,7 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 	if ( cleanUp.good ) {
 		cleanUp.fn = 1;
 		snprintf( script->fileNameWithPath, len, "%s%c%s", javascript->path, PATHSEP, cFile );
-		cleanUp.good = ( stat( script->fileNameWithPath, &sb ) >= 0 && S_ISREG( sb.st_mode ) && ( sb.st_mode & S_IXUSR ) );
+		cleanUp.good = ( stat( script->fileNameWithPath, &sb ) >= 0 && S_ISREG( sb.st_mode ) && ( sb.st_mode & X_OK ) );
 	}
 	if ( cleanUp.good ) {
 		JS::RootedObject		globalObjRoot( javascript->context, javascript->globalObj );
@@ -3296,6 +3339,7 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 
 static void Script_Delete( struct script_t * script ) {
 	free( script->fileNameWithPath ); script->fileNameWithPath = NULL;
+	PR_INIT_CLIST( &script->mLink );
 	script->bytecode = NULL;
 	free( script ); script = NULL;
 }

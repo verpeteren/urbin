@@ -45,17 +45,17 @@ static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
 		picoev_set_timeout( loop, fd, webclient->timeoutSec );
 		webpage = webclient->currentWebpage;
-		if ( webpage->response.headers != NULL ) {
+		if ( webpage->response.buffer != NULL ) {
 			cleanUp.good = 1;
 		} else {
-			cleanUp.good = ( ( webpage->response.headers = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+			cleanUp.good = ( ( webpage->response.buffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
 		}
 tryToReadMoreWebclient:
 		if ( cleanUp.good ) {
-			canReadBytes = webpage->response.headers->size - webpage->response.headers->used;
+			canReadBytes = webpage->response.buffer->size - webpage->response.buffer->used;
 			cleanUp.raw = 1;
 			//  BUFFER HACK
-			didReadBytes = read( fd, &webpage->response.headers->bytes[webpage->response.headers->used], canReadBytes );
+			didReadBytes = read( fd, &webpage->response.buffer->bytes[webpage->response.buffer->used], canReadBytes );
 			switch ( didReadBytes ) {
 			case 0:
 				Webclient_CloseConn( webclient );
@@ -68,34 +68,21 @@ tryToReadMoreWebclient:
 				}
 			 break;
 			default:
-				webpage->response.headers->used += (size_t) didReadBytes;
+				webpage->response.buffer->used += (size_t) didReadBytes;
 				if ( didReadBytes == canReadBytes ) {
 					// There is more to read
 					//  @FIXME: read until content length found and end of headers, always validating that it is valid HTTP. then read the rest.
-					if ( webpage->response.headers->used > HTTP_READ_BUFFER_LIMIT ) {
+					if ( webpage->response.buffer->used > HTTP_READ_BUFFER_LIMIT ) {
 						Webclient_CloseConn( webclient );
 						break;
 					}
-					cleanUp.good = ( Buffer_Increase( webpage->response.headers, HTTP_READ_BUFFER_LENGTH ) == 1 );
+					cleanUp.good = ( Buffer_Increase( webpage->response.buffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
 					goto tryToReadMoreWebclient;
 				}
-				webpage->response.headers->bytes[webpage->response.headers->used] = '\0';
-				if ( h3_request_header_parse( webpage->response.header, webpage->response.headers->bytes, webpage->response.headers->used ) == 0 ) {
-					HeaderField * headerField;
-					size_t contentStartPos;
-					// it is a valid HTTP request
-					contentStartPos = 0;
-					if ( webpage->response.header->Fields != NULL ) {
-						headerField = &webpage->response.header->Fields[webpage->response.header->HeaderSize];
-						contentStartPos = headerField->Value + headerField->ValueLen + 4 - webpage->response.headers->bytes;
-					} else {
-						contentStartPos = webpage->response.header->RequestLineEnd + 4 - webpage->response.headers->bytes;
-					}
-					if ( contentStartPos > 0 && contentStartPos < webpage->response.headers->used ) {
-						cleanUp.good = ( Buffer_Split( webpage->response.headers, webpage->response.content, contentStartPos ) == 1 );
-					}
+				webpage->response.buffer->bytes[webpage->response.buffer->used] = '\0';
+				if ( h3_request_header_parse( webpage->response.header, webpage->response.buffer->bytes, webpage->response.buffer->used ) == 0 ) {
+					//  @TODO check the H3_ERROR enum, how we are doing right now
 				}
-				//  @TODO:  then parse headers,  parse headers and split the headers and the content
 				if ( webpage->handlerCb != NULL ) {
 					webpage->handlerCb( webpage );
 				}
@@ -158,6 +145,9 @@ tryToWriteMoreWebclient:
 					wroteBytes = write( fd, &webpage->request.headers->bytes[webpage->wroteBytes], len - webpage->wroteBytes );  //  headers need to end with \r\n\n
 				} else {
 					Webclient_CloseConn( webclient );
+				}
+				if ( webpage->mode == MODE_GET ) {
+					done = 1;
 				}
 				break;
 			case SENDING_CONTENT:
@@ -251,8 +241,7 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 		webpage->request.headers = NULL;
 		webpage->request.content = NULL;
 		webpage->response.header = NULL;
-		webpage->response.headers = NULL;
-		webpage->response.content = NULL;
+		webpage->response.buffer = NULL;
 		webpage->sendingNow = SENDING_NONE;
 		webpage->wroteBytes = 0;
 		webpage->response.httpCode = HTTPCODE_NONE;
@@ -342,8 +331,7 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 			webpage->request.topLine = NULL;
 			webpage->request.headers = NULL;
 			webpage->request.content = NULL;
-			webpage->response.headers = NULL;
-			webpage->response.content = NULL;
+			webpage->response.buffer = NULL;
 			webpage->response.httpCode = HTTPCODE_NONE;
 			webpage->clearFuncCb = NULL;
 			free( webpage ); webpage = NULL;
@@ -428,7 +416,7 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	if ( webpage->clearFuncCb != NULL && webpage->cbArgs != NULL ) {
 		webpage->clearFuncCb( webpage->cbArgs );
 	}
-	//  response
+	//  request
 	if ( webpage->request.topLine != NULL ) {
 		Buffer_Delete( webpage->request.topLine ); webpage->request.topLine = NULL;
 	}
@@ -438,15 +426,12 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	if ( webpage->request.content != NULL ) {
 		Buffer_Delete( webpage->request.content ); webpage->request.content = NULL;
 	}
-	//  request
-	if ( webpage->response.headers != NULL ) {
-		Buffer_Delete( webpage->response.headers ); webpage->response.headers = NULL;
-	}
-	if ( webpage->response.content != NULL ) {
-		Buffer_Delete( webpage->response.content ); webpage->response.content = NULL;
-	}
+	//  response
 	if ( webpage->response.header != NULL ) {
 		h3_request_header_free( webpage->response.header ); webpage->response.header = NULL;
+	}
+	if ( webpage->response.buffer != NULL ) {
+		Buffer_Delete( webpage->response.buffer ); webpage->response.buffer = NULL;
 	}
 	webpage->response.httpCode = HTTPCODE_NONE;
 	webpage->handlerCb = NULL;
@@ -456,6 +441,7 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 	webpage->cbArgs = NULL;
 	webpage->clearFuncCb = NULL;
 	uriFreeUriMembersA( &webpage->uri );
+	PR_INIT_CLIST( &webpage->mLink );
 	free( webpage->url ); webpage->url = NULL;
 	free( webpage ); webpage = NULL;
 }

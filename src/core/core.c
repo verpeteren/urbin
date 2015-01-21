@@ -162,6 +162,7 @@ struct buffer_t * Buffer_NewText( const char * text ) {
 
 	return buffer;
 }
+#if 0
 unsigned char Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * otherBuffer, size_t orgBufferSplitPos ) {
 	size_t rest;
 	struct {unsigned char good:1; } cleanUp;
@@ -192,6 +193,7 @@ unsigned char Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * other
 	}
 	return ( cleanUp.good ) ? 1: 0;
 }
+#endif
 
 unsigned char Buffer_Append( struct buffer_t * buffer, const char * bytes, size_t bytesLen ) {
 	size_t i, newSize;
@@ -391,6 +393,7 @@ static void Timing_Delete( struct timing_t * timing ) {
 	timing->timerHandler_cb = NULL;
 	timing->clearFunc_cb = NULL;
 	timing->cbArgs = NULL;
+	PR_INIT_CLIST( &timing->mLink );
 	free( timing ); timing = NULL;
 }
 

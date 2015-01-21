@@ -116,7 +116,7 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 		startPos = region->beg[gn];
 		endPos = region->end[gn];
 		len = endPos - startPos;
-		start = namedRegex->webserverclient->header->RequestURI + startPos;
+		start = namedRegex->webserverclient->request.header->RequestURI + startPos;
 		cleanUp.good = ( ( namedRegex->kvPairs[slot] = Xstrdup( (const char *) name ) ) != NULL );
 		if ( cleanUp.good ) {
 			cleanUp.good = ( ( namedRegex->kvPairs[slot + 1] = calloc( 1, len + 1 ) ) != NULL );
@@ -241,6 +241,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 		if ( route->clearFuncCb != NULL && route->cbArgs != NULL ) {
 			route->clearFuncCb( route->cbArgs );
 		}
+		PR_INIT_CLIST( &route->mLink );
 		route->clearFuncCb = NULL;
 		route->cbArgs = NULL;
 		free( route ); route = NULL;
@@ -261,7 +262,6 @@ static struct webserverclient_t * Webserverclient_New( struct webserver_t * webs
 		cleanUp.webserverclient = 1;
 		webserverclient->socketFd = socketFd;
 		webserverclient->webserver = webserver;
-		webserverclient->header = NULL;
 		webserverclient->route = NULL;
 		webserverclient->response.start = time( 0 );
 		webserverclient->response.end = 0;
@@ -272,7 +272,8 @@ static struct webserverclient_t * Webserverclient_New( struct webserver_t * webs
 		webserverclient->connection = CONNECTION_CLOSE;
 		webserverclient->wroteBytes = 0;
 		webserverclient->mode = MODE_GET;
-		webserverclient->buffer = NULL;
+		webserverclient->request.header = NULL;
+		webserverclient->request.buffer = NULL;
 		if ( webserverclient == CONTENTTYPE_BUFFER ) {
 			webserverclient->response.content.dynamic.buffer = NULL;
 		} else {
@@ -361,11 +362,11 @@ const char * Webserverclient_GetUrl( const struct webserverclient_t * webserverc
 			unsigned char url:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	len = webserverclient->header->RequestURILen;
+	len = webserverclient->request.header->RequestURILen;
 	cleanUp.good = ( ( url = malloc( len + 1 ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.url = 1;
-		snprintf( url, len + 1, "%s", webserverclient->header->RequestURI );
+		snprintf( url, len + 1, "%s", webserverclient->request.header->RequestURI );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.url ) {
@@ -482,7 +483,7 @@ static void Webserverclient_RenderFile( struct webserverclient_t * webserverclie
 	cleanUp.good = ( ( requestedPath = malloc( pathLength + 1 ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.requestedPath = 1;
-		snprintf( requestedPath, pathLength, "%s", &webserverclient->header->RequestURI[webserverclient->region->beg[1]] );
+		snprintf( requestedPath, pathLength, "%s", &webserverclient->request.header->RequestURI[webserverclient->region->beg[1]] );
 	}
 	//  check that the file is not higher then the documentRoot. Such as  ../../../../etc/passwd
 	for ( j = 0; j < pathLength - 1; j++ ) {
@@ -555,17 +556,17 @@ static unsigned char Webserverclient_PrepareRequest( struct webserverclient_t * 
 			unsigned char h3:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	cleanUp.good = ( ( webserverclient->header = h3_request_header_new( ) ) != NULL );
+	cleanUp.good = ( ( webserverclient->request.header = h3_request_header_new( ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.h3 = 1;
-		cleanUp.good = ( ( h3_request_header_parse( webserverclient->header, webserverclient->buffer->bytes, webserverclient->buffer->used ) ) == 0 );
+		cleanUp.good = ( ( h3_request_header_parse( webserverclient->request.header, webserverclient->request.buffer->bytes, webserverclient->request.buffer->used ) ) == 0 );
 	}
 	if ( cleanUp.good ) {
-		if ( strncmp( webserverclient->header->RequestMethod, "POST", webserverclient->header->RequestMethodLen ) == 0 ) {
+		if ( strncmp( webserverclient->request.header->RequestMethod, "POST", webserverclient->request.header->RequestMethodLen ) == 0 ) {
 			webserverclient->mode = MODE_POST;
 		}
-		for ( i = 0; i < webserverclient->header->HeaderSize; i++ ) {
-			field = &webserverclient->header->Fields[i];
+		for ( i = 0; i < webserverclient->request.header->HeaderSize; i++ ) {
+			field = &webserverclient->request.header->Fields[i];
 			//  @TODO:  https://github.com/c9s/h3/issues/4
 			if ( strncmp( field->FieldName, "Connection", field->FieldNameLen ) == 0 ) {  //  @TODO:  RTFSpec! only if http/1.1 yadayadyada... http://i.stack.imgur.com/whhD1.png
 				close = ConnectionDefinitions[CONNECTION_CLOSE];
@@ -720,7 +721,7 @@ static unsigned char Webserverclient_PrepareRequest( struct webserverclient_t * 
 		}
 	} else {
 		if ( cleanUp.h3 ) {
-			h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
+			h3_request_header_free( webserverclient->request.header ); webserverclient->request.header = NULL;
 		}
 	}
 
@@ -728,10 +729,10 @@ static unsigned char Webserverclient_PrepareRequest( struct webserverclient_t * 
 }
 
 static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) {
-	if ( webserverclient->header != NULL ) {
-			h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
+	if ( webserverclient->request.header != NULL ) {
+			h3_request_header_free( webserverclient->request.header ); webserverclient->request.header = NULL;
 		}
-		Buffer_Reset( webserverclient->buffer, webserverclient->buffer->size );
+		Buffer_Reset( webserverclient->request.buffer, webserverclient->request.buffer->size );
 		webserverclient->route = NULL;
 		webserverclient->response.start = time( 0 );
 		webserverclient->response.end = 0;
@@ -759,8 +760,8 @@ static void Webserverclient_CloseConn( struct webserverclient_t * webserverclien
 	}
 
 static void Webserverclient_Delete( struct webserverclient_t * webserverclient ) {
-	if ( webserverclient->header != NULL ) {
-		h3_request_header_free( webserverclient->header ); webserverclient->header = NULL;
+	if ( webserverclient->request.header != NULL ) {
+		h3_request_header_free( webserverclient->request.header ); webserverclient->request.header = NULL;
 	}
 	webserverclient->route = NULL;
 	webserverclient->response.httpCode = HTTPCODE_NONE;
@@ -771,8 +772,8 @@ static void Webserverclient_Delete( struct webserverclient_t * webserverclient )
 	webserverclient->connection = CONNECTION_CLOSE;
 	webserverclient->mode = MODE_GET;
 	webserverclient->wroteBytes = 0;
-	if ( webserverclient->buffer != NULL ) {
-		Buffer_Delete( webserverclient->buffer ); webserverclient->buffer = NULL;
+	if ( webserverclient->request.buffer != NULL ) {
+		Buffer_Delete( webserverclient->request.buffer ); webserverclient->request.buffer = NULL;
 	}
 	onig_region_free( webserverclient->region, 1 ); webserverclient->region = NULL;
 	if ( webserverclient->response.contentType == CONTENTTYPE_FILE ) {
@@ -859,16 +860,16 @@ static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 	} else {
 		/* update timeout, and read */
 		picoev_set_timeout( loop, fd, webserverclient->webserver->timeoutSec );
-		if ( webserverclient->buffer != NULL ) {
+		if ( webserverclient->request.buffer != NULL ) {
 			cleanUp.good = 1;
 		} else {
-			cleanUp.good = ( ( webserverclient->buffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
+			cleanUp.good = ( ( webserverclient->request.buffer = Buffer_New( HTTP_READ_BUFFER_LENGTH ) ) != NULL );
 		}
 tryToReadMoreWebserver:
 		if ( cleanUp.good ) {
-			canReadBytes = webserverclient->buffer->size - webserverclient->buffer->used;
+			canReadBytes = webserverclient->request.buffer->size - webserverclient->request.buffer->used;
 			//  BUFFER HACK
-			didReadBytes = read( fd, webserverclient->buffer->bytes, canReadBytes );
+			didReadBytes = read( fd, webserverclient->request.buffer->bytes, canReadBytes );
 			switch ( didReadBytes ) {
 			case 0: /* connection closed by peer */
 				Webserverclient_CloseConn( webserverclient );
@@ -881,17 +882,17 @@ tryToReadMoreWebserver:
 				}
 				break;
 			default:
-				webserverclient->buffer->used += (size_t) didReadBytes;
+				webserverclient->request.buffer->used += (size_t) didReadBytes;
 				if ( didReadBytes == canReadBytes ) {
 					// There is more to read
-					if ( webserverclient->buffer->used > HTTP_READ_BUFFER_LIMIT ) {
+					if ( webserverclient->request.buffer->used > HTTP_READ_BUFFER_LIMIT ) {
 						Webserverclient_CloseConn( webserverclient );
 						break;
 					}
-					cleanUp.good = ( Buffer_Increase( webserverclient->buffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
+					cleanUp.good = ( Buffer_Increase( webserverclient->request.buffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
 					goto tryToReadMoreWebserver;
 				}
-				webserverclient->buffer->bytes[webserverclient->buffer->used] = '\0';
+				webserverclient->request.buffer->bytes[webserverclient->request.buffer->used] = '\0';
 				cleanUp.good = ( Webserverclient_PrepareRequest( webserverclient ) == 1 );
 				if ( cleanUp.good )  {
 					webserverclient->sendingNow = SENDING_TOPLINE;
@@ -1190,8 +1191,8 @@ static void Webserver_FindRoute( const struct webserver_t * webserver, struct we
 	int r, found;
 
 	webserverclient->route = NULL;
-	start = (const unsigned char * ) webserverclient->header->RequestURI;
-	end = start + webserverclient->header->RequestURILen;
+	start = (const unsigned char * ) webserverclient->request.header->RequestURI;
+	end = start + webserverclient->request.header->RequestURILen;
 	range = end;
 	firstRoute = route = webserver->routes;
 	if ( firstRoute != NULL ) {

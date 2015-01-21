@@ -12,7 +12,6 @@ extern "C" {
 #endif
 
 struct webpage_t;
-struct headers_t;
 
 typedef void 						(*	webclientHandler_cb_t)	( const struct webpage_t * webpage );
 
@@ -34,8 +33,7 @@ struct webpage_t{
 	struct {
 		RequestHeader *	 					header;
 		enum httpCode_t 					httpCode;
-		struct buffer_t *					headers;
-		struct buffer_t *					content;
+		struct buffer_t *					buffer;
 								} 		response;
 };
 

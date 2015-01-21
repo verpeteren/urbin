@@ -16,6 +16,17 @@ extern "C" {
 #define HTTP_READ_BUFFER_LENGTH 2048
 #define HTTP_READ_BUFFER_LIMIT  1024 * 1024 * 50  //  50 MB
 
+#define H3_HEADERS_BLOCK( header, start, end, found ) do {\
+	start = end = NULL; \
+	if ( (header)->Fields != NULL ) { \
+		start = (char *) (header)->Fields[0].Value;\
+		end = (char *) ( (header)->Fields[(header)->HeaderSize].Value + (header)->Fields[(header)->HeaderSize].ValueLen ) ;\
+	} else if ( (header)->RequestLineEnd > (header)->RequestLineEnd ) { \
+		end = start = ( char *) ( (header)->RequestLineEnd + 4 ); \
+	} \
+	found = ( start != NULL ); \
+} while( 0 );
+
 enum requestMode_t {
 	MODE_GET 								 = 0,
 	MODE_POST 								 = 1

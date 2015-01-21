@@ -68,17 +68,6 @@ struct mimeDetail_t {
 	const char *				applicationString;
 };
 
-struct webserver_t {
-	const struct core_t *		core;
-	struct route_t *			routes;
-	OnigOptionType				regexOptions;
-	uint16_t					port;
-	int							socketFd;
-	unsigned char				timeoutSec;
-	const char *				hostName;
-
-};
-
 struct webserverclientresponse_t {
 	time_t					start;
 	time_t					end;
@@ -105,18 +94,28 @@ struct webserverclient_t{
 	struct webserver_t *		 		webserver;
 	struct route_t *					route;
 	OnigRegion *						region;
-	RequestHeader *	 					header;
-	struct buffer_t *					buffer;
+	struct {
+		RequestHeader *	 					header;
+		struct buffer_t *					buffer;
+							}			request;
 	struct webserverclientresponse_t	response;
-	};
+};
+
+struct webserver_t {
+	const struct core_t *		core;
+	struct route_t *			routes;
+	OnigOptionType				regexOptions;
+	uint16_t					port;
+	int							socketFd;
+	unsigned char				timeoutSec;
+	const char *				hostName;
+};
 
 struct namedRegex_t {
 	size_t 								numGroups;
 	char ** 							kvPairs;
 	const struct webserverclient_t * 	webserverclient;
 };
-
-
 
 unsigned char					Webserverclientresponse_SetContent	( struct webserverclientresponse_t * response, const char * content );
 unsigned char					Webserverclientresponse_SetCode		( struct webserverclientresponse_t * response, const unsigned int code );
