@@ -15,8 +15,6 @@
 
 #define MAIN_OBJ_NAME "Urbin"
 
-extern const char * ConnectionDefinitions[];
-
 /* ============================================================================================================================================================== */
 /* Naming convention deviations for this file                                                                                                                     */
 /*                                                                                                                                                                */
@@ -190,7 +188,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 #define SET_PROPERTY_ON( handle, key, value ) do {\
 	JS::RootedValue valRoot( cx, value ); \
 	JS::HandleValue valHandle( valRoot ); \
-	cleanUp.good = ( JS_DefineProperty( cx, handle, key, valHandle, attrs, JS_PropertyStub, JS_StrictPropertyStub ) == true ); \
+	cleanUp.good = ( JS_DefineProperty( cx, handle, key, valHandle, attrs, nullptr, nullptr ) == true ); \
 } while ( 0 );
 
 #define CONNOBJ_GET_PROP_STRING( property, var ) do { \
@@ -3215,7 +3213,7 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vp ) 
 
 static const JSClass jscGlobal = {
 	"global",
-	JSCLASS_NEW_RESOLVE | JSCLASS_GLOBAL_FLAGS | JSCLASS_IS_GLOBAL | JSCLASS_HAS_PRIVATE,
+	JSCLASS_GLOBAL_FLAGS | JSCLASS_IS_GLOBAL | JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_DeletePropertyStub, JS_PropertyStub, JS_StrictPropertyStub, JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, nullptr, nullptr, nullptr, nullptr, nullptr, {nullptr}
 };
 
