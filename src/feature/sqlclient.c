@@ -753,7 +753,7 @@ static void Sqlclient_CloseConn( struct sqlclient_t * sqlclient ) {
 		if ( sqlclient->connection.my.conn != NULL ) {
 			free( sqlclient->connection.my.conn->buf ); sqlclient->connection.my.conn->buf = NULL;
 			mysac_close( sqlclient->connection.my.conn ); sqlclient->connection.my.conn = NULL;
-			//  @TODO check if memset on password field is needed
+			//  @TODO:  check if memset on password field is needed
 		}
 		break;
 #endif

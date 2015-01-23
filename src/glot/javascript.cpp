@@ -284,7 +284,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 		args.rval( ).setNull( );
 	}
 
-	memset( cPassword, '\0', strlen( cPassword ) ); /*  @TODO:  clean jPassword */
+	memset( cPassword, '\0', strlen( cPassword ) ); //  @TODO:  clean jPassword
 	JS_free( cx, cHostName ); cHostName = NULL;
 	JS_free( cx, cUserName ); cUserName = NULL;
 	JS_free( cx, cPassword ); cPassword = NULL;
@@ -1120,7 +1120,7 @@ static bool JsnWebclient_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	mode = MODE_GET;
 	payload = NULL;
 	cMode = cHeaders = cContent = cUrl = NULL;
-	//  @TODO: refractor core funcion of constructor and Queue into define
+	//  @TODO:  refractor core funcion of constructor and Queue into define
 	cleanUp.good = ( JS_ConvertArguments( cx, args, "S*o/i", &jUrl, &dummyVal, &connObj, &timeoutSec ) == true );
 	//somehow, connObj is not converted to an object
 	connObj = &args[2].toObject( );
@@ -2639,7 +2639,7 @@ static bool JsnOs_Dir( JSContext *cx, unsigned argc, jsval * vp ) {
  * @function
  * @static
  * @public
- * @deprecated: // @TODO:  future versions will probably run in a seperate thread
+ * @deprecated: future versions will probably run in a seperate thread
  * @since 0.0.8a
  *
  * @param {string} exec The full path to the executable. This must exist and executable

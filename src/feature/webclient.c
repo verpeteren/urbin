@@ -71,7 +71,7 @@ tryToReadMoreWebclient:
 				webpage->response.buffer->used += (size_t) didReadBytes;
 				if ( didReadBytes == canReadBytes ) {
 					// There is more to read
-					//  @FIXME: read until content length found and end of headers, always validating that it is valid HTTP. then read the rest.
+					//  @FIXME:  read until content length found and end of headers, always validating that it is valid HTTP. then read the rest.
 					if ( webpage->response.buffer->used > HTTP_READ_BUFFER_LIMIT ) {
 						Webclient_CloseConn( webclient );
 						break;
@@ -81,7 +81,7 @@ tryToReadMoreWebclient:
 				}
 				webpage->response.buffer->bytes[webpage->response.buffer->used] = '\0';
 				if ( h3_request_header_parse( webpage->response.header, webpage->response.buffer->bytes, webpage->response.buffer->used ) == 0 ) {
-					//  @TODO check the H3_ERROR enum, how we are doing right now
+					//  @TODO:  check the H3_ERROR enum, how we are doing right now
 				}
 				if ( webpage->handlerCb != NULL ) {
 					webpage->handlerCb( webpage );

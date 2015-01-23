@@ -378,7 +378,7 @@ static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t iden
 	return timing;
 }
 static void Timer_CalculateDue( struct timing_t * timing, const PRUint32 nowOrHorizon ) {
-	timing->due = ( nowOrHorizon + ( 1000 * timing->ms ) - 1 );  //  @FIXME, this might overflow if ms is in the far future ( +6 hours )
+	timing->due = ( nowOrHorizon + ( 1000 * timing->ms ) - 1 );  //  @FIXME:  this might overflow if ms is in the far future ( +6 hours )
 }
 
 static void Timing_Delete( struct timing_t * timing ) {
