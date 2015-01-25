@@ -346,6 +346,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResu
 	JS::RootedObject        sqlObjRoot( cx, sqlObj );
 	JS::RootedValue 		paramListRoot( cx, paramList );
 	JS::HandleValue 		paramListHandle( paramListRoot );
+	JS::MutableHandleValue	paramListMut( &paramListRoot );
 	JS::HandleValueArray 	paramListHandleArray( paramListRoot);
 	JS::RootedValue 		fnValRoot( cx, fnVal );
 	JS::HandleValue 		fnValHandle( fnValRoot );
@@ -360,6 +361,10 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResu
 		cleanUp.good = ( JS_ConvertValue( cx, fnValHandle, JSTYPE_FUNCTION, fnValMut ) == true );
 	}
 	if ( cleanUp.good ) {
+		cleanUp.good = ( ( cStatement = JS_EncodeString( cx, jStatement ) ) != NULL );
+	}
+	if ( cleanUp.good ) {
+		cleanUp.statement = 1;
 		if ( paramList.isNullOrUndefined( ) ) {
 			/*  it is a query like "SELECT user FROM users WHERE user_id = 666", 				null, 		function( result ) {console.log( result );} ); */
 			nParams = 0;
@@ -370,9 +375,12 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResu
 			if ( cleanUp.good ) {
 				cleanUp.params = 1; \
 				if ( paramList.isNumber( ) ) {
-					paramList.setString( paramList.toString( ) );
+					if ( JS_ConvertValue( cx, paramListHandle, JSTYPE_STRING, paramListMut ) ) {
+						cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, paramListMut.toString( ) ) ) != NULL );
+					}
+				} else {
+					cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, paramList.toString( ) ) ) != NULL );
 				}
-				cleanUp.good = ( ( cParamValues[i] = JS_EncodeString( cx, value.toString( ) ) ) != NULL );
 			}
 		} else {
 			/*  it is a query like "SELECT user FROM users WHERE user_id BETWEEN $1 AND $2",	[664, 668],	function( result ) {console.log( result );} ); */
@@ -398,9 +406,18 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResu
 							JS::RootedId 			idRoot( cx, idArray[i] );
 							JS::HandleId			idHandle( idRoot );
 							JS::RootedValue 		valueRoot( cx, paramVal );
+							JS::HandleValue			valueHandle( valueRoot );
 							JS::MutableHandleValue	valueMut( &valueRoot );
 							if ( JS_GetPropertyById( cx, paramObjHandle, idHandle, valueMut ) ) {
-								success = ( ( cParamValues[i] = JS_EncodeString( cx, valueMut.toString( ) ) ) != NULL );
+								if ( valueMut.isNull( ) ) {
+									success = ( ( cParamValues[i] = Xstrdup( "NULL" ) ) != NULL );
+								} else if ( valueMut.isNumber( ) ) {
+									if ( JS_ConvertValue( cx, valueHandle, JSTYPE_STRING, valueMut ) ) {
+										success = ( ( cParamValues[i] = JS_EncodeString( cx, valueMut.toString( ) ) ) != NULL );
+									}
+								} else {
+									success = ( ( cParamValues[i] = JS_EncodeString( cx, valueMut.toString( ) ) ) != NULL );
+								}
 							}
 						}
 					}
@@ -414,10 +431,6 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResu
 	}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		cleanUp.good = ( ( cStatement = JS_EncodeString( cx, jStatement ) ) != NULL );
-	}
-	if ( cleanUp.good ) {
-		cleanUp.statement = 1;
 		Query_New( sqlclient, cStatement, nParams, cParamValues, handler_cb, ( void * ) payload, Payload_Delete_Anon );
 	}
 	/*  always cleanup  */
@@ -457,6 +470,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 	JSString * jstr;
 	MYSAC_ROW *row;
 	MYSAC_RES * result;
+	MYSQL_FIELD * field;
 	jsval jValue, currentVal;
 	unsigned int rowId, rowCount, colId, colCount;
 	char * cFieldName, * cValue;
@@ -485,21 +499,57 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 						JS::RootedValue 	currentValRoot( cx, currentVal );
 						JS::HandleValue 	currentValHandle( currentValRoot );
 						JS_SetElement( cx, resultArrayHandle, rowId, currentValHandle );
-						for ( colId = 0; colId < colCount; colId++ ) {
-							cFieldName = ( ( MYSAC_RES * ) result )->cols[colId].name;
-							cValue = row[colId].blob;
-							if ( cValue == NULL ) {
-								jValue = JSVAL_NULL;
-							} else {
-								cleanUp.good = ( ( jstr = JS_NewStringCopyZ( cx, cValue ) ) != NULL );
-								if ( cleanUp.good ) {
-									jValue = STRING_TO_JSVAL( jstr );
-								} else {
-									jValue = JSVAL_VOID;  //  not quite true
-								}
-								if ( ! cleanUp.good ) {
+						for ( colId = 0; cleanUp.good && colId < colCount; colId++ ) {
+							field = &( ( MYSAC_RES * ) result )->cols[colId];
+							cFieldName = field->name;
+							switch( field->type ) {
+								//  @TODO: finetune this
+								case MYSQL_TYPE_NULL:
+									jValue = JSVAL_NULL;
 									break;
-								}
+								case MYSQL_TYPE_LONG:
+								case MYSQL_TYPE_LONGLONG:
+									jValue = JS_NumberValue( (double) row[colId].ubigint );
+									break;
+								case MYSQL_TYPE_FLOAT:
+									jValue = JS_NumberValue( row[colId].mfloat );
+									break;
+								case MYSQL_TYPE_DOUBLE:
+									jValue = JS_NumberValue( row[colId].mdouble );
+									break;
+									break;
+								case MYSQL_TYPE_ENUM:
+								case MYSQL_TYPE_STRING:
+								case MYSQL_TYPE_VARCHAR:
+								case MYSQL_TYPE_VAR_STRING:
+								case MYSQL_TYPE_TINY_BLOB:
+								case MYSQL_TYPE_MEDIUM_BLOB:
+								case MYSQL_TYPE_LONG_BLOB:
+								case MYSQL_TYPE_BLOB:
+									cValue = row[colId].blob;
+									cleanUp.good = ( ( jstr = JS_NewStringCopyZ( cx, cValue ) ) != NULL );
+									if ( cleanUp.good ) {
+										jValue = STRING_TO_JSVAL( jstr );
+									}
+									break;
+								case MYSQL_TYPE_BIT:
+								case MYSQL_TYPE_TINY:
+								case MYSQL_TYPE_INT24:
+								case MYSQL_TYPE_YEAR:
+								case MYSQL_TYPE_SHORT:
+								case MYSQL_TYPE_SET:
+								case MYSQL_TYPE_GEOMETRY:
+								case MYSQL_TYPE_DECIMAL:
+								case MYSQL_TYPE_NEWDECIMAL:
+								case MYSQL_TYPE_TIME:
+								case MYSQL_TYPE_NEWDATE:
+								case MYSQL_TYPE_DATE:
+								case MYSQL_TYPE_DATETIME:
+								case MYSQL_TYPE_TIMESTAMP:
+								break;
+								default:
+									jValue = JSVAL_VOID;  //  not quite true
+									break;
 							}
 							JS::RootedValue	jValueRoot( cx, jValue );
 							JS::HandleValue	jValueHandle( jValueRoot );
@@ -869,7 +919,6 @@ extern const char * MethodDefinitions[ ];
 */
 
 static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, const struct webpage_t * webpage ) {
-	//  @FIXME:  allA  SEE webserver_Route_ResultToJS
 	JSContext * cx;
 	JSObject * webpageObj, * thisObj;
 	JSString * jHeaders, * jContent;

@@ -3,7 +3,6 @@
 
 #include "../core/utils.h"
 #include "sqlclient.h"
-
 /*****************************************************************************/
 /* Module                                                                    */
 /*****************************************************************************/
@@ -176,7 +175,7 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 						done = ( query->result.pg.res == NULL );
 						if ( ! done && query->cbHandler != NULL ) {
 							if ( query->result.pg.res != NULL ) {
-								//  Most of the time all the results are returend in the first loop, but just in case we have to call it again.
+								//  Most of the time all the results are returned in the first loop, but just in case we have to call it again.
 								query->cbHandler( query );
 							}
 							PQclear( query->result.pg.res ); query->result.pg.res = NULL;
