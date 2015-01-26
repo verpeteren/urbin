@@ -64,6 +64,7 @@ void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const
 		cleanUp.values = 1;
 		for ( i = 0; i < query->paramCount; i++ ) {
 			query->paramLengths[i] = strlen( paramValues[i] );
+ 			//  @TODO:  Mysql insert with parameters is not running correctly
 			cleanUp.good = ( ( query->paramValues[i] = Xstrdup( paramValues[i] ) ) != NULL );
 			if ( ! cleanUp.good ) {
 				break;

@@ -1,4 +1,5 @@
 urbin
 lib*.a
 lib*.so*
+callgrind.out.*
 

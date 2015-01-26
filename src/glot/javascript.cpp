@@ -502,8 +502,8 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 						for ( colId = 0; cleanUp.good && colId < colCount; colId++ ) {
 							field = &( ( MYSAC_RES * ) result )->cols[colId];
 							cFieldName = field->name;
-							switch( field->type ) {
-								//  @TODO: finetune this
+ 							//  @TODO:  Not all mysql types will be correctly converted into javascript items
+							switch ( field->type ) {
 								case MYSQL_TYPE_NULL:
 									jValue = JSVAL_NULL;
 									break;

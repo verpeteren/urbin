@@ -1,6 +1,5 @@
 'use strict'
 
-var apedev = {host : '10.0.0.25', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 };
 var mysqlDetective = {host : 'localhost', db : 'SQLDETECTIVE', user : 'sqldetective', password : 'sherlock', port : 3306 };
 var pgsqlDetective = {host : 'localhost', db : 'sqldetective', user : 'sqldetective', password : 'sherlock', port : 5432 };
 
@@ -22,16 +21,16 @@ try {
 		console.log( 'load' );
 	}
 	Urbin.onReady = function( ) {
-		var test = { webserver: 		false,
+		var test = { webserver: 		true,
 					webclient:			false,
 					os: {	file: 		false,
 							env:		false,
 							system:		false,
-							mkdir:		true,
-							rm:			true,
-							dir:		true,
-							symlink:	true,
-							readdir:	true,
+							mkdir:		false,
+							rm:			false,
+							dir:		false,
+							symlink:	false,
+							readdir:	false,
 							hostName:	false
 						},
 					sql: { 	pg: 		false,
@@ -41,32 +40,35 @@ try {
 					interval: 			false
 					};
 		if ( test.webserver ) {
-			var ws = Urbin.Webserver( {ip: '127.0.0.1', port: 8888}, 60 );
+			var ws = Urbin.Webserver( {ip: 'localhost', port: 8888}, 60 );
 			ws.addDocumentRoot( '^/static/(?<path>.*)', '../var/www/static/' );
 			ws.addDocumentRoot( '^/docs/(?<path>.*)', '../var/www/docs/' );
 			ws.addRoute( '^/dynamic/(?<path>.*)', function( client ) {
 					console.log( 'requested: ' + client.method + ' ' + client.ip + ' ' + client.url );
 					client.response.setContent( 'okidokie' ).setMime( 'html' ).setCode( 200 );
+					console.log( client.request.headers );
+					console.log( client.request.content );
 				}
 			);
 			ws.addRoute( '^/blog/(?<year>[0-9]{4})/(?<month>[0-9]{1,2})/(?<day>[0-9]{1,2})', function( client ) {
 				var params = client.getNamedGroups( );
 				var blog = 'Well,  on ' + params.year + '-' + params.month + '-' + params.day + ' nothing happened';
 				client.response.setContent( blog ).setMime( 'html' ).setCode( 200 );
+					console.log( client.request.headers );
+					console.log( client.request.content );
 			 } );
 		}
 		if ( test.webclient ) {
-			var showResponse = function( data ) {
+			var showResponse = function( response ) {
 				console.log( "\n\n\ngot webpage" );
-				console.log( data.code );
-				console.log( data.headers );
-
+				console.log( response.code );
+				console.log( response.headers );
+				console.log( response.content );
 			}
 			var con = {method: 'GET', headers: 'Host: www.urbin.info\r\nAccept: text/html\r\n Cache-Control: max-age=0\r\n', content: '/content/'};
-			var wc = Urbin.Webclient( 'http://127.0.0.1/benchmark.html', showResponse, con, 60 );
-			wc.queue( 'http://127.0.0.1/index.html', showResponse, con );
-			// todo with out scheme
-			// todo with port
+			var wc = Urbin.Webclient( 'http://localhost:80/benchmark.html', showResponse, con, 60 );
+		//	wc.queue( '127.0.0.1:80/index.html', showResponse, con );
+			wc.queue( 'http://localhost:80/index.html', showResponse, con );
 		}
 		if ( test.os.hostName ) {
 			os.getHostByName('www.urbin.info', function( ip ) {
@@ -77,6 +79,13 @@ try {
 				}
 			});
 			os.getHostByName('www.google.com', function( ip ) {
+				if ( ip ) {
+					console.log( 'Resolved: ' + ip );
+				} else {
+					console.log( 'Could not resolve host' );
+				}
+			});
+			os.getHostByName('self', function( ip ) {
 				if ( ip ) {
 					console.log( 'Resolved: ' + ip );
 				} else {
