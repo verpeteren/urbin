@@ -502,14 +502,17 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 						for ( colId = 0; cleanUp.good && colId < colCount; colId++ ) {
 							field = &( ( MYSAC_RES * ) result )->cols[colId];
 							cFieldName = field->name;
- 							//  @TODO:  Not all mysql types will be correctly converted into javascript items
+							//  This reflects the logic in mysac_decode_row mysac_decode_binary_row etch
 							switch ( field->type ) {
 								case MYSQL_TYPE_NULL:
 									jValue = JSVAL_NULL;
 									break;
+								case MYSQL_TYPE_INT24:
 								case MYSQL_TYPE_LONG:
+									jValue = JS_NumberValue( (double) row[colId].sint );
+									break;
 								case MYSQL_TYPE_LONGLONG:
-									jValue = JS_NumberValue( (double) row[colId].ubigint );
+									jValue = JS_NumberValue( (double) row[colId].sbigint );
 									break;
 								case MYSQL_TYPE_FLOAT:
 									jValue = JS_NumberValue( row[colId].mfloat );
@@ -517,15 +520,22 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 								case MYSQL_TYPE_DOUBLE:
 									jValue = JS_NumberValue( row[colId].mdouble );
 									break;
+								case MYSQL_TYPE_TINY:
+									jValue = JS_NumberValue( row[colId].stiny );
 									break;
-								case MYSQL_TYPE_ENUM:
-								case MYSQL_TYPE_STRING:
-								case MYSQL_TYPE_VARCHAR:
-								case MYSQL_TYPE_VAR_STRING:
+								case MYSQL_TYPE_SHORT:
+									jValue = JS_NumberValue( row[colId].ssmall );
+									break;
+
 								case MYSQL_TYPE_TINY_BLOB:
 								case MYSQL_TYPE_MEDIUM_BLOB:
 								case MYSQL_TYPE_LONG_BLOB:
 								case MYSQL_TYPE_BLOB:
+								case MYSQL_TYPE_DECIMAL:
+								case MYSQL_TYPE_NEWDECIMAL:
+								case MYSQL_TYPE_STRING:
+								case MYSQL_TYPE_VARCHAR:
+								case MYSQL_TYPE_VAR_STRING:
 									cValue = row[colId].blob;
 									cleanUp.good = ( ( jstr = JS_NewStringCopyZ( cx, cValue ) ) != NULL );
 									if ( cleanUp.good ) {
@@ -533,20 +543,25 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 									}
 									break;
 								case MYSQL_TYPE_BIT:
-								case MYSQL_TYPE_TINY:
-								case MYSQL_TYPE_INT24:
-								case MYSQL_TYPE_YEAR:
-								case MYSQL_TYPE_SHORT:
-								case MYSQL_TYPE_SET:
-								case MYSQL_TYPE_GEOMETRY:
-								case MYSQL_TYPE_DECIMAL:
-								case MYSQL_TYPE_NEWDECIMAL:
-								case MYSQL_TYPE_TIME:
+									jValue = ( strcmp( row[colId].blob, "1")  == 0 ) ? JSVAL_TRUE : JSVAL_FALSE;
+									break;
 								case MYSQL_TYPE_NEWDATE:
-								case MYSQL_TYPE_DATE:
-								case MYSQL_TYPE_DATETIME:
+								case MYSQL_TYPE_TIME:
+								case MYSQL_TYPE_YEAR:
 								case MYSQL_TYPE_TIMESTAMP:
-								break;
+								case MYSQL_TYPE_DATETIME:
+								case MYSQL_TYPE_DATE:
+									JSObject * dateObj;
+
+									cleanUp.good = ( ( dateObj = JS_NewDateObjectMsec( cx, mktime( row[colId].tm ) ) ) != NULL );
+									if ( cleanUp.good ) {
+										JS::RootedObject dateObjRoot( cx, dateObj );
+										jValue = OBJECT_TO_JSVAL( dateObj );
+									}
+									break;
+								case MYSQL_TYPE_ENUM: 		  //  FT
+								case MYSQL_TYPE_SET:  		  //  FT
+								case MYSQL_TYPE_GEOMETRY:	  //  FT
 								default:
 									jValue = JSVAL_VOID;  //  not quite true
 									break;
