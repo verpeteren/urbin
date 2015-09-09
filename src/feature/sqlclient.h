@@ -52,7 +52,7 @@ struct sqlclient_t {
 	const char *				password;
 	const char *				dbName;
 	int							socketFd;
-	unsigned char				timeoutSec;
+	uint8_t						timeoutSec;
 	struct query_t *			queries;
 	uint16_t					port;
 };
@@ -83,9 +83,9 @@ struct query_t{
 };
 
 #if HAVE_MYSQL == 1
-struct sqlclient_t *			Mysql_New					( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
+struct sqlclient_t *			Mysql_New					( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const uint8_t timeoutSec );
 #endif
-struct sqlclient_t *			Postgresql_New				( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
+struct sqlclient_t *			Postgresql_New				( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const uint8_t timeoutSec );
 void							Sqlclient_Delete			( struct sqlclient_t * sqlclient );
 
 void 							Query_New					( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFuncCb );

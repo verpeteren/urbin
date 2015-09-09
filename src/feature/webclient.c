@@ -519,36 +519,25 @@ static void Webclient_Connect( struct webclient_t * webclient ) {
 	}
 }
 
-struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb, const unsigned char timeoutSec ) {
+struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb, const uint8_t timeoutSec ) {
 	struct webpage_t * webpage;
 	struct webclient_t * webclient;
-	struct cfg_t * webclientSection, * modulesSection;
-	modulesSection = cfg_getnsec( (cfg_t *) core->config, "modules", 0 );
-	webclientSection = cfg_getnsec( modulesSection, "webclient", 0 );
-	unsigned char timeSec;
 	struct {unsigned char good:1;
 			unsigned char webpage:1;
 			unsigned char webclient:1;} cleanUp;
 
-	memset(  &cleanUp, 0, sizeof(  cleanUp  )  );
-	timeSec = timeoutSec;
+	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webpage = NULL;
-	cleanUp.good = (  (  webclient = malloc(  sizeof(  * webclient  )  )  ) != NULL  );
+	cleanUp.good = ( ( webclient = malloc(  sizeof(  * webclient  )  )  ) != NULL  );
 	if (  cleanUp.good  ) {
 		cleanUp.webclient = 1;
-		webclient->timeoutSec = timeoutSec;
 		webclient->webpages = NULL;
 		webclient->currentWebpage = NULL;
 		webclient->socketFd = 0;
 		webclient->hostName = NULL;
 		webclient->core = (struct core_t *) core;
 		webclient->connection = CONNECTION_CLOSE;
-		if ( timeoutSec == 0 ) {
-			timeSec = (unsigned char) cfg_getint( webclientSection, "timeout_sec" );
-		}
-		if ( timeSec == 0 ) {
-			timeSec = PR_CFG_MODULES_WEBCLIENT_TIMEOUT_SEC;
-		}
+		webclient->timeoutSec = (timeoutSec == 0) ? (uint8_t) PR_CFG_MODULES_WEBCLIENT_TIMEOUT_SEC: timeoutSec;
 		//  we cannot connect at this point as the host and the port are in the url
 	}
 	if ( cleanUp.good ) {

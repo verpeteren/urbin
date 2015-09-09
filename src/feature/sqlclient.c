@@ -288,30 +288,10 @@ static void Postgresql_HandleConnect_cb( picoev_loop * loop, const int fd, const
 }
 
 #define SET_DEFAULTS_FOR_CONN( type, sectionName ) do { \
-	struct cfg_t * sqlSection, * modulesSection; \
-	\
 	prt = 0; \
-	timeSec = 0; \
-	modulesSection = cfg_getnsec( (cfg_t *) core->config, "modules", 0 ); \
-	sqlSection = cfg_getnsec( modulesSection, sectionName, 0 ); \
-	if ( port == 0 ) { \
-		prt = (uint16_t) cfg_getint( sqlSection, "port" ); \
-	} \
-	if ( prt == 0 ) { \
-		prt = PR_CFG_MODULES_ ## type ## SQLCLIENT_PORT; \
-	} \
-	if ( dbName == NULL ) { \
-		dbName = cfg_getstr( sqlSection, "database" );\
-	} \
-	if ( dbName == NULL ) { \
-		dbName = PR_CFG_MODULES_ ## type ## SQLCLIENT_DATABASE; \
-	} \
-	if ( timeoutSec == 0 ) { \
-		timeSec = (unsigned char) cfg_getint( sqlSection, "timeout_sec" ); \
-	} \
-	if ( timeSec == 0 ) { \
-		timeSec = PR_CFG_MODULES_ ## type ## SQLCLIENT_TIMEOUT_SEC; \
-	} \
+	prt = ( port == 0 ) ? PR_CFG_MODULES_ ## type ## SQLCLIENT_PORT : prt; \
+	dbName = ( dbName == NULL ) ? PR_CFG_MODULES_ ## type ## SQLCLIENT_DATABASE : dbName; \
+	timeSec =  ( timeoutSec == 0 ) ? PR_CFG_MODULES_ ## type ## SQLCLIENT_TIMEOUT_SEC: timeoutSec; \
 } while ( 0 );
 
 struct sqlclient_t * Postgresql_New( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec ) {
@@ -640,6 +620,7 @@ static struct sqlclient_t * Sqlclient_New( const struct core_t * core, const enu
 			free( (char *) sqlclient->dbName ); 		sqlclient->dbName = NULL;
 		}
 		if ( cleanUp.sqlclient ) {
+			sqlclient->timeoutSec = 0;
 			free( sqlclient ); sqlclient = NULL;
 		}
 	}

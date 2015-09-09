@@ -10,7 +10,7 @@
 #include <prclist.h>
 #include <prinrval.h>
 
-#include "configuration.h"
+#include "../common.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,7 +65,6 @@ struct module_t {
 
 struct core_t {
 	picoev_loop *				loop;
-	const cfg_t *				config;
 	struct {
 		struct dns *				dns;
 		unsigned int				actives;
@@ -77,9 +76,10 @@ struct core_t {
 				setlogmask_fun		logMask;
 				syslog_fun			logFun;
 							}	logger;
-	uint32_t					maxIdentifier;
+	uint32_t					maxIdentifier; 
 	unsigned char				processTicksMs;
 	unsigned char				keepOnRunning:1;
+	PRBool						isDaemon;
 };
 
 
@@ -96,18 +96,20 @@ void 							Buffer_Delete			( struct buffer_t * buffer );
 void							Boot					( const int maxFds );
 void							Shutdown				( );
 void							SetupSocket				( const int fd,  const unsigned char tcp );
+int 							GetPriorityFromName		( const char * name );
 
 char * 							DnsData_ToString		( const struct dns_cb_data * dnsData );
 
 struct module_t *				Module_New				( const char * name, moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * data, const clearFunc_cb_t clearFunc );
 void 							Module_Delete			( struct module_t * module );
 
-struct core_t *					Core_New				( const cfg_t * config );
+struct core_t *					Core_New				( const PRBool isDaemon );
 void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message );
-int 							Core_PrepareDaemon		( const struct core_t * core, const signalAction_cb_t signalHandler );
+int 							Core_PrepareDaemon		( const struct core_t * core, const int maxFds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup );
+
 void 							Core_GetHostByName		( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb, void * queryCbArgs );
 int								Core_AddModule			( struct core_t * core, struct module_t * module );
-int								Core_Loop				( struct core_t * core );
+int								Core_Loop				( struct core_t * core, const int maxWait );
 int								Core_DelModule			( struct core_t * core, struct module_t * module );
 
 struct timing_t *				Core_AddTiming 			( struct core_t * core, const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb );

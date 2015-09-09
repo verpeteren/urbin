@@ -44,12 +44,12 @@ struct webclient_t {
 	int									socketFd;
 	uint16_t							port;
 	enum connection_t					connection;
-	unsigned char						timeoutSec;
+	uint8_t								timeoutSec;
 	char *								hostName;
 };
 
 struct webpage_t * 						Webclient_Queue				( struct webclient_t * webclient, const enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb );
-struct webclient_t * 					Webclient_New				( const struct core_t * core, const enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb , const unsigned char timeoutSec );
+struct webclient_t * 					Webclient_New				( const struct core_t * core, const enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb , const uint8_t timeoutSec );
 void									Webclient_Delete			( struct webclient_t * webclient );
 
 #ifdef __cplusplus

@@ -95,7 +95,7 @@ $(DIR_URL):
 	tar -xaf uriparser-$(VER_URL).tar.bz2
 
 ###############################################################################
-# H3 - The Fast HTTP header parser library  
+# H3 - The Fast HTTP header parser library
 ###############################################################################
 $(LIB_H3_STATIC): $(DIR_H3)
 $(LIB_H3_SHARED): $(DIR_H3)
@@ -290,23 +290,6 @@ $(DIR_MOZ):
 	wget -q https://ftp.mozilla.org/pub/mozilla.org/firefox/candidates/$(VER_MOZ)-candidates/build1/source/firefox-$(VER_MOZ).source.tar.bz2 && \
 	tar -xaf firefox-$(VER_MOZ).source.tar.bz2 && \
 	mv mozilla-beta mozilla 
-
-#############################################################################
-# libconfuse: configuration file library 
-#############################################################################
-$(LIB_CONF_STATIC): $(DIR_CONF)
-$(LIB_CONF_SHARED): $(DIR_CONF)
-	@echo $@
-	@cd $(DIR_CONF) && \
-	./configure --with-gnu-ld --disable-examples --disable-nls --disable-rpath --enable-shared --enable-static && \
-	make 
-	@touch $@
-
-$(DIR_CONF):
-	@echo $@
-	@cd $(DEP_DIR) && \
-	wget -q http://savannah.nongnu.org/download/confuse/confuse-$(VER_CONF).tar.gz && \
-	tar -xaf confuse-$(VER_CONF).tar.gz
 
 ###############################################################################
 # Docstrape: JSDOC-Toolkit template based on bootstrap, and it realy looks slik!

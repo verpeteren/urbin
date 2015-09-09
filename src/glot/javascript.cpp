@@ -89,17 +89,14 @@ inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, co
  */
 unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t * module, void * cbArgs ) {
 	struct javascript_t * javascript;
-	cfg_t * glotSection, * javascriptSection;
-	char * path, * name;
+	const char * path, *name;
 	struct {unsigned char good:1;
 			unsigned char javascript:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	javascript = NULL;
-	glotSection = cfg_getnsec( (cfg_t *) core->config, "glot", 0 );
-	javascriptSection = cfg_getnsec( glotSection, "javascript", 0 );
-	path = cfg_getstr( javascriptSection, (char *) "path" );
-	name = cfg_getstr( javascriptSection, (char *) "main" );
+	path = PR_CFG_GLOT_PATH;
+	name =PR_CFG_GLOT_MAIN;
 	if ( module->instance == NULL ) {
 		//  this should not happen!
 		cleanUp.good = ( ( javascript = Javascript_New( core, path, name ) ) != NULL );
@@ -2023,6 +2020,7 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * @param	{string}		params.ip			The Ip address that the server will listen to.<p>default: The value for 'ip' in the webserver  section of the configurationFile.</p>
  * @param	{int}			params.port			The port that the server should bind to.<p>default: The value for 'port' in the webserver section of the configurationFile.</p>
  * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the webserver section of the configurationFile.</p>
+ * @param	{integer}		[backlog]			The listen backlog for the socket server.<p>default: The value for 'timeout' in the webserver section of the configurationFile.</p>
  *
  * @example
  * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
@@ -2042,7 +2040,7 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	JSObject * connObj, * webserverObj;
 	JS::CallArgs args;
 	char * cServerIp;
-	int port, timeoutSec;
+	int port, timeoutSec, backlog;
 	jsval value;
 	struct {unsigned char good:1;} cleanUp;
 
@@ -2053,7 +2051,7 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	port = 0;
 	cServerIp = NULL;
 	webserverObj = NULL;
-	cleanUp.good = ( JS_ConvertArguments( cx, args, "o/i", &connObj, &timeoutSec ) == true );
+	cleanUp.good = ( JS_ConvertArguments( cx, args, "o/ii", &connObj, &timeoutSec, &backlog ) == true );
 	JS::RootedObject connObjRoot( cx, connObj );
 	JS::HandleObject connObjHandle( connObjRoot );
 	JS::RootedValue valueRoot( cx, value );
@@ -2071,7 +2069,7 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	}
 	if ( cleanUp.good ) {
 
-		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, (unsigned char) timeoutSec ) ) != NULL );
+		cleanUp.good = ( ( webserver = Webserver_New( javascript->core, cServerIp, (uint16_t) port, (uint8_t) timeoutSec, (uint8_t) backlog ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.good = ( ( webserverObj = 	JS_NewObject( cx, &jscWebserver, JS::NullPtr( ), JS::NullPtr( ) ) ) != NULL );

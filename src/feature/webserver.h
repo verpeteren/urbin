@@ -107,8 +107,9 @@ struct webserver_t {
 	OnigOptionType				regexOptions;
 	uint16_t					port;
 	int							socketFd;
-	unsigned char				timeoutSec;
+	uint8_t						timeoutSec;
 	const char *				hostName;
+	uint8_t		 				listenBacklog;
 };
 
 struct namedRegex_t {
@@ -128,7 +129,7 @@ int 							Webserver_DynamicHandler			( struct webserver_t * webserver, const ch
 
 void 							NamedRegex_Delete					( struct namedRegex_t * namedRegex );
 
-struct webserver_t *			Webserver_New						( const struct core_t * core, const char * ip, const uint16_t port, const unsigned char timeoutSec );
+struct webserver_t *			Webserver_New						( const struct core_t * core, const char * ip, const uint16_t port, const uint8_t timeoutSec, const uint8_t listenBacklog );
 void 							Webserver_JoinCore					( struct webserver_t * webserver );
 void							Webserver_Delete					( struct webserver_t * webserver );
 

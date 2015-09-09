@@ -1032,8 +1032,7 @@ tryToWriteMoreWebserver:
 static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
 	struct webserver_t * webserver;
 	struct sockaddr_in listenAddr;
-	struct cfg_t * webserverSection, * modulesSection;
-	int flag, listenBacklog;
+	int flag;
 	char * ip;
 	struct { unsigned char good:1;
 			unsigned char ev:1;
@@ -1046,12 +1045,6 @@ static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
 	flag = 1;
 	ip = NULL;
 	webserver->core->dns.actives--;
-	modulesSection = cfg_getnsec( (cfg_t *) webserver->core->config, "modules", 0 );
-	webserverSection = cfg_getnsec( modulesSection, "webserver", 0 );
-	listenBacklog = cfg_getint( webserverSection, "listen_backlog" );
-	if ( listenBacklog == 0 ) {
-		listenBacklog = PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG;
-	}
 	cleanUp.good = ( ( webserver->socketFd = socket( AF_INET, SOCK_STREAM, 0 ) ) != -1 );
 	if ( cleanUp.good ) {
 		cleanUp.socket = 1;
@@ -1071,7 +1064,7 @@ static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
 		cleanUp.good = ( bind( webserver->socketFd, (struct sockaddr *) &listenAddr, sizeof( listenAddr ) ) == 0 );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( listen( webserver->socketFd, listenBacklog ) == 0 );
+		cleanUp.good = ( listen( webserver->socketFd, webserver->listenBacklog ) == 0 );
 	}
 	if ( cleanUp.good ) {
 		SetupSocket( webserver->socketFd, 1 );
@@ -1096,9 +1089,8 @@ static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
 	}
 }
 
-struct webserver_t * Webserver_New( const struct core_t * core, const char * hostName, const uint16_t port, const unsigned char timeoutSec ) {
+struct webserver_t * Webserver_New( const struct core_t * core, const char * hostName, const uint16_t port, const uint8_t const timeoutSec, const uint8_t listenBacklog ) {
 	struct webserver_t * webserver;
-	struct cfg_t * webserverSection, * modulesSection;
 	struct {unsigned char good:1;
 			unsigned char hostName:1;
 			unsigned char webserver:1;} cleanUp;
@@ -1106,31 +1098,15 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * hos
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	cleanUp.good = ( ( webserver = malloc( sizeof( * webserver ) ) ) != NULL );
 	if ( cleanUp.good ) {
-		modulesSection = cfg_getnsec( (cfg_t *) core->config, "modules", 0 );
-		webserverSection = cfg_getnsec( modulesSection, "webserver", 0 );
 		cleanUp.webserver = 1;
 		webserver->core = (struct core_t *) core;
 		webserver->socketFd = 0;
+		webserver->listenBacklog = ( listenBacklog == 0 ) ? PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG : listenBacklog;
+		webserver->port = ( port == 0 ) ? ( (uint16_t) PR_CFG_MODULES_WEBSERVER_PORT) : port;
 		webserver->routes = NULL;
 		//webserver->regexOptions = ONIG_OPTION_SINGLELINE | ONIG_OPTION_FIND_LONGEST | ONIG_OPTION_CAPTURE_GROUP;  //  | ONIG_OPTION_IGNORECASE | ONIG_OPTION_DEFAULT;
 		webserver->regexOptions = ONIG_OPTION_DEFAULT;
-		webserver->port = port;
-		if ( port == 0 ) {
-			webserver->port = (uint16_t) cfg_getint( webserverSection, "port" );
-		}
-		if ( webserver->port == 0 ) {
-			webserver->port = PR_CFG_MODULES_WEBSERVER_PORT;
-		}
-		webserver->timeoutSec = timeoutSec;
-		if ( timeoutSec == 0 ) {
-			webserver->timeoutSec = (unsigned char) cfg_getint( webserverSection, "timeout_sec" );
-		}
-		if ( webserver->timeoutSec == 0 ) {
-			webserver->timeoutSec = PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC;
-		}
-		if ( hostName == NULL ) {
-			hostName = cfg_getstr( webserverSection, "hostname" );
-		}
+		webserver->timeoutSec = (timeoutSec == 0) ? PR_CFG_MODULES_WEBSERVER_TIMEOUT_SEC: timeoutSec;
 		if ( hostName == NULL ) {
 			hostName = PR_CFG_MODULES_WEBSERVER_HOSTNAME;
 		}
@@ -1148,6 +1124,11 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * hos
 			free( (char * ) webserver->hostName ); hostName = NULL;
 		}
 		if ( cleanUp.webserver ) {
+			webserver->core = NULL;
+			webserver->listenBacklog = 0;
+			webserver->port = 0;
+			webserver->regexOptions = 0;
+			webserver->timeoutSec = 0;
 			free( webserver ); webserver = NULL;
 		}
 	}
@@ -1217,6 +1198,9 @@ void Webserver_Delete( struct webserver_t * webserver ) {
 	}
 	//  clean the rest
 	webserver->regexOptions = 0;
+	webserver->listenBacklog = 0;
+	webserver->port = 0;
+	webserver->timeoutSec = 0;
 	if ( picoev_is_active( webserver->core->loop, webserver->socketFd ) ) {
 		picoev_del( webserver->core->loop, webserver->socketFd );
 	}

@@ -18,7 +18,6 @@
 
 #include "core.h"
 #include "utils.h"
-#include "configuration.h"
 
 #ifdef SYSLOG_NAMES
 extern CODE prioritynames[];
@@ -70,7 +69,7 @@ void SetupSocket( const int fd, const unsigned char tcp ) {
 	assert( r == 0 );
 }
 
-static int GetPriorityFromName( const char * name ) {
+int GetPriorityFromName( const char * name ) {
 	int logLevel = PR_LOG_LEVEL_VALUE;
 	CODE * priority;
 
@@ -400,9 +399,8 @@ static void Timing_Delete( struct timing_t * timing ) {
 /*****************************************************************************/
 /* Core                                                                      */
 /*****************************************************************************/
-struct core_t * Core_New( const cfg_t * config ) {
+struct core_t * Core_New( const PRBool isDaemon ) {
 	struct core_t * core;
-	cfg_t * mainSection;
 	int timeoutSec;
 	struct {unsigned char good:1;
 			unsigned char loop:1;
@@ -418,30 +416,24 @@ struct core_t * Core_New( const cfg_t * config ) {
 	if ( cleanUp.good ) {
 		cleanUp.config = 1;
 		core->maxIdentifier = 1;
+		core->isDaemon = isDaemon;
 		core->loop = NULL;
-		core->config =  config;
 		core->timings = NULL;
 		core->modules = NULL;
 		core->dns.dns = NULL;
 		core->dns.actives = 0;
 		core->logger.logLevel = PR_LOG_LEVEL_VALUE;
-		mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
-		timeoutSec = cfg_getint( mainSection, "timeout_sec" );
-		if ( timeoutSec == 0 ) {
-			timeoutSec = PR_CFG_CORE_TIMEOUT_SEC;
-		}
-		core->processTicksMs = (unsigned char) cfg_getint( mainSection, "ticks_ms" );
-		if ( core->processTicksMs == 0 ) {
-			core->processTicksMs = PR_CFG_CORE_TICKS_MS;
-		}
+		timeoutSec = PR_CFG_CORE_TIMEOUT_SEC;
+		core->processTicksMs = PR_CFG_CORE_TICKS_MS;
+		
 		//  Set up the logging
-		if ( cfg_getbool( mainSection, "daemon" ) == cfg_true ) {
+		if ( isDaemon ) {
 			 get_syslog_logger( &core->logger.logFun, 0, &core->logger.logMask );
 		} else {
 			//  we log to the stderr in interactive mode
 			get_stderr_logger( &core->logger.logFun, 0, &core->logger.logMask );
 		}
-		core->logger.logLevel = GetPriorityFromName( cfg_getstr( mainSection, "log_level" ) );
+		core->logger.logLevel = PR_LOG_LEVEL_VALUE;
 		core->logger.logMask( LOG_UPTO( core->logger.logLevel ) );
 		cleanUp.good = ( ( core->loop = picoev_create_loop( timeoutSec ) ) != NULL );
 	}
@@ -462,12 +454,10 @@ struct core_t * Core_New( const cfg_t * config ) {
 			picoev_destroy_loop( core->loop );
 			core->loop = NULL;
 		}
-		if ( cleanUp.config ) {
-			cfg_free( (cfg_t *) core->config ); core->config = NULL;
-		}
 		if ( cleanUp.core ) {
 			core->modules = NULL;
 			core->timings = NULL;
+			core->isDaemon = PR_FALSE;
 			free( core ); core = NULL;
 		}
 	}
@@ -496,11 +486,9 @@ void Core_Log( const struct core_t * core, const int logLevel, const char * file
 extern int setgroups( size_t __n, __const gid_t *__groups );
 extern int initgroups( const char * user, gid_t group );
 
-static int Core_SwitchToUser( const struct core_t * core ) {
-	cfg_t * mainSection;
+static int Core_SwitchToUser( const struct core_t * core, const char* runAsUser, const char * runAsGroup ) {
 	struct group *grp;
 	struct passwd *pwd;
-	char * runAsUser, * runAsGroup;
 	struct {unsigned char good:1;
 			unsigned char pwd:1;
 			unsigned char grp:1;} cleanUp;
@@ -508,9 +496,6 @@ static int Core_SwitchToUser( const struct core_t * core ) {
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	grp = NULL;
 	pwd = NULL;
-	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
-	runAsUser = cfg_getstr( mainSection, "run_as_user" );
-	runAsGroup = cfg_getstr( mainSection, "run_as_group" );
 	/* Get the user information */
 	if  ( strcmp( runAsUser, "none" ) != 0 ) {
 		cleanUp.good = ( ( pwd = getpwnam( runAsUser ) ) != NULL );
@@ -558,21 +543,13 @@ static int Core_SwitchToUser( const struct core_t * core ) {
 	return 1;
 }
 
-int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t signalHandler ) {
+int Core_PrepareDaemon( const struct core_t * core , const int fds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup ) {
 	struct rlimit limit;
-	cfg_t * mainSection;
-	cfg_bool_t daemonize;
-	int fds;
 	struct {unsigned char good:1;
 			unsigned char fds:1;
 			unsigned char signal:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
-	fds = cfg_getint( mainSection, "max_fds" );
-	if ( fds == 0 ) {
-		fds = PR_CFG_CORE_MAX_FDS;
-	}
 	limit.rlim_cur = ( rlim_t ) fds;
 	limit.rlim_max = ( rlim_t ) fds;
 	cleanUp.good = ( setrlimit( RLIMIT_NOFILE, &limit) != -1 );
@@ -580,8 +557,7 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 		cleanUp.fds = 1;
 		cleanUp.signal = 1;
 		signal( SIGUSR2, signalHandler );
-		daemonize = cfg_getbool( mainSection, "daemon" );
-		if ( daemonize == cfg_true )  {
+		if ( core->isDaemon )  {
 			if ( 0 != fork( ) ) {
 				exit( 0 );
 			}
@@ -597,7 +573,7 @@ int Core_PrepareDaemon( const struct core_t * core , const signalAction_cb_t sig
 	}
 	if ( cleanUp.good ) {
 		if ( getuid( ) == 0 ) {
-			cleanUp.good = ( Core_SwitchToUser( core ) ) ? 1 : 0;
+			cleanUp.good = ( Core_SwitchToUser( core, runAsUser, runAsGroup ) ) ? 1 : 0;
 		}
 	}
 	return cleanUp.good;
@@ -696,18 +672,14 @@ void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callba
 	dns_queue( core->dns.dns, queryCbArgs, hostName, queryType, onSuccess_cb );
 }
 
-int Core_Loop( struct core_t * core ) {
+int Core_Loop( struct core_t * core, const int maxWait ) {
 	struct module_t * module, * firstModule;
-	cfg_t * mainSection;
 	PRCList * next;
-	int maxWait, dnsSocketFd;
+	int dnsSocketFd;
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	dnsSocketFd = dns_get_fd( core->dns.dns );
-	maxWait = PR_CFG_CORE_MAX_FDS;
-	mainSection = cfg_getnsec( (cfg_t *) core->config, "main", 0 );
-	maxWait = cfg_getint( mainSection, "max_wait" );
 	cleanUp.good = 1;
 	firstModule = module = core->modules;
 	if ( firstModule != NULL ) {
@@ -861,9 +833,9 @@ void Core_Delete( struct core_t * core ) {
 	dns_fini( core->dns.dns ); core->dns.dns = NULL;
 	core->dns.actives = 0;
 	//  cleanup the rest
+	core->isDaemon = PR_FALSE;
 	core->processTicksMs = 0;
 	picoev_destroy_loop( core->loop );
-	cfg_free( (cfg_t *) core->config ); core->config = NULL;
 	free( core ); core = NULL;
 }
 
