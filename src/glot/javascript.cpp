@@ -218,7 +218,7 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 	} \
 } while ( 0 );
 
-static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, const sqlNew_cb_t engine_new, const JSClass * jsnClass, const JSFunctionSpec jsms[] )  {
+static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, const sqlNew_cb_t engine_new, const JSClass * jsnClass, const JSFunctionSpec jsms[] ) {
 	struct sqlclient_t * sqlclient;
 	struct javascript_t * instance;
 	JSObject * globalObj, * sqlclientObj, * connObj, * thisObj;
@@ -340,7 +340,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResu
 		fnVal = args[2];
 	}
 	sqlObj = JS_THIS_OBJECT( cx, vp );
-	JS::RootedObject        sqlObjRoot( cx, sqlObj );
+	JS::RootedObject		sqlObjRoot( cx, sqlObj );
 	JS::RootedValue 		paramListRoot( cx, paramList );
 	JS::HandleValue 		paramListHandle( paramListRoot );
 	JS::MutableHandleValue	paramListMut( &paramListRoot );
@@ -540,7 +540,7 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 									}
 									break;
 								case MYSQL_TYPE_BIT:
-									jValue = ( strcmp( row[colId].blob, "1")  == 0 ) ? JSVAL_TRUE : JSVAL_FALSE;
+									jValue = ( strcmp( row[colId].blob, "1") == 0 ) ? JSVAL_TRUE : JSVAL_FALSE;
 									break;
 								case MYSQL_TYPE_NEWDATE:
 								case MYSQL_TYPE_TIME:
@@ -556,11 +556,11 @@ static JSObject * Mysqlclient_Query_ResultToJS( JSContext * cx, const void * raw
 										jValue = OBJECT_TO_JSVAL( dateObj );
 									}
 									break;
-								case MYSQL_TYPE_ENUM: 		  //  FT
-								case MYSQL_TYPE_SET:  		  //  FT
-								case MYSQL_TYPE_GEOMETRY:	  //  FT
+								case MYSQL_TYPE_ENUM: 		//  FT
+								case MYSQL_TYPE_SET:		//  FT
+								case MYSQL_TYPE_GEOMETRY:	//  FT
 								default:
-									jValue = JSVAL_VOID;  //  not quite true
+									jValue = JSVAL_VOID;	//  not quite true
 									break;
 							}
 							JS::RootedValue	jValueRoot( cx, jValue );
@@ -627,7 +627,7 @@ static bool JsnMysqlclient_Query( JSContext * cx, unsigned argc, jsval * vp ) {
  * @returns {integer} Used to get the last insert id with auto-increment for this connection.
  *
  * @example
- * sql.query( 'INSERT INTO table VALUES( "a", "b", "c" )', [],  function( res ) {
+ * sql.query( 'INSERT INTO table VALUES( "a", "b", "c" )', [], function( res ) {
  * 	console.log( 'Inserted: ' + sql.getInsertId( ) );
  * } );
  * @see	Urbin.MysqlClient

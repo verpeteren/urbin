@@ -132,7 +132,7 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 		}
 		namedRegex->numGroups = 0;
 	}
-	return ( cleanUp.good ) ? 0 : 1;  /* 0: continue */
+	return ( cleanUp.good ) ? 0 : 1; /* 0: continue */
 }
 
 struct namedRegex_t * Webserverclient_GetNamedGroups( struct webserverclient_t * webserverclient ) {
@@ -312,7 +312,7 @@ unsigned char Webserverclientresponse_SetContent( struct webserverclientresponse
 		cleanUp.content = 1;
 	}
 	if ( ! cleanUp.good ) {
-		if ( cleanUp.content )  {
+		if ( cleanUp.content ) {
 			Buffer_Delete( response->content.dynamic.buffer ); response->content.dynamic.buffer = NULL;
 		}
 	}

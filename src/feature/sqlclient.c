@@ -17,7 +17,7 @@ static void 						Sqlclient_PushQuery 		( struct sqlclient_t * sqlclient, struct
 static struct query_t * 			Sqlclient_PopQuery			( struct sqlclient_t * sqlclient );
 
 /*****************************************************************************/
-/* Query     .                                                               */
+/* Query                                                                    */
 /*****************************************************************************/
 void Query_New( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFuncCb ) {
 	struct query_t * query;
@@ -189,7 +189,7 @@ static void Postgresql_HandleRead_cb	( picoev_loop * loop, const int fd, const i
 					picoev_add( loop, fd, PICOEV_WRITE, sqlclient->timeoutSec, Postgresql_HandleWrite_cb, cbArgs );
 				}
 			}
-	 	} else  {
+	 	} else {
 			Core_Log( sqlclient->core, LOG_ERR, __FILE__ , __LINE__, PQerrorMessage( sqlclient->connection.pg.conn ) );
 			Sqlclient_CloseConn( sqlclient );
 		}
@@ -326,7 +326,7 @@ static void	Mysql_HandleRead_cb	( picoev_loop * loop, const int fd, const int ev
 	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
 		picoev_set_timeout( loop, fd, sqlclient->timeoutSec );
 		retCode = mysac_io( sqlclient->connection.my.conn );
-		 if ( retCode == MYERR_WANT_WRITE ||  retCode == MYERR_WANT_READ )  {
+		 if ( retCode == MYERR_WANT_WRITE || retCode == MYERR_WANT_READ ) {
 			// pass once more
 		} else if ( retCode == 0 ) {
 			if ( query->cbHandler != NULL ) {
@@ -516,7 +516,7 @@ static void Mysql_HandleConnect_cb( picoev_loop * loop, const int fd, const int 
 		retCode = mysac_io( sqlclient->connection.my.conn );
 		if ( retCode == MYERR_WANT_WRITE || retCode == MYERR_WANT_READ ) {
 			// loop once more
-		} else if ( retCode  == 0 ) {
+		} else if ( retCode == 0 ) {
 			//  Yes, we are connected, now set the database, as mysac needs that first
 			picoev_del( loop, fd );
 			picoev_add( loop, fd, PICOEV_READWRITE, sqlclient->timeoutSec, Mysql_HandleSetDb_cb, cbArgs );

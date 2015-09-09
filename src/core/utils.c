@@ -13,7 +13,7 @@ char * Xstrdup( const char* str ) {
 	char * tmp;
 
 	tmp = malloc( strlen( str ) + 1 );
-	if ( tmp == NULL )  {
+	if ( tmp == NULL ) {
 		return NULL;
 	}
 	return strcpy( tmp, str );

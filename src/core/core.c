@@ -234,7 +234,7 @@ unsigned char Buffer_Increase( struct buffer_t * buffer, size_t extraBytes ) {
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	newSize = buffer->size + extraBytes;
-	cleanUp.good = ( ( newBytes = realloc( buffer->bytes, newSize  ) ) != NULL );
+	cleanUp.good = ( ( newBytes = realloc( buffer->bytes, newSize ) ) != NULL );
 	if ( cleanUp.good ) {
 		memset( newBytes + buffer->size,'\0', extraBytes );
 		buffer->size = newSize;
@@ -293,7 +293,7 @@ struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad
 		module->instance = NULL;
 		module->clearFunc_cb = clearFunc_cb;
 		PR_INIT_CLIST( &module->mLink );
-		cleanUp.name = ( ( module->name =  Xstrdup( name ) ) != NULL );
+		cleanUp.name = ( ( module->name = Xstrdup( name ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.name = 1;

@@ -87,13 +87,13 @@ tryToReadMoreWebclient:
 				}
 				Webpage_Delete( webpage ); webpage = NULL;
 				webclient->currentWebpage = NULL;
-				if ( CONNECTION_KEEPALIVE ==  webclient->connection ) {
+				if ( CONNECTION_KEEPALIVE == webclient->connection ) {
 					picoev_del( loop, fd );
 					picoev_add( loop, fd, PICOEV_WRITE, webclient->timeoutSec, Webclient_HandleWrite_cb, wcArgs );
 				} else {
 					Webclient_CloseConn( webclient );
 				}
-			  break;
+				break;
 			}
 		} else {
 			Webclient_CloseConn( webclient );
@@ -273,7 +273,7 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 			cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen + addcrcn + 1 ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.headers = 1;
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, headers, headerLen  ) == 1 );
+				cleanUp.good = ( Buffer_Append( webpage->request.headers, headers, headerLen ) == 1 );
 			}
 			if ( cleanUp.good ) {
 				while ( addcrcn != 0 ) {
@@ -352,7 +352,7 @@ static void Webclient_GenTopLine( struct webclient_t * webclient, struct webpage
 	modeStringLen = strlen( modeString );
 	versionLen = strlen( HTTP_VERSION );
 	hostLen = (size_t) ( webpage->uri.hostText.afterLast - webpage->uri.hostText.first );
-	topLineLen = modeStringLen + 3 * hostLen +  versionLen + 6; //  2x' ' + 1x'/'+ 1x'\0' + 1 x \r\n
+	topLineLen = modeStringLen + 3 * hostLen + versionLen + 6; //  2x' ' + 1x'/'+ 1x'\0' + 1 x \r\n
 	if ( webpage->request.topLine == NULL ) {
 		cleanUp.good = ( ( webpage->request.topLine = Buffer_New( topLineLen ) ) != NULL );
 	} else {
@@ -465,9 +465,9 @@ static void Webclient_ConnectToIp( struct dns_cb_data * dnsData ) {
 		serverAddr.sin_family = AF_INET;
 		serverAddr.sin_port = htons( webclient->port );
 		serverAddr.sin_addr.s_addr = inet_addr( ip );
-		cleanUp.good =  ( connect( webclient->socketFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) == 0 );
+		cleanUp.good = ( connect( webclient->socketFd, (struct sockaddr *) &serverAddr, sizeof( serverAddr ) ) == 0 );
 	}
-	if ( cleanUp.good )  {
+	if ( cleanUp.good ) {
 		SetupSocket( webclient->socketFd, 1 );
 		picoev_add( webclient->core->loop, webclient->socketFd, PICOEV_READWRITE, webclient->timeoutSec , Webclient_HandleConnect_cb, (void *) webclient );
 	}
@@ -493,14 +493,14 @@ static void Webclient_Connect( struct webclient_t * webclient ) {
 		len = (size_t) ( uri->hostText.afterLast - uri->hostText.first );
 		cleanUp.good = ( ( webclient->hostName = malloc( len + 1 ) ) != NULL );
 	}
-	if ( cleanUp.good )  {
+	if ( cleanUp.good ) {
 		cleanUp.hostName = 1;
 		snprintf( webclient->hostName, len + 1, "%s", uri->hostText.first );
 		len = (size_t) ( uri->portText.afterLast - uri->portText.first );
 		snprintf( &portString[0], len + 1, "%s", uri->portText.first );
 		webclient->port = (uint16_t) atoi( &portString[0] );
 		if ( webclient->port == 0 ) {
-			if ( uri->scheme.first != NULL )  {
+			if ( uri->scheme.first != NULL ) {
 				if ( strncmp( uri->scheme.first, "https", 5 ) == 0 ) {
 					webclient->port = 443;
 				} else if ( strncmp( uri->scheme.first, "http", 4 ) == 0 ) {
@@ -528,8 +528,8 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	webpage = NULL;
-	cleanUp.good = ( ( webclient = malloc(  sizeof(  * webclient  )  )  ) != NULL  );
-	if (  cleanUp.good  ) {
+	cleanUp.good = ( ( webclient = malloc( sizeof( * webclient ) ) ) != NULL );
+	if ( cleanUp.good ) {
 		cleanUp.webclient = 1;
 		webclient->webpages = NULL;
 		webclient->currentWebpage = NULL;
@@ -547,7 +547,7 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 	if ( cleanUp.good ) {
 		cleanUp.webpage = 1;
 	}
-	if (  ! cleanUp.good  ) {
+	if ( ! cleanUp.good ) {
 		if ( cleanUp.webpage ) {
 			Webpage_Delete( webpage ); webpage = NULL;
 		}
@@ -558,7 +558,7 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 			webclient->core = NULL;
 			webclient->socketFd = 0;
 			webclient->hostName = NULL;
-			free(  webclient  ); webclient = NULL;
+			free( webclient ); webclient = NULL;
 		}
 	}
 
@@ -589,7 +589,7 @@ static int Webclient_CanUseConn( struct webclient_t * webclient, struct webpage_
 			unsigned char portText:1;
 			} good;
 
-	memset(  &good, 0, sizeof(  good  )  );
+	memset( &good, 0, sizeof( good ) );
 	current = webclient->currentWebpage;
 	if ( current == NULL ) {
 		//  no connection yet, can proceed
@@ -653,6 +653,6 @@ void Webclient_Delete( struct webclient_t * webclient ) {
 	if ( webclient->hostName != NULL ) {
 		free( webclient->hostName ); webclient->hostName = NULL;
 	}
-	free(  webclient  ); webclient = NULL;
+	free( webclient ); webclient = NULL;
 }
 

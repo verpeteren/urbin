@@ -95,7 +95,7 @@ void 							Buffer_Delete			( struct buffer_t * buffer );
 
 void							Boot					( const int maxFds );
 void							Shutdown				( );
-void							SetupSocket				( const int fd,  const unsigned char tcp );
+void							SetupSocket				( const int fd, const unsigned char tcp );
 int 							GetPriorityFromName		( const char * name );
 
 char * 							DnsData_ToString		( const struct dns_cb_data * dnsData );
