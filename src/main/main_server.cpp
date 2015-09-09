@@ -42,11 +42,11 @@ int main( int argc, const char ** argv ) {
 		cleanUp.good = ( ( javascriptModule = Module_New( "javascript", JavascriptModule_Load, JavascriptModule_Ready, JavascriptModule_Unload, NULL, NULL ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Core_AddModule( core, javascriptModule ) ) ? 1 : 0;
+		cleanUp.good = ( Core_AddModule( core, javascriptModule ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
 		cleanUp.javascript = 1;
-		cleanUp.good = ( Core_PrepareDaemon( core, PR_CFG_CORE_MAX_FDS, SignalHandler, runAsUser, runAsGroup ) == 1 );
+		cleanUp.good = ( Core_PrepareDaemon( core, PR_CFG_CORE_MAX_FDS, SignalHandler, runAsUser, runAsGroup ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
 		Core_Loop( core, maxWait );

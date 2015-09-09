@@ -40,8 +40,8 @@ struct script_t {
 };
 
 static struct payload_t * 			Payload_New						( JSContext * cx, JSObject * object, JSObject * fnObj_cb, jsval fnVal_cbArg, const bool repeat );
-static int 							Payload_Call					( const struct payload_t * payload );
-static int 							Payload_Timing_ResultHandler_cb	( void * cbArgs );
+static PRStatus						Payload_Call					( const struct payload_t * payload );
+static PRStatus						Payload_Timing_ResultHandler_cb	( void * cbArgs );
 static void 						Payload_Delete					( struct payload_t * payload );
 static void 						Payload_Delete_Anon				( void * cbArgs );
 static struct script_t * 			Javascript_AddScript			( struct javascript_t * javascript, const char * fileName );
@@ -87,7 +87,7 @@ inline void JAVASCRIPT_MODULE_ACTION( const struct javascript_t * javascript, co
  * @see	Urbin.onReady
  * @see	Urbin.onUnload
  */
-unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t * module, void * cbArgs ) {
+PRStatus JavascriptModule_Load( const struct core_t * core, struct module_t * module, void * cbArgs ) {
 	struct javascript_t * javascript;
 	const char * path, *name;
 	struct {unsigned char good:1;
@@ -111,7 +111,8 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
 			Javascript_Delete( javascript );
 		}
 	}
-	return ( cleanUp.good ) ? 1: 0;
+
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
 /**
@@ -131,7 +132,7 @@ unsigned char JavascriptModule_Load( const struct core_t * core, struct module_t
  * @see	Urbin.onLoad
  * @see	Urbin.onUnload
  */
-unsigned char JavascriptModule_Ready( const struct core_t * core, struct module_t * module, void * args ) {
+PRStatus JavascriptModule_Ready( const struct core_t * core, struct module_t * module, void * args ) {
 	struct javascript_t * javascript;
 	struct {unsigned char good:1;} cleanUp;
 
@@ -140,7 +141,8 @@ unsigned char JavascriptModule_Ready( const struct core_t * core, struct module_
 		javascript = (struct javascript_t * ) module->instance;
 		JAVASCRIPT_MODULE_ACTION( javascript, "onReady" );
 	}
-	return 1;
+
+	return PR_SUCCESS;
 }
 
 /**
@@ -161,7 +163,7 @@ unsigned char JavascriptModule_Ready( const struct core_t * core, struct module_
  * @see	Urbin.onReady
  * @see	Urbin.shutdown
  */
-unsigned char JavascriptModule_Unload( const struct core_t * core, struct module_t * module, void * args ) {
+PRStatus JavascriptModule_Unload( const struct core_t * core, struct module_t * module, void * args ) {
 	struct javascript_t * javascript;
 	struct {unsigned char good:1;} cleanUp;
 
@@ -172,7 +174,8 @@ unsigned char JavascriptModule_Unload( const struct core_t * core, struct module
 		Javascript_Delete( javascript ); javascript = NULL;
 		module->instance = NULL;
 	}
-	return 1;
+
+	return PR_SUCCESS;
 }
 
 /**
@@ -287,6 +290,7 @@ static bool SqlClassConstructor( JSContext * cx, unsigned argc, jsval * vp, cons
 	JS_free( cx, cPassword ); cPassword = NULL;
 	JS_free( cx, cDbName ); cDbName = NULL;
 	JS_free( cx, cDbName ); cDbName = NULL;
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -449,6 +453,7 @@ static bool SqlClientQuery( JSContext * cx, unsigned argc, jsval * vp, queryResu
 		}
 		args.rval( ).setBoolean( false );
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -612,6 +617,7 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * @name Urbin.MysqlClient.getInsertId
  */
 static bool JsnMysqlclient_Query( JSContext * cx, unsigned argc, jsval * vp ) {
+
 	return SqlClientQuery( cx, argc, vp, Mysqlclient_Query_ResultHandler_cb );
 }
 
@@ -643,6 +649,7 @@ static bool JsnMysqlclient_GetInsertId( JSContext * cx, unsigned argc, jsval * v
 	JS::RootedObject sqlObjRoot( cx, sqlObj );
 	sqlclient = (struct sqlclient_t *) JS_GetPrivate( sqlObj );
 	args.rval( ).set( INT_TO_JSVAL( (int32_t ) mysac_insert_id( sqlclient->connection.my.conn ) ) ); //  this cast is not 100% correct.
+
 	return true;
 }
 
@@ -689,6 +696,7 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * @see	Urbin.PostgreslClient
  */
 static bool JsnMysqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
+
 	return SqlClassConstructor( cx, argc, vp, Mysql_New, &jscMysqlclient, jsmMysqlclient );
 }
 
@@ -860,6 +868,7 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * @see	Urbin.MysqlClient.query
  */
 static bool JsnPostgresqlclient_Query( JSContext * cx, unsigned argc, jsval * vp ) {
+
 	return SqlClientQuery( cx, argc, vp, Postgresqlclient_Query_ResultHandler_cb );
 }
 
@@ -906,6 +915,7 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
 
 
 static bool JsnPostgresqlclient_Constructor( JSContext * cx, unsigned argc, jsval * vp ) {
+
 	return SqlClassConstructor( cx, argc, vp, Postgresql_New, &jscPostgresqlclient, jsmPostgresqlclient );
 }
 
@@ -993,6 +1003,7 @@ static JSObject * Webclient_Webpage_ResultToJS( struct payload_t * payload, cons
 			JS_free( cx, jContent ); jContent = NULL;
 		}
 	}
+
 	return webpageObj;
 }
 
@@ -1107,6 +1118,7 @@ static void Webclient_ResultHandler_cb( const struct webpage_t * webpage ) {
 	JS_free( cx, cMode ); cMode = NULL;
 	JS_free( cx, cHeaders ); cHeaders = NULL;
 	JS_free( cx, cContent ); cContent = NULL;
+
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -1239,6 +1251,7 @@ static bool JsnWebclient_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 	JS_free( cx, cMode ); cMode = NULL;
 	JS_free( cx, cHeaders ); cHeaders = NULL;
 	JS_free( cx, cContent ); cContent = NULL;
+
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -1306,12 +1319,13 @@ static bool JsnWebserverclientresponse_SetContent( JSContext * cx, unsigned argc
 		cleanUp.good = ( ( response = (struct webserverclientresponse_t *) JS_GetPrivate( thisObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Webserverclientresponse_SetContent( response, cString ) ) ? 1 : 0;
+		cleanUp.good = ( Webserverclientresponse_SetContent( response, cString ) == PR_SUCCESS );
 	}
 	//  always cleanUp
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1359,6 +1373,7 @@ static bool JsnWebserverclientresponse_SetCode( JSContext * cx, unsigned argc, j
 	if ( cleanUp.good ) {
 		cleanUp.good = ( Webserverclientresponse_SetCode( response, (unsigned int) code ) ) ? 1 : 0;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1483,6 +1498,7 @@ static bool JsnWebserverclient_GetNamedGroups( JSContext * cx, unsigned argc, js
 	if ( cleanUp.named ) {
 		NamedRegex_Delete( namedRegex ); namedRegex = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1822,6 +1838,7 @@ static JSObject * Webserver_Route_ResultToJS( struct payload_t * payload, const 
 	if ( cleanUp.ip ) {
 		free( (char *) ip ); ip = NULL;
 	}
+
 	return webserverclientObj;
 }
 
@@ -1912,8 +1929,9 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 			}
 	if ( cleanUp.good ) {
 		cleanUp.payload = 1;
-		Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload, Payload_Delete_Anon );
-	} else {
+		cleanUp.good = ( Webserver_DynamicHandler( webserver, cPattern, Webserver_Route_ResultHandler_cb, ( void * ) payload, Payload_Delete_Anon ) == PR_SUCCESS );
+	}
+	if ( ! cleanUp.good ) {
 		if ( cleanUp.payload ) {
 			// this is the only thing that needs special care if something went wrong; we cleanup the rest any way,
 			Payload_Delete( payload ); payload = NULL;
@@ -1927,6 +1945,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.pattern ) {
 		JS_free( cx, cPattern ); cPattern = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -1980,7 +1999,7 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 		cleanUp.good = ( ( webserver = (struct webserver_t *) JS_GetPrivate( webServerObj ) ) != NULL );
 	}
 	if ( cleanUp.good ) {
-		Webserver_DocumentRoot( webserver, cPattern, cDocumentRoot );
+		cleanUp.good = ( Webserver_DocumentRoot( webserver, cPattern, cDocumentRoot ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
 		args.rval( ).setBoolean( true );
@@ -1993,6 +2012,7 @@ static bool JsnWebserver_AddDocumentRoot( JSContext * cx, unsigned argc, jsval *
 	if ( cleanUp.pattern ) {
 		JS_free( cx, cPattern ); cPattern = NULL;
 	}
+
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -2086,6 +2106,7 @@ static bool JsnWebserver_Constructor( JSContext * cx, unsigned argc, jsval * vp 
 		args.rval( ).setUndefined( );
 	}
 	JS_free( cx, cServerIp ); cServerIp = NULL;
+
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -2105,6 +2126,7 @@ static void JsnWebserver_Finalizer( JSFreeOp * fop, JSObject * webserverObj ) {
  */
 static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vp );
 static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vp ) {
+
 	return true;
 }
 
@@ -2143,6 +2165,7 @@ static bool JsnUrbin_Shutdown( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.good ) {
 		javascript->core->keepOnRunning = 0;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2218,6 +2241,7 @@ static bool JsnOs_GetEnv( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.cString ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2333,6 +2357,7 @@ static bool JsnOs_WriteFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.content ) {
 		JS_free( cx, cContent ); cContent = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2400,6 +2425,7 @@ static bool JsnOs_ReadFile( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.fileName ) {
 		JS_free( cx, cFileName ); cFileName = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2448,6 +2474,7 @@ static bool JsnOs_Mkdir( JSContext *cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.dir ) {
 		free( cDir ); cDir = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2495,6 +2522,7 @@ static bool JsnOs_Rm( JSContext *cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.name ) {
 		free( cFileName ); cFileName = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2552,6 +2580,7 @@ static bool JsnOs_Symlink( JSContext *cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.nameNew ) {
 		free( cFileNameNew ); cFileNameNew = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2688,6 +2717,7 @@ static bool JsnOs_Dir( JSContext *cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.dirName ) {
 		free( cDirName ); cDirName = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2776,6 +2806,7 @@ static bool JsnOs_System( JSContext *cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.exec ) {
 		JS_free( cx, cExec ); cExec = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -2897,6 +2928,7 @@ static bool JsnOs_GetHostByName( JSContext *cx, unsigned argc, jsval * vp ) {
 	}
 	//  always cleanup
 	js_free( cHostName ); cHostName = NULL;
+
 	return ( cleanUp.good ) ? true : false;
 
 }
@@ -2994,6 +3026,7 @@ static bool JsnConsole_Log( JSContext * cx, unsigned argc, jsval * vp ) {
 	if ( cleanUp.cstring ) {
 		JS_free( cx, cString ); cString = NULL;
 	}
+
 	return ( cleanUp.good ) ? true : false;
 }
 
@@ -3072,6 +3105,7 @@ static bool JsnGlobal_Include( JSContext * cx, unsigned argc, jsval * vp ) {
 	}
 	success = ( cleanUp.good ) ? true : false;
 	args.rval( ).setBoolean( success );
+
 	return success;
 }
 
@@ -3103,10 +3137,11 @@ static struct payload_t * Payload_New( JSContext * cx, JSObject * object, JSObje
 			free( payload ); payload = NULL;
 		}
 	}
+
 	return payload;
 }
 
-static int Payload_Call( const struct payload_t * payload ) {
+static PRStatus Payload_Call( const struct payload_t * payload ) {
 	jsval value;
 
 	if ( payload != NULL ) {
@@ -3130,10 +3165,11 @@ static int Payload_Call( const struct payload_t * payload ) {
 		// the payload is cleaned-up by automatically, spawned by Core_ProcessTick and clearFuncCb
 		// We don't need to clear the payload, because that is needed also the next time that this route will be called
 	}
-	return ( payload->repeat ) ? 1 : 0;
+
+	return ( payload->repeat ) ? PR_SUCCESS : PR_FAILURE;
 }
 
-static int Payload_Timing_ResultHandler_cb( void * cbArgs ) {
+static PRStatus Payload_Timing_ResultHandler_cb( void * cbArgs ) {
 	struct payload_t * payload;
 
 	payload = ( struct payload_t * ) cbArgs;
@@ -3207,6 +3243,7 @@ static void Payload_Delete( struct payload_t * payload ) {
 		} \
 		args.rval( ).setUndefined( ); \
 	} \
+	\
 	return ( cleanUp.good ) ? true : false; \
 } while ( 0 );
 
@@ -3319,6 +3356,7 @@ static bool JsnGlobal_ClearTimeout( JSContext * cx, unsigned argc, jsval * vp ) 
 		javascript = (struct javascript_t *) JS_GetPrivate( globalObj );
 		Core_DelTimingId( javascript->core, identifier );
 	}
+
 	return ( cleanUp.good ) ? true: false;
 }
 
@@ -3402,6 +3440,7 @@ static struct script_t * Script_New( const struct javascript_t * javascript, con
 			free( script ); script = NULL;
 		}
 	}
+
 	return script;
 }
 
@@ -3489,6 +3528,7 @@ static int Javascript_Init( struct javascript_t * javascript ) {
 		JS_SetPrivate( javascript->globalObj, ( void * ) javascript );
 		cleanUp.good = ( Javascript_Run( javascript ) ) ? 1: 0;
 	}
+
 	return cleanUp.good;
 }
 

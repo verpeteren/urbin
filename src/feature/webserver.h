@@ -118,14 +118,14 @@ struct namedRegex_t {
 	const struct webserverclient_t * 	webserverclient;
 };
 
-unsigned char					Webserverclientresponse_SetContent	( struct webserverclientresponse_t * response, const char * content );
+PRStatus 						Webserverclientresponse_SetContent	( struct webserverclientresponse_t * response, const char * content );
 unsigned char					Webserverclientresponse_SetCode		( struct webserverclientresponse_t * response, const unsigned int code );
 unsigned char					Webserverclientresponse_SetMime		( struct webserverclientresponse_t * response, const char * mimeString );
 const char *					Webserverclient_GetUrl				( const struct webserverclient_t * webserverclient );
 struct namedRegex_t * 			Webserverclient_GetNamedGroups		( struct webserverclient_t * webserverclient );
 const char *					Webserverclient_GetIp				( const struct webserverclient_t * webserverclient );
-int 							Webserver_DocumentRoot				( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
-int 							Webserver_DynamicHandler			( struct webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb );
+PRStatus						Webserver_DocumentRoot				( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
+PRStatus						Webserver_DynamicHandler			( struct webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb );
 
 void 							NamedRegex_Delete					( struct namedRegex_t * namedRegex );
 

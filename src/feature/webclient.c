@@ -75,7 +75,7 @@ tryToReadMoreWebclient:
 						Webclient_CloseConn( webclient );
 						break;
 					}
-					cleanUp.good = ( Buffer_Increase( webpage->response.buffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
+					cleanUp.good = ( Buffer_Increase( webpage->response.buffer, HTTP_READ_BUFFER_LENGTH ) == PR_SUCCESS );
 					goto tryToReadMoreWebclient;
 				}
 				webpage->response.buffer->bytes[webpage->response.buffer->used] = '\0';
@@ -273,11 +273,11 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 			cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen + addcrcn + 1 ) ) != NULL );
 			if ( cleanUp.good ) {
 				cleanUp.headers = 1;
-				cleanUp.good = ( Buffer_Append( webpage->request.headers, headers, headerLen ) == 1 );
+				cleanUp.good = ( Buffer_Append( webpage->request.headers, headers, headerLen ) == PR_SUCCESS );
 			}
 			if ( cleanUp.good ) {
 				while ( addcrcn != 0 ) {
-					cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n", 2 ) == 1 );
+					cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n", 2 ) == PR_SUCCESS );
 					addcrcn -= 2;
 				}
 			}
@@ -356,13 +356,13 @@ static void Webclient_GenTopLine( struct webclient_t * webclient, struct webpage
 	if ( webpage->request.topLine == NULL ) {
 		cleanUp.good = ( ( webpage->request.topLine = Buffer_New( topLineLen ) ) != NULL );
 	} else {
-		cleanUp.good = ( Buffer_Reset( webpage->request.topLine, topLineLen ) == 1 );
+		cleanUp.good = ( Buffer_Reset( webpage->request.topLine, topLineLen ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.topLine, modeString, modeStringLen ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.topLine, modeString, modeStringLen ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.topLine, " /", 2 ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.topLine, " /", 2 ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
 		//  BUFFER HACK
@@ -370,13 +370,13 @@ static void Webclient_GenTopLine( struct webclient_t * webclient, struct webpage
 		webpage->request.topLine->used = strlen( webpage->request.topLine->bytes );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.topLine, " ", 1 ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.topLine, " ", 1 ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.topLine, HTTP_VERSION, versionLen ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.topLine, HTTP_VERSION, versionLen ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.topLine, "\r\n", 2 ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.topLine, "\r\n", 2 ) == PR_SUCCESS );
 	}
 	if ( ! cleanUp.good ) {
 		if ( cleanUp.topLine ) {
@@ -395,19 +395,19 @@ static void Webclient_GenHeader( struct webclient_t * webclient, struct webpage_
 	headerLen = 27 + hostLen + connLen;
 	cleanUp.good = ( ( webpage->request.headers = Buffer_New( headerLen ) ) != NULL );
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.headers, "Host: ", 6 ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, "Host: ", 6 ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.headers, webpage->uri.hostText.first, hostLen ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, webpage->uri.hostText.first, hostLen ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\nConnection: ", 14 ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\nConnection: ", 14 ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.headers, ConnectionDefinitions[webclient->connection], connLen ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, ConnectionDefinitions[webclient->connection], connLen ) == PR_SUCCESS );
 	}
 	if ( cleanUp.good ) {
-		cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n\r\n", 4 ) == 1 );
+		cleanUp.good = ( Buffer_Append( webpage->request.headers, "\r\n\r\n", 4 ) == PR_SUCCESS );
 	}
 }
 

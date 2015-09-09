@@ -30,9 +30,9 @@ struct javascript_t {
 struct javascript_t *			Javascript_New						( const struct core_t * core, const char * path, const char * fileName );
 void							Javascript_Delete					( struct javascript_t * javascript );
 
-unsigned char	 				JavascriptModule_Load				( const struct core_t * core, struct module_t * module, void * args );
-unsigned char					JavascriptModule_Ready				( const struct core_t * core, struct module_t * module, void * args );
-unsigned char					JavascriptModule_Unload				( const struct core_t * core, struct module_t * module, void * args );
+PRStatus		 				JavascriptModule_Load				( const struct core_t * core, struct module_t * module, void * args );
+PRStatus						JavascriptModule_Ready				( const struct core_t * core, struct module_t * module, void * args );
+PRStatus						JavascriptModule_Unload				( const struct core_t * core, struct module_t * module, void * args );
 
 #ifdef __cplusplus
 }

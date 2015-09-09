@@ -62,7 +62,7 @@ static void 					Webserver_FindRoute				( const struct webserver_t * webserver, 
 static void						Webserver_AddRoute				( struct webserver_t * webserver, struct route_t * route );
 static void						Webserver_DelRoute				( struct webserver_t * webserver, struct route_t * route );
 static struct webserverclient_t *Webserverclient_New			( struct webserver_t * webserver, int socketFd);
-static unsigned char 			Webserverclient_PrepareRequest	( struct webserverclient_t * webserverclient );
+static PRStatus					Webserverclient_PrepareRequest	( struct webserverclient_t * webserverclient );
 static void						Webserverclient_RenderFile		( struct webserverclient_t * webserverclient );
 static void 					Webserverclient_CloseConn		( struct webserverclient_t * webserverclient );
 static void 					Webserverclient_Delete			( struct webserverclient_t * webserverclient );
@@ -92,6 +92,7 @@ static struct namedRegex_t * NamedRegex_New( const struct webserverclient_t * 	w
 			free( namedRegex ); namedRegex = NULL;
 		}
 	}
+
 	return namedRegex;
 }
 
@@ -132,7 +133,8 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 		}
 		namedRegex->numGroups = 0;
 	}
-	return ( cleanUp.good ) ? 0 : 1; /* 0: continue */
+
+	return ( cleanUp.good ) ? 0: 1; /* 0: continue */
 }
 
 struct namedRegex_t * Webserverclient_GetNamedGroups( struct webserverclient_t * webserverclient ) {
@@ -144,6 +146,7 @@ struct namedRegex_t * Webserverclient_GetNamedGroups( struct webserverclient_t *
 	if ( cleanUp.good ) {
 		onig_foreach_name( webserverclient->route->urlRegex, Webclient_NamedGroup_cb, (void * ) namedRegex );
 	}
+
 	return namedRegex;
 }
 
@@ -227,6 +230,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 				free( route ); route = NULL;
 			}
 		}
+
 		return route;
 	}
 
@@ -295,7 +299,7 @@ static struct webserverclient_t * Webserverclient_New( struct webserver_t * webs
 	return webserverclient;
 }
 
-unsigned char Webserverclientresponse_SetContent( struct webserverclientresponse_t * response, const char * content ) {
+PRStatus Webserverclientresponse_SetContent( struct webserverclientresponse_t * response, const char * content ) {
 	size_t contentLen;
 	struct { unsigned char good:1;
 			unsigned char content:1; } cleanUp;
@@ -303,7 +307,7 @@ unsigned char Webserverclientresponse_SetContent( struct webserverclientresponse
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	if ( response->content.dynamic.buffer != NULL ) {
 		contentLen = strlen( content );
-		cleanUp.good = ( Buffer_Reset( response->content.dynamic.buffer, contentLen ) == 1 );
+		cleanUp.good = ( Buffer_Reset( response->content.dynamic.buffer, contentLen ) == PR_SUCCESS );
 	} else {
 		cleanUp.good = ( ( response->content.dynamic.buffer = Buffer_NewText( content ) ) != NULL );
 	}
@@ -317,7 +321,7 @@ unsigned char Webserverclientresponse_SetContent( struct webserverclientresponse
 		}
 	}
 
-	return ( cleanUp.good ) ? 1 : 0;
+	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 
 unsigned char Webserverclientresponse_SetCode( struct webserverclientresponse_t * response, const unsigned int code ) {
@@ -332,6 +336,7 @@ unsigned char Webserverclientresponse_SetCode( struct webserverclientresponse_t 
 			break;
 		}
 	}
+
 	return found;
 }
 
@@ -349,6 +354,7 @@ unsigned char Webserverclientresponse_SetMime( struct webserverclientresponse_t 
 			break;
 		}
 	}
+
 	return found;
 }
 
@@ -371,6 +377,7 @@ const char * Webserverclient_GetUrl( const struct webserverclient_t * webserverc
 			free( url ); url = NULL;
 		}
 	}
+
 	return url;
 }
 
@@ -399,6 +406,7 @@ const char * Webserverclient_GetIp( const struct webserverclient_t * webservercl
 			free( ip ); ip = NULL;
 		}
 	}
+
 	return ip;
 }
 
@@ -546,7 +554,7 @@ static void Webserverclient_RenderFile( struct webserverclient_t * webserverclie
 	}
 }
 
-static unsigned char Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient ) {
+static PRStatus Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient ) {
 	HeaderField * field;
 	size_t i;
 	const char * close, * keepAlive;
@@ -723,7 +731,7 @@ static unsigned char Webserverclient_PrepareRequest( struct webserverclient_t * 
 		}
 	}
 
-	return ( cleanUp.good ) ? 1 : 0;
+	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 
 static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) {
@@ -790,7 +798,7 @@ static void Webserverclient_Delete( struct webserverclient_t * webserverclient )
 /*****************************************************************************/
 /* Webserver                                                                 */
 /*****************************************************************************/
-int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot ) {
+PRStatus Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot ) {
 	struct route_t * route;
 	struct { unsigned char good:1;
 			unsigned char route:1;} cleanUp;
@@ -807,10 +815,10 @@ int Webserver_DocumentRoot	( struct webserver_t * webserver, const char * patter
 		}
 	}
 
-	return ( cleanUp.good == 1 );
+	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 
-int Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
+PRStatus Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
 	struct route_t * route;
 	struct { unsigned char good:1;
 			unsigned char route:1;} cleanUp;
@@ -827,7 +835,7 @@ int Webserver_DynamicHandler( struct webserver_t * webserver, const char * patte
 		}
 	}
 
-	return ( cleanUp.good == 1 );
+	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArg ) {
 	struct webserver_t * webserver;
@@ -886,7 +894,7 @@ tryToReadMoreWebserver:
 						Webserverclient_CloseConn( webserverclient );
 						break;
 					}
-					cleanUp.good = ( Buffer_Increase( webserverclient->request.buffer, HTTP_READ_BUFFER_LENGTH ) == 1 );
+					cleanUp.good = ( Buffer_Increase( webserverclient->request.buffer, HTTP_READ_BUFFER_LENGTH ) == PR_SUCCESS );
 					goto tryToReadMoreWebserver;
 				}
 				webserverclient->request.buffer->bytes[webserverclient->request.buffer->used] = '\0';

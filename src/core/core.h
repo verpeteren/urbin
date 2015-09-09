@@ -8,6 +8,7 @@
 #include <picoev.h>
 #include <tadns.h>
 #include <prclist.h>
+#include <prtypes.h>
 #include <prinrval.h>
 
 #include "../common.h"
@@ -28,9 +29,9 @@ struct core_t;
 struct module_t;
 
 typedef void 				( * signalAction_cb_t )		( const int signal );
-typedef int 				( * timerHandler_cb_t )		( void * cbArgs );
+typedef PRStatus			( * timerHandler_cb_t )		( void * cbArgs );
 typedef void 				( * clearFunc_cb_t )		( void * cbArgs );
-typedef unsigned char		( * moduleHandler_cb_t )	( const struct core_t * core, struct module_t * module, void * cbArgs );
+typedef PRStatus			( * moduleHandler_cb_t )	( const struct core_t * core, struct module_t * module, void * cbArgs );
 
 #define FROM_NEXT_TO_ITEM( type ) ( (type *) ( ( (char * ) next ) - offsetof( type, mLink.next ) ) )
 
@@ -85,12 +86,12 @@ struct core_t {
 
 struct buffer_t *				Buffer_New				( size_t initialSize );
 #if 0
-unsigned char 					Buffer_Split			( struct buffer_t * orgBuffer, struct buffer_t * otherBuffer, size_t orgBufferSplitPos );
+PRStatus						Buffer_Split			( struct buffer_t * orgBuffer, struct buffer_t * otherBuffer, size_t orgBufferSplitPos );
 #endif
-unsigned char 					Buffer_Increase			( struct buffer_t * buffer, size_t extraBytes );
+PRStatus						Buffer_Increase			( struct buffer_t * buffer, size_t extraBytes );
 struct buffer_t * 				Buffer_NewText			( const char * text );
-unsigned char 					Buffer_Append			( struct buffer_t * buffer, const char * bytes, size_t bytesLen );
-unsigned char 					Buffer_Reset			( struct buffer_t * buffer, size_t minLen );
+PRStatus						Buffer_Append			( struct buffer_t * buffer, const char * bytes, size_t bytesLen );
+PRStatus	 					Buffer_Reset			( struct buffer_t * buffer, size_t minLen );
 void 							Buffer_Delete			( struct buffer_t * buffer );
 
 void							Boot					( const int maxFds );
@@ -105,12 +106,12 @@ void 							Module_Delete			( struct module_t * module );
 
 struct core_t *					Core_New				( const PRBool isDaemon );
 void 							Core_Log				( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message );
-int 							Core_PrepareDaemon		( const struct core_t * core, const int maxFds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup );
+PRStatus						Core_PrepareDaemon		( const struct core_t * core, const int maxFds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup );
 
 void 							Core_GetHostByName		( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb, void * queryCbArgs );
-int								Core_AddModule			( struct core_t * core, struct module_t * module );
-int								Core_Loop				( struct core_t * core, const int maxWait );
-int								Core_DelModule			( struct core_t * core, struct module_t * module );
+PRStatus						Core_AddModule			( struct core_t * core, struct module_t * module );
+PRStatus						Core_Loop				( struct core_t * core, const int maxWait );
+PRStatus						Core_DelModule			( struct core_t * core, struct module_t * module );
 
 struct timing_t *				Core_AddTiming 			( struct core_t * core, const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb );
 void 							Core_DelTimingId		( struct core_t * core, uint32_t id );

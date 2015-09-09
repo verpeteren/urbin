@@ -161,8 +161,9 @@ struct buffer_t * Buffer_NewText( const char * text ) {
 
 	return buffer;
 }
+
 #if 0
-unsigned char Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * otherBuffer, size_t orgBufferSplitPos ) {
+PRStatus Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * otherBuffer, size_t orgBufferSplitPos ) {
 	size_t rest;
 	struct {unsigned char good:1; } cleanUp;
 
@@ -175,7 +176,7 @@ unsigned char Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * other
 		cleanUp.good = ( ( Buffer_NewText( orgBuffer->bytes + orgBufferSplitPos ) ) != NULL );
 	} else if ( rest > otherBuffer->size ) {
 		//  it does not fit
-		cleanUp.good = ( Buffer_Increase( otherBuffer, otherBuffer->size - rest ) == 1 );
+		cleanUp.good = ( Buffer_Increase( otherBuffer, otherBuffer->size - rest ) == PR_SUCCESS );
 		if ( cleanUp.good ) {
 			otherBuffer->used = 0;
 			Buffer_Append( otherBuffer, orgBuffer->bytes + orgBufferSplitPos, rest );
@@ -190,11 +191,11 @@ unsigned char Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * other
 		memset( orgBuffer->bytes + orgBufferSplitPos, '\0', rest );
 		orgBuffer->used = orgBufferSplitPos;
 	}
-	return ( cleanUp.good ) ? 1: 0;
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 #endif
 
-unsigned char Buffer_Append( struct buffer_t * buffer, const char * bytes, size_t bytesLen ) {
+PRStatus Buffer_Append( struct buffer_t * buffer, const char * bytes, size_t bytesLen ) {
 	size_t i, newSize;
 	char * pos, *newBytes;
 	int fits;
@@ -224,10 +225,10 @@ unsigned char Buffer_Append( struct buffer_t * buffer, const char * bytes, size_
 		}
 	}
 
-	return ( cleanUp.good ) ? 1: 0;
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-unsigned char Buffer_Increase( struct buffer_t * buffer, size_t extraBytes ) {
+PRStatus Buffer_Increase( struct buffer_t * buffer, size_t extraBytes ) {
 	size_t newSize;
 	char * newBytes;
 	struct {unsigned char good:1; } cleanUp;
@@ -243,10 +244,10 @@ unsigned char Buffer_Increase( struct buffer_t * buffer, size_t extraBytes ) {
 		Buffer_Delete( buffer ); buffer = NULL;
 	}
 
-	return ( cleanUp.good ) ? 1: 0;
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-unsigned char Buffer_Reset( struct buffer_t * buffer, size_t minLen ) {
+PRStatus Buffer_Reset( struct buffer_t * buffer, size_t minLen ) {
 	struct {unsigned char good:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -261,7 +262,8 @@ unsigned char Buffer_Reset( struct buffer_t * buffer, size_t minLen ) {
 	if ( ! cleanUp.good ) {
 		Buffer_Delete( buffer ); buffer = NULL;
 	}
-	return ( cleanUp.good ) ? 1: 0;
+
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
 void Buffer_Delete( struct buffer_t * buffer ) {
@@ -317,6 +319,7 @@ struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad
 			free( module ); module = NULL;
 		}
 	}
+
 	return module;
 }
 
@@ -374,6 +377,7 @@ static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t iden
 			free( timing ); timing = NULL;
 		}
 	}
+
 	return timing;
 }
 static void Timer_CalculateDue( struct timing_t * timing, const PRUint32 nowOrHorizon ) {
@@ -486,7 +490,7 @@ void Core_Log( const struct core_t * core, const int logLevel, const char * file
 extern int setgroups( size_t __n, __const gid_t *__groups );
 extern int initgroups( const char * user, gid_t group );
 
-static int Core_SwitchToUser( const struct core_t * core, const char* runAsUser, const char * runAsGroup ) {
+static PRStatus Core_SwitchToUser( const struct core_t * core, const char* runAsUser, const char * runAsGroup ) {
 	struct group *grp;
 	struct passwd *pwd;
 	struct {unsigned char good:1;
@@ -538,12 +542,14 @@ static int Core_SwitchToUser( const struct core_t * core, const char* runAsUser,
 	}
 	if ( getuid( ) == 0 ) {
 		Core_Log( core, LOG_CRIT, __FILE__ , __LINE__, "Running as root!" );
-		return 0;
+
+		return PR_FAILURE;
 	}
-	return 1;
+
+	return PR_SUCCESS;
 }
 
-int Core_PrepareDaemon( const struct core_t * core , const int fds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup ) {
+PRStatus Core_PrepareDaemon( const struct core_t * core , const int fds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup ) {
 	struct rlimit limit;
 	struct {unsigned char good:1;
 			unsigned char fds:1;
@@ -573,10 +579,11 @@ int Core_PrepareDaemon( const struct core_t * core , const int fds, const signal
 	}
 	if ( cleanUp.good ) {
 		if ( getuid( ) == 0 ) {
-			cleanUp.good = ( Core_SwitchToUser( core, runAsUser, runAsGroup ) ) ? 1 : 0;
+			cleanUp.good = ( Core_SwitchToUser( core, runAsUser, runAsGroup ) == PR_SUCCESS ) ? 1 : 0;
 		}
 	}
-	return cleanUp.good;
+
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
 static void Core_ProcessTick( struct core_t * core ) {
@@ -672,7 +679,7 @@ void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callba
 	dns_queue( core->dns.dns, queryCbArgs, hostName, queryType, onSuccess_cb );
 }
 
-int Core_Loop( struct core_t * core, const int maxWait ) {
+PRStatus Core_Loop( struct core_t * core, const int maxWait ) {
 	struct module_t * module, * firstModule;
 	PRCList * next;
 	int dnsSocketFd;
@@ -686,7 +693,7 @@ int Core_Loop( struct core_t * core, const int maxWait ) {
 		do {
 			next = PR_NEXT_LINK( &module->mLink );
 			if ( module->onReady != NULL )  {
-					cleanUp.good = ( module->onReady( core, module, module->cbArgs ) ) ? 1 : 0;
+					cleanUp.good = ( module->onReady( core, module, module->cbArgs ) == PR_SUCCESS ) ? 1 : 0;
 			}
 			module = FROM_NEXT_TO_ITEM( struct module_t );
 		} while ( cleanUp.good && module != firstModule );
@@ -703,10 +710,11 @@ int Core_Loop( struct core_t * core, const int maxWait ) {
 	if ( picoev_is_active( core->loop, dnsSocketFd ) ) {
 		picoev_del( core->loop, dnsSocketFd );
 	}
-	return ( cleanUp.good ) ? 1 : 0;
+
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-int Core_AddModule( struct core_t * core, struct module_t * module ) {
+PRStatus Core_AddModule( struct core_t * core, struct module_t * module ) {
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -718,14 +726,15 @@ int Core_AddModule( struct core_t * core, struct module_t * module ) {
 			PR_INSERT_BEFORE( &module->mLink, &core->modules->mLink );
 		}
 		if ( module->onLoad != NULL ) {
-			cleanUp.good = ( module->onLoad( core, module, module->cbArgs ) ) ? 1 : 0;
+			cleanUp.good = ( module->onLoad( core, module, module->cbArgs ) == PR_SUCCESS) ? 1 : 0;
 		}
 		Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "New Module allocated" );
 	}
-	return ( cleanUp.good ) ? 1 : 0;
+
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-int Core_DelModule( struct core_t * core, struct module_t * module ) {
+PRStatus Core_DelModule( struct core_t * core, struct module_t * module ) {
 	struct module_t * moduleNext;
 	PRCList * next;
 	struct {unsigned char good:1;}cleanUp;
@@ -741,11 +750,12 @@ int Core_DelModule( struct core_t * core, struct module_t * module ) {
 	}
 	PR_REMOVE_AND_INIT_LINK( &module->mLink );
 	if ( module->onUnload != NULL ) {
-		cleanUp.good = ( module->onUnload( core, module, module->cbArgs ) ) ? 1 : 0;
+		cleanUp.good = ( module->onUnload( core, module, module->cbArgs ) == PR_SUCCESS ) ? 1 : 0;
 	}
 	Module_Delete( module ); module = NULL;
 	Core_Log( core, LOG_INFO, __FILE__ , __LINE__, "Delete Module free-ed" );
-	return ( cleanUp.good ) ? 1 : 0;
+
+	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
 struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
