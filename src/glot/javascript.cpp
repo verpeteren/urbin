@@ -593,7 +593,7 @@ static void Mysqlclient_Query_ResultHandler_cb( const struct query_t * query ) {
  * @since	0.0.5b
  * @returns	{boolean}					If the query could be registered successfully it returns true; else false is returned
  * @param	{string}	statement		A sql command or query. Please not that for postgres the placeholders are marked as $n etc. and for mysql these are ?
- * @param	{array}		[parameters]	A list of parameters that can be used in a query.<p>default: []</p>
+ * @param	{array}		[parameters]	A list of parameters that can be used in a query
  * @param	{function}	fn				The callback function {response}
  *
  * @example
@@ -672,7 +672,7 @@ static const JSFunctionSpec jsmMysqlclient[ ] = {
  * @param	{string}		params.db			The database name
  * @param	{string}		params.user			The database user
  * @param	{string}		params.password		The database user password
- * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
+ * @param	{integer}		[timeout]			The timeout for valid connections
  *
  * @example
  * var my = Urbin.MysqlClient( {host : 'localhast', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
@@ -842,7 +842,7 @@ static void Postgresqlclient_Query_ResultHandler_cb( const struct query_t * quer
  * @since	0.0.5b
  * @returns	{boolean}					If the query could be registered successfully it returns true; else false is returned
  * @param	{string}	statement		A sql command or query. Please not that for postgres the placeholders are marked as $n etc. and for mysql these are ?
- * @param	{array}		[parameters]	A list of parameters that can be used in a query.<p>default: []</p>
+ * @param	{array}		[parameters]	A list of parameters that can be used in a query
  * @param	{function}	fn				The callback function {response}
  *
  * @example
@@ -888,7 +888,7 @@ static const JSFunctionSpec jsmPostgresqlclient[ ] = {
  * @param	{string}		params.db			The database name
  * @param	{string}		params.user			The database user
  * @param	{string}		params.password		The database user password
- * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the postgresql section of the configurationFile.</p>
+ * @param	{integer}		[timeout]			The timeout for valid connections
  *
  * @example
  * var pg = Urbin.PostgresqlClient( {host : 'localhost', db : 'apedevdb', user : 'apedev', password : 'vedepa', port : 5432 }, 60 );
@@ -1140,7 +1140,7 @@ static const JSFunctionSpec jsmWebclient[ ] = {
  * @param	{string}		params.method		The request method "GET" or "POST"
  * @param	{string}		params.headers		The headers, if the headers are not set, then HOST and CONNECTION will be set automatically. As long as there are requests in the queue, the connection will be Keep-Alive, else close
  * @param	{string}		params.content		The content to sent out
- * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the webclient section of the configurationFile.</p>
+ * @param	{integer}		[timeout]			The timeout for valid connections
  *
  * @example
  * showResponse = function( responseObj ) {
@@ -1939,7 +1939,7 @@ static bool JsnWebserver_AddDynamicRoute( JSContext * cx, unsigned argc, jsval *
  * @since	0.0.5b
  * @returns	{boolean}						If the route could be registered successfully it returns true; else false is returned
  * @param	{string}		pattern			The regular expression that triggers a lookup in the filesystem. Please not that this is a string and not a RegExp object. The expression must have exactly 1 group. This will act as the placeholder for the requested file.
- * @param	{string}		documentRoot	The folder name that acts as the document root for this webserver.<p>default: The value for 'document_root' in the http section of the configurationFile</p>
+ * @param	{string}		documentRoot	The folder name that acts as the document root for this webserver
  *
  * @example
  * var ws = Urbin.Webserver( {ip: '10.0.0.25', port: 8888}, 60 );
@@ -2017,10 +2017,10 @@ static const JSFunctionSpec jsmWebserver[ ] = {
  * @since	0.0.5b
  * @returns	{object}							The web server javascript
  * @param	{object}		params				The connection string.
- * @param	{string}		params.ip			The Ip address that the server will listen to.<p>default: The value for 'ip' in the webserver  section of the configurationFile.</p>
- * @param	{int}			params.port			The port that the server should bind to.<p>default: The value for 'port' in the webserver section of the configurationFile.</p>
- * @param	{integer}		[timeout]			The timeout for valid connections.<p>default: The value for 'timeout' in the webserver section of the configurationFile.</p>
- * @param	{integer}		[backlog]			The listen backlog for the socket server.<p>default: The value for 'timeout' in the webserver section of the configurationFile.</p>
+ * @param	{string}		params.ip			The Ip address that the server will listen to
+ * @param	{int}			params.port			The port that the server should bind to
+ * @param	{integer}		[timeout]			The timeout for valid connections
+ * @param	{integer}		[backlog]			The listen backlog for the socket server
  *
  * @example
  * var ws = Urbin.Webserver( { ip : '10.0.0.25', port : 8888 }, 60 );
@@ -2118,7 +2118,7 @@ static bool JsnFunction_Stub( JSContext * cx, unsigned argc, jsval * vp ) {
  * @public
  * @since	0.0.5b
  * @returns	{null}
- * @param	{integer}		[timeout]	Time to wait before the shut down should start. Defaults to 1 second.
+ * @param	{integer}		[timeout]	Time to wait before the shut down should start
  *
  * @example
  *Urbin.shutdown( 10 );
