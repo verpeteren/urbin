@@ -40,16 +40,16 @@ enum mimeType_t {
 	__MIMETYPE_LAST
 };
 
-struct webserverclient_t;
+typedef struct _Webserverclient_t Webserverclient_t;
 
-typedef void 				(* webserverHandler_cb_t)	( const struct webserverclient_t * webserverclient );
+typedef void 				(* webserverHandler_cb_t)	( const Webserverclient_t * webserverclient );
 
 enum routeType_t {
 	ROUTETYPE_DOCUMENTROOT,
 	ROUTETYPE_DYNAMIC
 };
 
-struct route_t {
+typedef struct _Route_t {
 	enum routeType_t			routeType;
 	const char * 				orgPattern;
 	regex_t *					urlRegex;
@@ -60,15 +60,15 @@ struct route_t {
 	void *						cbArgs;
 	clearFunc_cb_t				clearFuncCb;
 	struct PRCListStr			mLink;
-};
+} Route_t;
 
-struct mimeDetail_t {
+typedef struct _MimeDetail_t {
 	enum mimeType_t				mime;
 	const char *				ext;
 	const char *				applicationString;
-};
+} MimeDetail_t;
 
-struct webserverclientresponse_t {
+typedef struct _Webserverclientresponse_t {
 	time_t					start;
 	time_t					end;
 	enum httpCode_t			httpCode;
@@ -80,58 +80,58 @@ struct webserverclientresponse_t {
 			const char *			fileName;
 				}				file;
 		struct {
-			struct buffer_t *		buffer;
+			Buffer_t *			buffer;
 					}			dynamic;
 			}				content;
-};
+} Webserverclientresponse_t;
 
-struct webserverclient_t{
-	int									socketFd;
-	ssize_t								wroteBytes;
-	enum sending_t						sendingNow;
-	enum requestMode_t					mode;
-	enum connection_t					connection;
-	struct webserver_t *		 		webserver;
-	struct route_t *					route;
-	OnigRegion *						region;
-	struct {
-		RequestHeader *	 					header;
-		struct buffer_t *					buffer;
-							}			request;
-	struct webserverclientresponse_t	response;
-};
-
-struct webserver_t {
-	struct core_t *				core;
-	struct route_t *			routes;
+typedef struct _Webserver_t {
+	Core_t *					core;
+	Route_t *					routes;
 	OnigOptionType				regexOptions;
 	uint16_t					port;
 	int							socketFd;
 	uint8_t						timeoutSec;
 	const char *				hostName;
 	uint8_t		 				listenBacklog;
-};
+} Webserver_t;
 
-struct namedRegex_t {
-	size_t 								numGroups;
-	char ** 							kvPairs;
-	const struct webserverclient_t * 	webserverclient;
-};
+typedef struct _Webserverclient_t {
+	int									socketFd;
+	ssize_t								wroteBytes;
+	enum sending_t						sendingNow;
+	enum requestMode_t					mode;
+	enum connection_t					connection;
+	Webserver_t *		 				webserver;
+	Route_t *							route;
+	OnigRegion *						region;
+	struct {
+		RequestHeader *	 					header;
+		Buffer_t *							buffer;
+							}			request;
+	Webserverclientresponse_t			response;
+} Webserverclient_t;
 
-PRStatus 						Webserverclientresponse_SetContent	( struct webserverclientresponse_t * response, const char * content );
-unsigned char					Webserverclientresponse_SetCode		( struct webserverclientresponse_t * response, const unsigned int code );
-unsigned char					Webserverclientresponse_SetMime		( struct webserverclientresponse_t * response, const char * mimeString );
-const char *					Webserverclient_GetUrl				( const struct webserverclient_t * webserverclient );
-struct namedRegex_t * 			Webserverclient_GetNamedGroups		( struct webserverclient_t * webserverclient );
-const char *					Webserverclient_GetIp				( const struct webserverclient_t * webserverclient );
-PRStatus						Webserver_DocumentRoot				( struct webserver_t * webserver, const char * pattern, const char * documentRoot );
-PRStatus						Webserver_DynamicHandler			( struct webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb );
+typedef struct _NamedRegex_t {
+	size_t 						numGroups;
+	char ** 					kvPairs;
+	const Webserverclient_t * 	webserverclient;
+} NamedRegex_t;
 
-void 							NamedRegex_Delete					( struct namedRegex_t * namedRegex );
+PRStatus 						Webserverclientresponse_SetContent	( Webserverclientresponse_t * response, const char * content );
+unsigned char					Webserverclientresponse_SetCode		( Webserverclientresponse_t * response, const unsigned int code );
+unsigned char					Webserverclientresponse_SetMime		( Webserverclientresponse_t * response, const char * mimeString );
+const char *					Webserverclient_GetUrl				( const Webserverclient_t * webserverclient );
+NamedRegex_t * 					Webserverclient_GetNamedGroups		( Webserverclient_t * webserverclient );
+const char *					Webserverclient_GetIp				( const Webserverclient_t * webserverclient );
+PRStatus						Webserver_DocumentRoot				( Webserver_t * webserver, const char * pattern, const char * documentRoot );
+PRStatus						Webserver_DynamicHandler			( Webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb );
 
-struct webserver_t *			Webserver_New						( const struct core_t * core, const char * ip, const uint16_t port, const uint8_t timeoutSec, const uint8_t listenBacklog );
-void 							Webserver_JoinCore					( struct webserver_t * webserver );
-void							Webserver_Delete					( struct webserver_t * webserver );
+void 							NamedRegex_Delete					( NamedRegex_t * namedRegex );
+
+Webserver_t *					Webserver_New						( const Core_t * core, const char * ip, const uint16_t port, const uint8_t timeoutSec, const uint8_t listenBacklog );
+void 							Webserver_JoinCore					( Webserver_t * webserver );
+void							Webserver_Delete					( Webserver_t * webserver );
 
 #ifdef __cplusplus
 }

@@ -100,8 +100,8 @@ void ShowLink( const PRCList * start, const char * label, const size_t count ) {
 /*****************************************************************************/
 /* Buffer                                                                   */
 /*****************************************************************************/
-struct buffer_t * Buffer_New( size_t initialSize ) {
-	struct buffer_t * buffer;
+Buffer_t * Buffer_New( size_t initialSize ) {
+	Buffer_t * buffer;
 	struct {unsigned char good:1;
 			unsigned char buffer:1;
 			unsigned char bytes:1;} cleanUp;
@@ -130,8 +130,8 @@ struct buffer_t * Buffer_New( size_t initialSize ) {
 	return buffer;
 }
 
-struct buffer_t * Buffer_NewText( const char * text ) {
-	struct buffer_t * buffer;
+Buffer_t * Buffer_NewText( const char * text ) {
+	Buffer_t * buffer;
 	size_t initialSize = strlen( text );
 	struct {unsigned char good:1;
 			unsigned char buffer:1;
@@ -163,7 +163,7 @@ struct buffer_t * Buffer_NewText( const char * text ) {
 }
 
 #if 0
-PRStatus Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * otherBuffer, size_t orgBufferSplitPos ) {
+PRStatus Buffer_Split( Buffer_t * orgBuffer, buffer_t * otherBuffer, size_t orgBufferSplitPos ) {
 	size_t rest;
 	struct {unsigned char good:1; } cleanUp;
 
@@ -195,7 +195,7 @@ PRStatus Buffer_Split( struct buffer_t * orgBuffer, struct buffer_t * otherBuffe
 }
 #endif
 
-PRStatus Buffer_Append( struct buffer_t * buffer, const char * bytes, size_t bytesLen ) {
+PRStatus Buffer_Append( Buffer_t * buffer, const char * bytes, size_t bytesLen ) {
 	size_t i, newSize;
 	char * pos, *newBytes;
 	int fits;
@@ -228,7 +228,7 @@ PRStatus Buffer_Append( struct buffer_t * buffer, const char * bytes, size_t byt
 	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-PRStatus Buffer_Increase( struct buffer_t * buffer, size_t extraBytes ) {
+PRStatus Buffer_Increase( Buffer_t * buffer, size_t extraBytes ) {
 	size_t newSize;
 	char * newBytes;
 	struct {unsigned char good:1; } cleanUp;
@@ -247,7 +247,7 @@ PRStatus Buffer_Increase( struct buffer_t * buffer, size_t extraBytes ) {
 	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-PRStatus Buffer_Reset( struct buffer_t * buffer, size_t minLen ) {
+PRStatus Buffer_Reset( Buffer_t * buffer, size_t minLen ) {
 	struct {unsigned char good:1; } cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -266,7 +266,7 @@ PRStatus Buffer_Reset( struct buffer_t * buffer, size_t minLen ) {
 	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-void Buffer_Delete( struct buffer_t * buffer ) {
+void Buffer_Delete( Buffer_t * buffer ) {
 	if ( buffer->bytes != NULL ) {
 		free( buffer->bytes ); buffer->bytes = NULL;
 	}
@@ -278,8 +278,8 @@ void Buffer_Delete( struct buffer_t * buffer ) {
 /*****************************************************************************/
 /* Modules                                                                   */
 /*****************************************************************************/
-struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
-	struct module_t * module;
+Module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad, const moduleHandler_cb_t onReady, const moduleHandler_cb_t onUnload, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
+	Module_t * module;
 	struct {unsigned char good:1;
 			unsigned char name:1;
 			unsigned char module:1;} cleanUp;
@@ -323,7 +323,7 @@ struct module_t * Module_New( const char * name, const moduleHandler_cb_t onLoad
 	return module;
 }
 
-void Module_Delete( struct module_t * module ) {
+void Module_Delete( Module_t * module ) {
 	free( (char * ) module->name ); module->name = NULL;
 	if ( module->clearFunc_cb != NULL && module->cbArgs != NULL ) {
 		module->clearFunc_cb( module->cbArgs );
@@ -341,12 +341,12 @@ void Module_Delete( struct module_t * module ) {
 /*****************************************************************************/
 /* Timings                                                                    */
 /*****************************************************************************/
-static struct timing_t *			Timing_New 					( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb );
-static void 						Timer_CalculateDue			( struct timing_t * timing, const PRUint32 nowOrHorizon );
-static void 						Timing_Delete				( struct timing_t * timing );
+static Timing_t *			Timing_New 					( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb );
+static void 						Timer_CalculateDue			( Timing_t * timing, const PRUint32 nowOrHorizon );
+static void 						Timing_Delete				( Timing_t * timing );
 
-static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
-	struct timing_t * timing;
+static Timing_t * Timing_New ( const unsigned int ms, const uint32_t identifier, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
+	Timing_t * timing;
 	PRUint32 horizon;
 	PRIntervalTime now;
 	struct {unsigned char good:1;
@@ -380,11 +380,11 @@ static struct timing_t * Timing_New ( const unsigned int ms, const uint32_t iden
 
 	return timing;
 }
-static void Timer_CalculateDue( struct timing_t * timing, const PRUint32 nowOrHorizon ) {
+static void Timer_CalculateDue( Timing_t * timing, const PRUint32 nowOrHorizon ) {
 	timing->due = ( nowOrHorizon + ( 1000 * timing->ms ) - 1 );  //  @FIXME:  this might overflow if ms is in the far future ( +6 hours )
 }
 
-static void Timing_Delete( struct timing_t * timing ) {
+static void Timing_Delete( Timing_t * timing ) {
 	if ( timing->clearFunc_cb != NULL && timing->cbArgs != NULL ) {
 		timing->clearFunc_cb( timing->cbArgs );
 	}
@@ -403,8 +403,8 @@ static void Timing_Delete( struct timing_t * timing ) {
 /*****************************************************************************/
 /* Core                                                                      */
 /*****************************************************************************/
-struct core_t * Core_New( const PRBool isDaemon ) {
-	struct core_t * core;
+Core_t * Core_New( const PRBool isDaemon ) {
+	Core_t * core;
 	int timeoutSec;
 	struct {unsigned char good:1;
 			unsigned char loop:1;
@@ -469,7 +469,7 @@ struct core_t * Core_New( const PRBool isDaemon ) {
 	return core;
 }
 
-void Core_Log( const struct core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message ) {
+void Core_Log( const Core_t * core, const int logLevel, const char * fileName, const unsigned int lineNr, const char * message ) {
 	char * line;
 	size_t len;
 	struct {unsigned char good:1;
@@ -490,7 +490,7 @@ void Core_Log( const struct core_t * core, const int logLevel, const char * file
 extern int setgroups( size_t __n, __const gid_t *__groups );
 extern int initgroups( const char * user, gid_t group );
 
-static PRStatus Core_SwitchToUser( const struct core_t * core, const char* runAsUser, const char * runAsGroup ) {
+static PRStatus Core_SwitchToUser( const Core_t * core, const char* runAsUser, const char * runAsGroup ) {
 	struct group *grp;
 	struct passwd *pwd;
 	struct {unsigned char good:1;
@@ -549,7 +549,7 @@ static PRStatus Core_SwitchToUser( const struct core_t * core, const char* runAs
 	return PR_SUCCESS;
 }
 
-PRStatus Core_PrepareDaemon( const struct core_t * core , const int fds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup ) {
+PRStatus Core_PrepareDaemon( const Core_t * core , const int fds, const signalAction_cb_t signalHandler, const char * runAsUser, const char * runAsGroup ) {
 	struct rlimit limit;
 	struct {unsigned char good:1;
 			unsigned char fds:1;
@@ -586,8 +586,8 @@ PRStatus Core_PrepareDaemon( const struct core_t * core , const int fds, const s
 	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-static void Core_ProcessTick( struct core_t * core ) {
-	struct timing_t * timing, *firstTiming;
+static void Core_ProcessTick( Core_t * core ) {
+	Timing_t * timing, *firstTiming;
 	PRCList * next;
 	PRUint32 horizon;
 	PRIntervalTime now;
@@ -608,15 +608,15 @@ static void Core_ProcessTick( struct core_t * core ) {
 					Core_DelTiming( core, timing );
 				}
 			}
-			timing = FROM_NEXT_TO_ITEM( struct timing_t );
+			timing = FROM_NEXT_TO_ITEM( Timing_t );
 		} while ( timing != firstTiming );
 	}
 }
 
 static void Dns_ReadWrite_cb( picoev_loop * loop, int fd, int events, void * cbArgs ) {
-	struct core_t * core;
+	Core_t * core;
 
-	core = ( struct core_t *) cbArgs;
+	core = ( Core_t *) cbArgs;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout, stop and retry again..... */
 		core->dns.actives--;
@@ -665,7 +665,7 @@ char * DnsData_ToString( const struct dns_cb_data * dnsData ) {
 	return cIp;
 }
 
-void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callback_t onSuccess_cb, void * queryCbArgs ) {
+void Core_GetHostByName( Core_t * core, const char * hostName, dns_callback_t onSuccess_cb, void * queryCbArgs ) {
 	enum dns_query_type queryType;
 	int dnsSocketFd;
 
@@ -679,8 +679,8 @@ void Core_GetHostByName( struct core_t * core, const char * hostName, dns_callba
 	dns_queue( core->dns.dns, queryCbArgs, hostName, queryType, onSuccess_cb );
 }
 
-PRStatus Core_Loop( struct core_t * core, const int maxWait ) {
-	struct module_t * module, * firstModule;
+PRStatus Core_Loop( Core_t * core, const int maxWait ) {
+	Module_t * module, * firstModule;
 	PRCList * next;
 	int dnsSocketFd;
 	struct {unsigned char good:1;} cleanUp;
@@ -695,7 +695,7 @@ PRStatus Core_Loop( struct core_t * core, const int maxWait ) {
 			if ( module->onReady != NULL )  {
 					cleanUp.good = ( module->onReady( core, module, module->cbArgs ) == PR_SUCCESS ) ? 1 : 0;
 			}
-			module = FROM_NEXT_TO_ITEM( struct module_t );
+			module = FROM_NEXT_TO_ITEM( Module_t );
 		} while ( cleanUp.good && module != firstModule );
 	}
 	if ( cleanUp.good ) {
@@ -714,7 +714,7 @@ PRStatus Core_Loop( struct core_t * core, const int maxWait ) {
 	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-PRStatus Core_AddModule( struct core_t * core, struct module_t * module ) {
+PRStatus Core_AddModule( Core_t * core, Module_t * module ) {
 	struct {unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -734,8 +734,8 @@ PRStatus Core_AddModule( struct core_t * core, struct module_t * module ) {
 	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-PRStatus Core_DelModule( struct core_t * core, struct module_t * module ) {
-	struct module_t * moduleNext;
+PRStatus Core_DelModule( Core_t * core, Module_t * module ) {
+	Module_t * moduleNext;
 	PRCList * next;
 	struct {unsigned char good:1;}cleanUp;
 
@@ -745,7 +745,7 @@ PRStatus Core_DelModule( struct core_t * core, struct module_t * module ) {
 		core->modules = NULL;
 	} else {
 		next = PR_NEXT_LINK( &module->mLink );
-		moduleNext = FROM_NEXT_TO_ITEM( struct module_t );
+		moduleNext = FROM_NEXT_TO_ITEM( Module_t );
 		core->modules = moduleNext;
 	}
 	PR_REMOVE_AND_INIT_LINK( &module->mLink );
@@ -758,8 +758,8 @@ PRStatus Core_DelModule( struct core_t * core, struct module_t * module ) {
 	return ( cleanUp.good ) ? PR_SUCCESS: PR_FAILURE;
 }
 
-struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
-	struct timing_t * timing;
+Timing_t * Core_AddTiming( Core_t * core , const unsigned int ms, const unsigned int repeat, const timerHandler_cb_t timerHandler_cb, void * cbArgs, const clearFunc_cb_t clearFunc_cb ) {
+	Timing_t * timing;
 	struct {unsigned char good:1;
 			unsigned char timing:1; } cleanUp;
 
@@ -787,23 +787,23 @@ struct timing_t * Core_AddTiming( struct core_t * core , const unsigned int ms, 
 	return timing;
 }
 
-void Core_DelTiming( struct core_t * core, struct timing_t * timing ) {
-	struct timing_t * timingNext;
+void Core_DelTiming( Core_t * core, Timing_t * timing ) {
+	Timing_t * timingNext;
 	PRCList * next;
 
 	if ( PR_CLIST_IS_EMPTY( &timing->mLink ) ) {
 		core->timings = NULL;
 	} else {
 		next = PR_NEXT_LINK( &timing->mLink );
-		timingNext = FROM_NEXT_TO_ITEM( struct timing_t );
+		timingNext = FROM_NEXT_TO_ITEM( Timing_t );
 		core->timings = timingNext;
 	}
 	PR_REMOVE_AND_INIT_LINK( &timing->mLink );
 	Timing_Delete( timing ); timing = NULL;
 }
 
-void Core_DelTimingId( struct core_t * core , uint32_t id ) {
-	struct timing_t * timing, *firstTiming;
+void Core_DelTimingId( Core_t * core , uint32_t id ) {
+	Timing_t * timing, *firstTiming;
 	PRCList * next;
 
 	firstTiming = timing = core->timings;
@@ -814,14 +814,14 @@ void Core_DelTimingId( struct core_t * core , uint32_t id ) {
 				Core_DelTiming( core, timing );
 				break;
 			}
-			timing = FROM_NEXT_TO_ITEM( struct timing_t );
+			timing = FROM_NEXT_TO_ITEM( Timing_t );
 		} while ( timing != firstTiming );
 	}
 }
 
-void Core_Delete( struct core_t * core ) {
-	struct timing_t * firstTiming;
-	struct module_t * firstModule;
+void Core_Delete( Core_t * core ) {
+	Timing_t * firstTiming;
+	Module_t * firstModule;
 	int dnsSocketFd;
 
 	//  cleanup the modules

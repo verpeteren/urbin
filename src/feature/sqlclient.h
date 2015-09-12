@@ -20,10 +20,11 @@ extern "C" {
 #endif
 
 
-struct query_t;
+typedef struct _Query_t Query_t;
+typedef struct _Sqlclient_t Sqlclient_t;
 
-typedef void					( * queryHandler_cb_t )			( const struct query_t * query );
-typedef struct sqlclient_t *	( * sqlNew_cb_t)				( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
+typedef void					( * queryHandler_cb_t )			( const Query_t * query );
+typedef Sqlclient_t *			( * sqlNew_cb_t)				( const Core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const unsigned char timeoutSec );
 
 enum sqlAdapter_t {
 	SQLADAPTER_POSTGRESQL,
@@ -31,11 +32,10 @@ enum sqlAdapter_t {
 	SQLADAPTER_MYSQL
 #endif
 };
-struct query_t;
 
-struct sqlclient_t {
-	struct core_t *				core;
-	struct query_t *			currentQuery;
+typedef struct _Sqlclient_t {
+	Core_t *					core;
+	Query_t *					currentQuery;
 	enum sqlAdapter_t			adapter;
 	union {
 		struct{
@@ -53,12 +53,12 @@ struct sqlclient_t {
 	const char *				dbName;
 	int							socketFd;
 	uint8_t						timeoutSec;
-	struct query_t *			queries;
+	Query_t *					queries;
 	uint16_t					port;
-};
+} Sqlclient_t;
 
-struct query_t{
-	const struct sqlclient_t *	sqlclient;
+typedef struct _Query_t{
+	const Sqlclient_t *			sqlclient;
 	const char *				statement;
 	const char **				paramValues;
 	size_t *					paramLengths;
@@ -80,16 +80,16 @@ struct query_t{
 	queryHandler_cb_t			cbHandler;
 	clearFunc_cb_t				clearFuncCb;
 	struct PRCListStr			mLink;
-};
+} Query_t;
 
 #if HAVE_MYSQL == 1
-struct sqlclient_t *			Mysql_New					( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const uint8_t timeoutSec );
+Sqlclient_t *					Mysql_New					( const Core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const uint8_t timeoutSec );
 #endif
-struct sqlclient_t *			Postgresql_New				( const struct core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const uint8_t timeoutSec );
-void							Sqlclient_Delete			( struct sqlclient_t * sqlclient );
+Sqlclient_t *					Postgresql_New				( const Core_t * core, const char * hostName, const uint16_t port, const char * loginName, const char * password, const char * dbName, const uint8_t timeoutSec );
+void							Sqlclient_Delete			( Sqlclient_t * sqlclient );
 
-void 							Query_New					( struct sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFuncCb );
-void							Query_Delete				( struct query_t * query );
+void 							Query_New					( Sqlclient_t * sqlclient, const char * sqlStatement, const size_t paramCount, const char ** paramValues, const queryHandler_cb_t callback, void * args, const clearFunc_cb_t clearFuncCb );
+void							Query_Delete				( Query_t * query );
 
 #ifdef __cplusplus
 }

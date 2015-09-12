@@ -33,7 +33,7 @@ const char * ConnectionDefinitions[] = {
 	"Keep-Alive"
 };
 
-struct mimeDetail_t MimeTypeDefinitions[] = {
+MimeDetail_t MimeTypeDefinitions[] = {
 	{ MIMETYPE_HTML,			"html",	"text/html" },
 	{ MIMETYPE_TXT,				"txt",	"text/plain" },
 	{ MIMETYPE_CSS,				"css",	"text/css" },
@@ -53,22 +53,23 @@ struct mimeDetail_t MimeTypeDefinitions[] = {
 	{ MIMETYPE_CSV,				"csv",	"application/vnd.ms-excel" },
 	{ __MIMETYPE_LAST,			'\0',	"application/octet-stream"}
 };
-static struct route_t * 		Route_New						( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFuncCb );
-static void						Route_Delete					( struct route_t * route );
+
+static Route_t * 				Route_New						( const char * pattern, const enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFuncCb );
+static void						Route_Delete					( Route_t * route );
 static void						Webserver_HandleRead_cb			( picoev_loop * loop, int fd, int events, void * wcArgs );
 static void						Webserver_HandleWrite_cb		( picoev_loop * loop, int fd, int events, void * wcArgs );
 static void						Webserver_HandleAccept_cb		( picoev_loop * loop, int fd, int events, void * wsArgs );
-static void 					Webserver_FindRoute				( const struct webserver_t * webserver, struct webserverclient_t * webserverclient );
-static void						Webserver_AddRoute				( struct webserver_t * webserver, struct route_t * route );
-static void						Webserver_DelRoute				( struct webserver_t * webserver, struct route_t * route );
-static struct webserverclient_t *Webserverclient_New			( struct webserver_t * webserver, int socketFd);
-static PRStatus					Webserverclient_PrepareRequest	( struct webserverclient_t * webserverclient );
-static void						Webserverclient_RenderFile		( struct webserverclient_t * webserverclient );
-static void 					Webserverclient_CloseConn		( struct webserverclient_t * webserverclient );
-static void 					Webserverclient_Delete			( struct webserverclient_t * webserverclient );
+static void 					Webserver_FindRoute				( const Webserver_t * webserver, Webserverclient_t * webserverclient );
+static void						Webserver_AddRoute				( Webserver_t * webserver, Route_t * route );
+static void						Webserver_DelRoute				( Webserver_t * webserver, Route_t * route );
+static Webserverclient_t *		Webserverclient_New				( Webserver_t * webserver, int socketFd);
+static PRStatus					Webserverclient_PrepareRequest	( Webserverclient_t * webserverclient );
+static void						Webserverclient_RenderFile		( Webserverclient_t * webserverclient );
+static void 					Webserverclient_CloseConn		( Webserverclient_t * webserverclient );
+static void 					Webserverclient_Delete			( Webserverclient_t * webserverclient );
 
-static struct namedRegex_t * NamedRegex_New( const struct webserverclient_t * 	webserverclient, const int numGroups ) {
-	struct namedRegex_t * namedRegex;
+static NamedRegex_t * NamedRegex_New( const Webserverclient_t * 	webserverclient, const int numGroups ) {
+	NamedRegex_t * namedRegex;
 	struct { unsigned char good:1;
 			unsigned char ng:1;
 			unsigned char kv:1; }cleanUp;
@@ -97,7 +98,7 @@ static struct namedRegex_t * NamedRegex_New( const struct webserverclient_t * 	w
 }
 
 static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int ngroupNum, int* group_nums, regex_t* reg, void* cbArgs ) {
-	struct namedRegex_t * namedRegex;
+	NamedRegex_t * namedRegex;
 	OnigRegion * region;
 	int i, gn, startPos, endPos;
 	const char * start;
@@ -106,7 +107,7 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 	struct { unsigned char good:1; }cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	namedRegex = (struct namedRegex_t *) cbArgs;
+	namedRegex = (NamedRegex_t *) cbArgs;
 	region = namedRegex->webserverclient->region;
 	slot = 0;
 	for ( i = 0; i < ngroupNum; i++ ) {
@@ -137,8 +138,8 @@ static int Webclient_NamedGroup_cb( const UChar* name, const UChar* nameEnd, int
 	return ( cleanUp.good ) ? 0: 1; /* 0: continue */
 }
 
-struct namedRegex_t * Webserverclient_GetNamedGroups( struct webserverclient_t * webserverclient ) {
-	struct namedRegex_t * namedRegex;
+NamedRegex_t * Webserverclient_GetNamedGroups( Webserverclient_t * webserverclient ) {
+	NamedRegex_t * namedRegex;
 	struct { unsigned char good:1; }cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
@@ -150,7 +151,7 @@ struct namedRegex_t * Webserverclient_GetNamedGroups( struct webserverclient_t *
 	return namedRegex;
 }
 
-void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
+void NamedRegex_Delete( NamedRegex_t * namedRegex ) {
 	size_t j;
 
 	for ( j = 0; j < namedRegex->numGroups * 2; j++ ) {
@@ -164,8 +165,8 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 /*****************************************************************************/
 	/* Route                                                                    */
 	/*****************************************************************************/
-	static struct route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
-		struct route_t * route;
+	static Route_t * Route_New( const char * pattern, enum routeType_t routeType, void * details, const OnigOptionType regexOptions, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
+		Route_t * route;
 		OnigErrorInfo einfo;
 		UChar * pat;
 		char * lastChar;
@@ -234,7 +235,7 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 		return route;
 	}
 
-	static void Route_Delete( struct route_t * route ) {
+	static void Route_Delete( Route_t * route ) {
 		if ( route->routeType == ROUTETYPE_DOCUMENTROOT ) {
 			free( (char *) route->details.documentRoot ); route->details.documentRoot = NULL;
 		}
@@ -252,8 +253,8 @@ void NamedRegex_Delete( struct namedRegex_t * namedRegex ) {
 	/*****************************************************************************/
 	/* webserverclient                                                                 */
 	/*****************************************************************************/
-static struct webserverclient_t * Webserverclient_New( struct webserver_t * webserver, int socketFd) {
-	struct webserverclient_t * webserverclient;
+static Webserverclient_t * Webserverclient_New( Webserver_t * webserver, int socketFd) {
+	Webserverclient_t * webserverclient;
 	struct {unsigned char good:1;
 			unsigned char onig:1;
 			unsigned char webserverclient:1; } cleanUp;
@@ -299,7 +300,7 @@ static struct webserverclient_t * Webserverclient_New( struct webserver_t * webs
 	return webserverclient;
 }
 
-PRStatus Webserverclientresponse_SetContent( struct webserverclientresponse_t * response, const char * content ) {
+PRStatus Webserverclientresponse_SetContent( Webserverclientresponse_t * response, const char * content ) {
 	size_t contentLen;
 	struct { unsigned char good:1;
 			unsigned char content:1; } cleanUp;
@@ -324,7 +325,7 @@ PRStatus Webserverclientresponse_SetContent( struct webserverclientresponse_t * 
 	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 
-unsigned char Webserverclientresponse_SetCode( struct webserverclientresponse_t * response, const unsigned int code ) {
+unsigned char Webserverclientresponse_SetCode( Webserverclientresponse_t * response, const unsigned int code ) {
 	enum httpCode_t codeId;
 	unsigned char found;
 
@@ -340,9 +341,9 @@ unsigned char Webserverclientresponse_SetCode( struct webserverclientresponse_t 
 	return found;
 }
 
-unsigned char Webserverclientresponse_SetMime( struct webserverclientresponse_t * response, const char * mimeString ) {
+unsigned char Webserverclientresponse_SetMime( Webserverclientresponse_t * response, const char * mimeString ) {
 	enum mimeType_t mimeId;
-	struct mimeDetail_t * mimeDetail;
+	MimeDetail_t * mimeDetail;
 	unsigned char found;
 
 	found = 0;
@@ -359,7 +360,7 @@ unsigned char Webserverclientresponse_SetMime( struct webserverclientresponse_t 
 }
 
 
-const char * Webserverclient_GetUrl( const struct webserverclient_t * webserverclient ) {
+const char * Webserverclient_GetUrl( const Webserverclient_t * webserverclient ) {
 	char * url;
 	int len;
 	struct {unsigned char good:1;
@@ -381,7 +382,7 @@ const char * Webserverclient_GetUrl( const struct webserverclient_t * webserverc
 	return url;
 }
 
-const char * Webserverclient_GetIp( const struct webserverclient_t * webserverclient ) {
+const char * Webserverclient_GetIp( const Webserverclient_t * webserverclient ) {
 	char * ip;
 	struct sockaddr_storage addr;
 	socklen_t len;
@@ -411,7 +412,7 @@ const char * Webserverclient_GetIp( const struct webserverclient_t * webservercl
 }
 
 #define WEBSERVERCLIENT_RENDER( name, webpage ) \
-static void Webserverclient_Render_##name( struct webserverclient_t * webserverclient) { \
+static void Webserverclient_Render_##name( Webserverclient_t * webserverclient) { \
 	struct {unsigned char good:1; \
 			unsigned char content:1; } cleanUp; \
 	\
@@ -466,8 +467,8 @@ WEBSERVERCLIENT_RENDER( Service_unavailable, "<html>" "\n\t" "<body>" "\n\t\t" "
 WEBSERVERCLIENT_RENDER( Gateway_timeout, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>Gateway Timeout</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
 WEBSERVERCLIENT_RENDER( Http_version_not_supported, "<html>" "\n\t" "<body>" "\n\t\t" "<h1>HTTP Version Not Supported</h1>" "\n\t" "</body>" "\n" "</html>" "\n" )
 
-static void Webserverclient_RenderFile( struct webserverclient_t * webserverclient ) {
-	struct route_t * route;
+static void Webserverclient_RenderFile( Webserverclient_t * webserverclient ) {
+	Route_t * route;
 
 	route = webserverclient->route;
 	struct stat fileStat;
@@ -554,7 +555,7 @@ static void Webserverclient_RenderFile( struct webserverclient_t * webserverclie
 	}
 }
 
-static PRStatus Webserverclient_PrepareRequest( struct webserverclient_t * webserverclient ) {
+static PRStatus Webserverclient_PrepareRequest( Webserverclient_t * webserverclient ) {
 	HeaderField * field;
 	size_t i;
 	const char * close, * keepAlive;
@@ -734,7 +735,7 @@ static PRStatus Webserverclient_PrepareRequest( struct webserverclient_t * webse
 	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 
-static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) {
+static void Webserverclient_Reset( Webserverclient_t * webserverclient ) {
 	if ( webserverclient->request.header != NULL ) {
 			h3_request_header_free( webserverclient->request.header ); webserverclient->request.header = NULL;
 		}
@@ -758,14 +759,14 @@ static void Webserverclient_Reset( struct webserverclient_t * webserverclient ) 
 		onig_region_free( webserverclient->region, 0 );
 	}
 
-static void Webserverclient_CloseConn( struct webserverclient_t * webserverclient ) {
+static void Webserverclient_CloseConn( Webserverclient_t * webserverclient ) {
 		webserverclient->response.end = time( 0 );
 		picoev_del( webserverclient->webserver->core->loop, webserverclient->socketFd );
 		close( webserverclient->socketFd );
 		Webserverclient_Delete( webserverclient );
 	}
 
-static void Webserverclient_Delete( struct webserverclient_t * webserverclient ) {
+static void Webserverclient_Delete( Webserverclient_t * webserverclient ) {
 	if ( webserverclient->request.header != NULL ) {
 		h3_request_header_free( webserverclient->request.header ); webserverclient->request.header = NULL;
 	}
@@ -798,8 +799,8 @@ static void Webserverclient_Delete( struct webserverclient_t * webserverclient )
 /*****************************************************************************/
 /* Webserver                                                                 */
 /*****************************************************************************/
-PRStatus Webserver_DocumentRoot	( struct webserver_t * webserver, const char * pattern, const char * documentRoot ) {
-	struct route_t * route;
+PRStatus Webserver_DocumentRoot	( Webserver_t * webserver, const char * pattern, const char * documentRoot ) {
+	Route_t * route;
 	struct { unsigned char good:1;
 			unsigned char route:1;} cleanUp;
 
@@ -818,8 +819,8 @@ PRStatus Webserver_DocumentRoot	( struct webserver_t * webserver, const char * p
 	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 
-PRStatus Webserver_DynamicHandler( struct webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
-	struct route_t * route;
+PRStatus Webserver_DynamicHandler( Webserver_t * webserver, const char * pattern, const webserverHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
+	Route_t * route;
 	struct { unsigned char good:1;
 			unsigned char route:1;} cleanUp;
 
@@ -838,11 +839,11 @@ PRStatus Webserver_DynamicHandler( struct webserver_t * webserver, const char * 
 	return ( cleanUp.good ) ? PR_SUCCESS : PR_FAILURE;
 }
 static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, void * wsArg ) {
-	struct webserver_t * webserver;
-	struct webserverclient_t * webserverclient;
+	Webserver_t * webserver;
+	Webserverclient_t * webserverclient;
 	int newFd;
 
-	webserver = (struct webserver_t *) wsArg;
+	webserver = (Webserver_t *) wsArg;
 	newFd = accept( fd, NULL, NULL );
 	if ( -1 != newFd ) {
 		SetupSocket( newFd, 1 );
@@ -852,13 +853,13 @@ static void Webserver_HandleAccept_cb( picoev_loop * loop, int fd, int events, v
 }
 
 static void Webserver_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
-	struct webserverclient_t * webserverclient;
+	Webserverclient_t * webserverclient;
 	ssize_t didReadBytes, canReadBytes;
 	struct {unsigned char raw:1;
 			unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	webserverclient = (struct webserverclient_t *) wcArg;
+	webserverclient = (Webserverclient_t *) wcArg;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
 			Webserverclient_CloseConn( webserverclient );
@@ -917,7 +918,7 @@ tryToReadMoreWebserver:
 #define HTTP_TOPLINE_LENGTH 20
 #define HTTP_HEADER_LENGTH 2048
 static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArg ) {
-	struct webserverclient_t * webserverclient;
+	Webserverclient_t * webserverclient;
 	size_t len;
 	ssize_t wroteBytes;
 	int done;
@@ -925,7 +926,7 @@ static void Webserver_HandleWrite_cb( picoev_loop * loop, int fd, int events, vo
 	done = 0;
 	len = 0;
 	wroteBytes = 0;
-	webserverclient = (struct webserverclient_t *) wcArg;
+	webserverclient = (Webserverclient_t *) wcArg;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		/* timeout */
 		Webserverclient_CloseConn( webserverclient );
@@ -1038,7 +1039,7 @@ tryToWriteMoreWebserver:
 }
 
 static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
-	struct webserver_t * webserver;
+	Webserver_t * webserver;
 	struct sockaddr_in listenAddr;
 	int flag;
 	char * ip;
@@ -1049,7 +1050,7 @@ static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
 		} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	webserver = (struct webserver_t *) dnsData->context;
+	webserver = (Webserver_t *) dnsData->context;
 	flag = 1;
 	ip = NULL;
 	webserver->core->dns.actives--;
@@ -1097,8 +1098,8 @@ static void Webserver_AcceptAtIp( struct dns_cb_data * dnsData ) {
 	}
 }
 
-struct webserver_t * Webserver_New( const struct core_t * core, const char * hostName, const uint16_t port, const uint8_t const timeoutSec, const uint8_t listenBacklog ) {
-	struct webserver_t * webserver;
+Webserver_t * Webserver_New( const Core_t * core, const char * hostName, const uint16_t port, const uint8_t const timeoutSec, const uint8_t listenBacklog ) {
+	Webserver_t * webserver;
 	struct {unsigned char good:1;
 			unsigned char hostName:1;
 			unsigned char webserver:1;} cleanUp;
@@ -1107,7 +1108,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * hos
 	cleanUp.good = ( ( webserver = malloc( sizeof( * webserver ) ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.webserver = 1;
-		webserver->core = (struct core_t *) core;
+		webserver->core = (Core_t *) core;
 		webserver->socketFd = 0;
 		webserver->listenBacklog = ( listenBacklog == 0 ) ? PR_CFG_MODULES_WEBSERVER_LISTEN_BACKLOG : listenBacklog;
 		webserver->port = ( port == 0 ) ? ( (uint16_t) PR_CFG_MODULES_WEBSERVER_PORT) : port;
@@ -1144,7 +1145,7 @@ struct webserver_t * Webserver_New( const struct core_t * core, const char * hos
 	return webserver;
 }
 
-static void Webserver_AddRoute( struct webserver_t * webserver, struct route_t * route ) {
+static void Webserver_AddRoute( Webserver_t * webserver, Route_t * route ) {
 	if ( route != NULL ) {
 		if ( webserver->routes == NULL ) {
 			webserver->routes = route;
@@ -1155,15 +1156,15 @@ static void Webserver_AddRoute( struct webserver_t * webserver, struct route_t *
 	}
 }
 
-static void Webserver_DelRoute( struct webserver_t * webserver, struct route_t * route ) {
-	struct route_t * routeNext;
+static void Webserver_DelRoute( Webserver_t * webserver, Route_t * route ) {
+	Route_t * routeNext;
 	PRCList * next;
 
 	if ( PR_CLIST_IS_EMPTY( &route->mLink ) ) {
 		webserver->routes = NULL;
 	} else {
 		next = PR_NEXT_LINK( &route->mLink );
-		routeNext = FROM_NEXT_TO_ITEM( struct route_t );
+		routeNext = FROM_NEXT_TO_ITEM( Route_t );
 		webserver->routes = routeNext;
 	}
 	PR_REMOVE_AND_INIT_LINK( &route->mLink );
@@ -1171,8 +1172,8 @@ static void Webserver_DelRoute( struct webserver_t * webserver, struct route_t *
 	Core_Log( webserver->core, LOG_INFO, __FILE__ , __LINE__, "Delete Route free-ed" );
 }
 
-static void Webserver_FindRoute( const struct webserver_t * webserver, struct webserverclient_t * webserverclient ) {
-	struct route_t * route, *firstRoute;
+static void Webserver_FindRoute( const Webserver_t * webserver, Webserverclient_t * webserverclient ) {
+	Route_t * route, *firstRoute;
 	PRCList * next;
 	const unsigned char * range, * end, * start;
 	int r, found;
@@ -1191,13 +1192,13 @@ static void Webserver_FindRoute( const struct webserver_t * webserver, struct we
 				webserverclient->route = route;
 				break;
 			}
-			route = FROM_NEXT_TO_ITEM( struct route_t );
+			route = FROM_NEXT_TO_ITEM( Route_t );
 		} while ( route != firstRoute );
 	}
 }
 
-void Webserver_Delete( struct webserver_t * webserver ) {
-	struct route_t * firstRoute;
+void Webserver_Delete( Webserver_t * webserver ) {
+	Route_t * firstRoute;
 	//  clean the routes
 	firstRoute = webserver->routes;
 	while  ( firstRoute != NULL ) {

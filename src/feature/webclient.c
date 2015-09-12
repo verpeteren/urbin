@@ -16,22 +16,22 @@ extern const char * ConnectionDefinitions[];
 static void						Webclient_HandleRead_cb		( picoev_loop * loop, int fd, int events, void * wcArgs );
 static void						Webclient_HandleWrite_cb	( picoev_loop * loop, int fd, int events, void * wcArgs );
 static void						Webclient_HandleConnect_cb	( picoev_loop * loop, int fd, int events, void * wsArgs );
-static void 					Webclient_Connect			( struct webclient_t * webclient );
-static void 					Webclient_GenTopLine			( struct webclient_t * webclient, struct webpage_t * webpage );
-static void 					Webclient_GenHeader			( struct webclient_t * webclient, struct webpage_t * webpage );
-static void 					Webclient_PushWebpage		( struct webclient_t * webclient, struct webpage_t * webpage );
-static struct webpage_t * 		Webclient_PopWebpage		( struct webclient_t * webclient );
+static void 					Webclient_Connect			( Webclient_t * webclient );
+static void 					Webclient_GenTopLine		( Webclient_t * webclient, Webpage_t * webpage );
+static void 					Webclient_GenHeader			( Webclient_t * webclient, Webpage_t * webpage );
+static void 					Webclient_PushWebpage		( Webclient_t * webclient, Webpage_t * webpage );
+static Webpage_t * 				Webclient_PopWebpage		( Webclient_t * webclient );
 
-static void 					Webpage_Delete				( struct webpage_t * webpage );
+static void 					Webpage_Delete				( Webpage_t * webpage );
 
-static void Webclient_CloseConn( struct webclient_t * webclient ) {
+static void Webclient_CloseConn( Webclient_t * webclient ) {
 	picoev_del( webclient->core->loop, webclient->socketFd );
 	close( webclient->socketFd ); webclient->socketFd = 0;
 }
 
 static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, void * wcArgs ) {
-	struct webclient_t * webclient;
-	struct webpage_t * webpage;
+	Webclient_t * webclient;
+	Webpage_t * webpage;
 	ssize_t didReadBytes, canReadBytes;
 	struct {unsigned char headers:1;
 			unsigned char content:1;
@@ -39,7 +39,7 @@ static void Webclient_HandleRead_cb( picoev_loop * loop, int fd, int events, voi
 			unsigned char good:1;} cleanUp;
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
-	webclient = (struct webclient_t *) wcArgs;
+	webclient = (Webclient_t *) wcArgs;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Webclient_CloseConn( webclient );
 	} else if ( ( events & PICOEV_READ ) != 0 ) {
@@ -102,13 +102,13 @@ tryToReadMoreWebclient:
 }
 
 static void Webclient_HandleWrite_cb( picoev_loop * loop, int fd, int events, void * wcArgs ) {
-	struct webclient_t * webclient;
-	struct webpage_t * webpage;
+	Webclient_t * webclient;
+	Webpage_t * webpage;
 	size_t len;
 	ssize_t wroteBytes;
 	int done;
 
-	webclient = (struct webclient_t *) wcArgs;
+	webclient = (Webclient_t *) wcArgs;
 	done = 0;
 	len = 0;
 	wroteBytes = 0;
@@ -204,9 +204,9 @@ tryToWriteMoreWebclient:
 }
 
 static void Webclient_HandleConnect_cb( picoev_loop * loop, int fd, int events, void * wcArgs ) {
-	struct webclient_t * webclient;
+	Webclient_t * webclient;
 
-	webclient = (struct webclient_t *) wcArgs;
+	webclient = (Webclient_t *) wcArgs;
 	if ( ( events & PICOEV_TIMEOUT ) != 0 ) {
 		Webclient_CloseConn( webclient );
 	} else if ( ( events & PICOEV_READWRITE ) != 0 ) {
@@ -215,8 +215,8 @@ static void Webclient_HandleConnect_cb( picoev_loop * loop, int fd, int events, 
 	}
 }
 
-static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
-	struct webpage_t * webpage;
+static Webpage_t * Webpage_New( Webclient_t * webclient, const enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
+	Webpage_t * webpage;
 	UriParserStateA state;
 	size_t headerLen;
 	size_t addcrcn;
@@ -341,7 +341,7 @@ static struct webpage_t * Webpage_New( struct webclient_t * webclient, const enu
 }
 
 #define HTTP_VERSION "HTTP/1.1"
-static void Webclient_GenTopLine( struct webclient_t * webclient, struct webpage_t * webpage ) {
+static void Webclient_GenTopLine( Webclient_t * webclient, Webpage_t * webpage ) {
 	size_t modeStringLen, hostLen, topLineLen, versionLen;
 	const char * modeString;
 	struct {unsigned char good:1;
@@ -385,7 +385,7 @@ static void Webclient_GenTopLine( struct webclient_t * webclient, struct webpage
 	}
 }
 
-static void Webclient_GenHeader( struct webclient_t * webclient, struct webpage_t * webpage ) {
+static void Webclient_GenHeader( Webclient_t * webclient, Webpage_t * webpage ) {
 	size_t hostLen, connLen, headerLen;
 	struct {unsigned char good:1;} cleanUp;
 
@@ -411,7 +411,7 @@ static void Webclient_GenHeader( struct webclient_t * webclient, struct webpage_
 	}
 }
 
-static void Webpage_Delete( struct webpage_t * webpage ) {
+static void Webpage_Delete( Webpage_t * webpage ) {
 	if ( webpage->clearFuncCb != NULL && webpage->cbArgs != NULL ) {
 		webpage->clearFuncCb( webpage->cbArgs );
 	}
@@ -446,7 +446,7 @@ static void Webpage_Delete( struct webpage_t * webpage ) {
 }
 
 static void Webclient_ConnectToIp( struct dns_cb_data * dnsData ) {
-	struct webclient_t * webclient;
+	Webclient_t * webclient;
 	struct sockaddr_in serverAddr;
 	char *ip;
 	struct { unsigned char good:1;
@@ -454,7 +454,7 @@ static void Webclient_ConnectToIp( struct dns_cb_data * dnsData ) {
 
 	memset( &cleanUp, 0, sizeof( cleanUp ) );
 	ip = NULL;
-	webclient = (struct webclient_t *) dnsData->context;
+	webclient = (Webclient_t *) dnsData->context;
 	webclient->core->dns.actives--;
 	cleanUp.good = ( dnsData->addr_len > 0 );
 	if ( cleanUp.good ) {
@@ -477,7 +477,7 @@ static void Webclient_ConnectToIp( struct dns_cb_data * dnsData ) {
 	}
 }
 
-static void Webclient_Connect( struct webclient_t * webclient ) {
+static void Webclient_Connect( Webclient_t * webclient ) {
 	UriUriA * uri;
 	char portString[7];
 	size_t len;
@@ -519,9 +519,9 @@ static void Webclient_Connect( struct webclient_t * webclient ) {
 	}
 }
 
-struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb, const uint8_t timeoutSec ) {
-	struct webpage_t * webpage;
-	struct webclient_t * webclient;
+Webclient_t * Webclient_New( const Core_t * core, enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb, const uint8_t timeoutSec ) {
+	Webpage_t * webpage;
+	Webclient_t * webclient;
 	struct {unsigned char good:1;
 			unsigned char webpage:1;
 			unsigned char webclient:1;} cleanUp;
@@ -535,7 +535,7 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 		webclient->currentWebpage = NULL;
 		webclient->socketFd = 0;
 		webclient->hostName = NULL;
-		webclient->core = (struct core_t *) core;
+		webclient->core = (Core_t *) core;
 		webclient->connection = CONNECTION_CLOSE;
 		webclient->timeoutSec = (timeoutSec == 0) ? (uint8_t) PR_CFG_MODULES_WEBCLIENT_TIMEOUT_SEC: timeoutSec;
 		//  we cannot connect at this point as the host and the port are in the url
@@ -565,7 +565,7 @@ struct webclient_t * Webclient_New( const struct core_t * core, enum requestMode
 	return webclient;
 }
 
-struct webpage_t * Webclient_Queue( struct webclient_t * webclient, enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
+Webpage_t * Webclient_Queue( Webclient_t * webclient, enum requestMode_t mode, const char * url, const char * headers, const char * content, const webclientHandler_cb_t handlerCb, void * cbArgs, const clearFunc_cb_t clearFuncCb ) {
 	return Webpage_New( webclient, mode, url, headers, content, handlerCb, cbArgs, clearFuncCb );
 }
 #define CHECK_SAME_CONN( field ) do \
@@ -579,8 +579,8 @@ struct webpage_t * Webclient_Queue( struct webclient_t * webclient, enum request
 	} \
 	while ( 0 );
 
-static int Webclient_CanUseConn( struct webclient_t * webclient, struct webpage_t * webpage ) {
-	struct webpage_t * current;
+static int Webclient_CanUseConn( Webclient_t * webclient, Webpage_t * webpage ) {
+	Webpage_t * current;
 	size_t len;
 	struct {unsigned char good:1;
 			unsigned char scheme:1;
@@ -604,7 +604,7 @@ static int Webclient_CanUseConn( struct webclient_t * webclient, struct webpage_
 	return ( good.good ) ? 1 : 0;
 }
 
-static void Webclient_PushWebpage( struct webclient_t * webclient, struct webpage_t * webpage ) {
+static void Webclient_PushWebpage( Webclient_t * webclient, Webpage_t * webpage ) {
 	if ( webpage != NULL ) {
 		if ( Webclient_CanUseConn( webclient, webpage ) ) {
 			if ( webclient->webpages == NULL ) {
@@ -617,7 +617,7 @@ static void Webclient_PushWebpage( struct webclient_t * webclient, struct webpag
 	}
 }
 
-static struct webpage_t * Webclient_PopWebpage( struct webclient_t * webclient ) {
+static Webpage_t * Webclient_PopWebpage( Webclient_t * webclient ) {
 	PRCList * next;
 
 	if ( webclient->currentWebpage == NULL ) {
@@ -628,7 +628,7 @@ static struct webpage_t * Webclient_PopWebpage( struct webclient_t * webclient )
 				webclient->webpages = NULL;
 			} else {
 				next = PR_NEXT_LINK( &webclient->currentWebpage->mLink );
-				webclient->webpages = FROM_NEXT_TO_ITEM( struct webpage_t );
+				webclient->webpages = FROM_NEXT_TO_ITEM( Webpage_t );
 			}
 			PR_REMOVE_AND_INIT_LINK( &webclient->currentWebpage->mLink );
 		}
@@ -636,8 +636,8 @@ static struct webpage_t * Webclient_PopWebpage( struct webclient_t * webclient )
 	return webclient->currentWebpage;
 }
 
-void Webclient_Delete( struct webclient_t * webclient ) {
-	struct webpage_t * webpage;
+void Webclient_Delete( Webclient_t * webclient ) {
+	Webpage_t * webpage;
 	//  clean the webpages
 	if ( webclient->currentWebpage != NULL ) {
 		Webpage_Delete( webclient->currentWebpage ); webclient->currentWebpage = NULL;

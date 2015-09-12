@@ -61,7 +61,7 @@ $(OBJ_DIR)/main_server.o:			EXCEPTION =
 $(OBJ_DIR)/webserver.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion -Wno-conversion -Wno-array-bounds
 $(OBJ_DIR)/webclient.o	:			EXCEPTION = -Wno-strict-aliasing -Wno-sign-conversion -Wno-conversion
 $(OBJ_DIR)/sqlclient.o:				EXCEPTION = -Wno-conversion
-$(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return
+$(OBJ_DIR)/javascript.o:			EXCEPTION = -Wno-aggregate-return -Wno-unused-function -Wno-unused-variable -Wno-unused-macros
 $(OBJ_DIR)/core.o:					EXCEPTION = -Wno-unused-result
 $(OBJ_DIR)/utils.o:					EXCEPTION = -Wno-unused-result
 ifeq ($(CC),gcc)

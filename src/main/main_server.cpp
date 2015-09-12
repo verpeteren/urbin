@@ -7,7 +7,7 @@
 #include "../glot/javascript.h"
 
 
-static struct core_t * core;
+static Core_t * core;
 
 static void SignalHandler( const int signal ) {
 	fprintf( stdout, "Shutting down...\n" );
@@ -17,7 +17,7 @@ static void SignalHandler( const int signal ) {
 int main( int argc, const char ** argv ) {
 	int fds, maxWait;
 	PRBool isDaemon;
-	struct module_t * javascriptModule;
+	Module_t * javascriptModule;
 	char * runAsUser, * runAsGroup;
 	struct {
 		unsigned int good:1;
