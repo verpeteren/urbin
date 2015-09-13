@@ -15,24 +15,24 @@
 extern "C" {
 #endif
 
-struct script_t;
+typedef struct _Script_t Script_t;
 
-struct javascript_t {
-	struct core_t *				core;
+typedef struct _Javascript_t {
+	Core_t *					core;
 	const char *				path;
 	const char *				fileName;
 	JSRuntime *					runtime;
 	JSContext *					context;
-	struct script_t *			scripts;
+	Script_t *					scripts;
 	JSObject * 					globalObj;
-};
+} Javascript_t;
 
-struct javascript_t *			Javascript_New						( const struct core_t * core, const char * path, const char * fileName );
-void							Javascript_Delete					( struct javascript_t * javascript );
+Javascript_t *					Javascript_New						( const Core_t * core, const char * path, const char * fileName );
+void							Javascript_Delete					( Javascript_t * javascript );
 
-PRStatus		 				JavascriptModule_Load				( const struct core_t * core, struct module_t * module, void * args );
-PRStatus						JavascriptModule_Ready				( const struct core_t * core, struct module_t * module, void * args );
-PRStatus						JavascriptModule_Unload				( const struct core_t * core, struct module_t * module, void * args );
+PRStatus		 				JavascriptModule_Load				( const Core_t * core, Module_t * module, void * args );
+PRStatus						JavascriptModule_Ready				( const Core_t * core, Module_t * module, void * args );
+PRStatus						JavascriptModule_Unload				( const Core_t * core, Module_t * module, void * args );
 
 #ifdef __cplusplus
 }

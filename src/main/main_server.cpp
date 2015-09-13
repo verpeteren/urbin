@@ -34,9 +34,7 @@ int main( int argc, const char ** argv ) {
 	runAsGroup = strdup( PR_CFG_CORE_RUN_AS_GROUP );
 	maxWait = PR_CFG_CORE_MAX_FDS;
 	Boot( fds );
-	if ( cleanUp.good ) {
-		cleanUp.good = ( ( core = Core_New( isDaemon ) ) != NULL );
-	}
+	cleanUp.good = ( ( core = Core_New( isDaemon ) ) != NULL );
 	if ( cleanUp.good ) {
 		cleanUp.core = 1;
 		cleanUp.good = ( ( javascriptModule = Module_New( "javascript", JavascriptModule_Load, JavascriptModule_Ready, JavascriptModule_Unload, NULL, NULL ) ) != NULL );

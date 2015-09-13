@@ -236,8 +236,8 @@ $(LIB_NSPR_SHARED): $(DIR_MOZ)
 $(DIR_NSPR): $(DIR_MOZ)
 	@echo $@
 	@cd $(DEP_DIR) 
-	#wget -q https://ftp.mozilla.org/pub/mozilla.org/nspr/betas/v$(VER_NSPR)/src/nspr-$(VER_NSPR).tar.gz && \
-	#tar xzf nspr-$(VER_NSPR).tar.gz
+	wget -q https://ftp.mozilla.org/pub/mozilla.org/nspr/releases/v$(VER_NSPR)/src/nspr-$(VER_NSPR).tar.gz && \
+	tar -xzf nspr-$(VER_NSPR).tar.gz
 
 ###############################################################################
 # spidermonkey: embedded javascript interpreter
@@ -287,8 +287,8 @@ $(LIB_MOZ_SHARED): $(LIB_NSPR_SHARED) $(LIB_Z_SHARED)
 $(DIR_MOZ):
 	@echo $@
 	@cd $(DEP_DIR) && \
-	wget -q https://ftp.mozilla.org/pub/mozilla.org/firefox/candidates/$(VER_MOZ)-candidates/build1/source/firefox-$(VER_MOZ).source.tar.bz2 && \
-	tar -xaf firefox-$(VER_MOZ).source.tar.bz2 && \
+	wget -q https://ftp.mozilla.org/pub/mozilla.org/firefox/releases/$(VER_MOZ)/source/firefox-$(VER_MOZ).source.tar.xz && \
+	tar -xaf firefox-$(VER_MOZ).source.tar.xz && \
 	mv mozilla-beta mozilla 
 
 ###############################################################################
