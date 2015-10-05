@@ -1,8 +1,33 @@
 # Urbin
 
+
+
 [The async'd non-block'd server](http://www.urbin.info)
 
 ![benchmark](http://www.urbin.info/static/img/screenshot_benchmarks.png "benchmark on a crappy laptop")
+
+## Update: This Project is 'dead'.
+
+I have decided to abandon this project and to team up with the guys of http://www.nidium.com/. 
+
+These two projects have a lot in common:
+ * Goal wise:
+   * networking async non blocking
+   * high performance eventloop
+   * embedded javascript
+   * lots of modules out of the box
+   * ..
+   * profit
+ * Technology wise:
+   * Speed from C/C++
+   * adapting cool libraries
+   * embedded Spidermonkey from Mozilla
+   * ...
+   * fun
+
+Do not fear:
+ * as long as https://github.com/nidium/ is not there, we are working hard on cool stuff :-)
+ * as long as https://github.com/verpeteren/urbin is here, it is not lost... :-)
 
 ## Introduction
 
